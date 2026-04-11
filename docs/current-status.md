@@ -44,6 +44,9 @@ Last major verified milestone: **real 3DS settings persistence works on hardware
   - wrapped message/reply text instead of fixed preview-only truncation
   - reply paging with `L/R`
   - compact home-screen layout for longer Hermes replies
+- A dual-screen UI pass is now implemented in the client build:
+  - top screen focuses on reply/status output
+  - bottom screen focuses on actions, metadata, and page hints
 
 ### Deployment / device workflow
 - FTP deploy to the 3DS works when FTPD is open and the SD card is mounted correctly.
@@ -86,11 +89,11 @@ On desktop-verified live bridge tests, chat now also supports:
 - surfacing HTTP / auth / timeout failures as short errors
 
 ## Recommended next step
-Tighten **small-screen formatting** based on the successful real-hardware chat test:
-- improve reply wrapping / clipping on the 3DS screens
-- reduce awkward long-line rendering
-- keep replies readable when Hermes answers in multiple sentences
-- re-test on hardware after each formatting pass
+Run the next **real hardware UI validation**:
+- verify the new top/bottom split feels better on the real 3DS
+- check whether controls and page hints are readable on the bottom screen
+- confirm long replies page cleanly with `L/R`
+- note any remaining awkward wrapping or clipping to fix next
 
 ## New requested follow-ups
 - add microphone input as an option/button so the 3DS can send speech to the bridge for STT

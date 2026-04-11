@@ -10,7 +10,10 @@
 #define HOME_WRAP_WIDTH 38
 #define HOME_WRAP_MAX_LINES 128
 #define HOME_MESSAGE_LINES_PER_PAGE 3
-#define HOME_REPLY_LINES_PER_PAGE 8
+#define HOME_REPLY_LINES_PER_PAGE 10
+
+static PrintConsole top_console;
+static PrintConsole bottom_console;
 
 typedef enum AppScreen {
     APP_SCREEN_HOME = 0,
@@ -323,8 +326,7 @@ static bool prompt_message_input(char* out_message, size_t out_size)
     );
 }
 
-static void render_home_screen(
-    const HermesAppConfig* config,
+static void render_home_top_screen(
     const BridgeHealthResult* health_result,
     const BridgeChatResult* chat_result,
     const char* last_message,
@@ -333,31 +335,17 @@ static void render_home_screen(
     Result last_rc
 )
 {
-    char health_url[HERMES_APP_HEALTH_URL_MAX];
-    char token_summary[48];
     char message_lines[16][HOME_WRAP_WIDTH + 1];
     char reply_lines[HOME_WRAP_MAX_LINES][HOME_WRAP_WIDTH + 1];
     size_t message_line_count = 0;
     size_t reply_line_count = 0;
-    size_t reply_page_count = 1;
-    size_t clamped_reply_page = 0;
 
-    format_token_summary(config, token_summary, sizeof(token_summary));
-
-    if (!hermes_app_config_build_health_url(config, health_url, sizeof(health_url)))
-        snprintf(health_url, sizeof(health_url), "<invalid local config>");
-
-    if (chat_result != NULL && (chat_result->success || chat_result->error[0] != '\0')) {
-        message_line_count = wrap_text_for_console(last_message, message_lines, 16);
-        reply_line_count = wrap_text_for_console(chat_result->success ? chat_result->reply : chat_result->error, reply_lines, HOME_WRAP_MAX_LINES);
-        reply_page_count = page_count_for_lines(reply_line_count, HOME_REPLY_LINES_PER_PAGE);
-        clamped_reply_page = reply_page < reply_page_count ? reply_page : reply_page_count - 1;
-    }
+    consoleSelect(&top_console);
+    consoleClear();
 
     printf("Hermes Agent 3DS\n");
-    printf("Home\n");
-    printf("\n");
-    printf("Status: %s\n", status_line);
+    printf("=================\n");
+    printf("%s\n", status_line);
     printf("last rc: 0x%08lX\n", (unsigned long)last_rc);
 
     if (chat_result != NULL && (chat_result->success || chat_result->error[0] != '\0')) {
@@ -370,12 +358,16 @@ static void render_home_screen(
     printf("\n");
 
     if (chat_result != NULL && chat_result->success) {
+        message_line_count = wrap_text_for_console(last_message, message_lines, 16);
+        reply_line_count = wrap_text_for_console(chat_result->reply, reply_lines, HOME_WRAP_MAX_LINES);
         render_wrapped_page("Last message:", message_lines, message_line_count, 0, HOME_MESSAGE_LINES_PER_PAGE, false);
         printf("\n");
-        render_wrapped_page("Last reply:", reply_lines, reply_line_count, clamped_reply_page, HOME_REPLY_LINES_PER_PAGE, true);
+        render_wrapped_page("Last reply:", reply_lines, reply_line_count, reply_page, HOME_REPLY_LINES_PER_PAGE, true);
         if (chat_result->truncated)
             printf("(reply truncated)\n");
     } else if (chat_result != NULL && chat_result->error[0] != '\0') {
+        message_line_count = wrap_text_for_console(last_message, message_lines, 16);
+        reply_line_count = wrap_text_for_console(chat_result->error, reply_lines, HOME_WRAP_MAX_LINES);
         render_wrapped_page("Last message:", message_lines, message_line_count, 0, HOME_MESSAGE_LINES_PER_PAGE, false);
         printf("\n");
         render_wrapped_page("Chat failed:", reply_lines, reply_line_count, 0, HOME_REPLY_LINES_PER_PAGE, false);
@@ -386,57 +378,98 @@ static void render_home_screen(
         printf("service: %s\n", health_result->service);
         printf("version: %s\n", health_result->version);
         printf("http: %lu\n", (unsigned long)health_result->http_status);
-        printf("target: %s\n", health_url);
-        printf("token: %s\n", token_summary);
     } else if (health_result->error[0] != '\0') {
         printf("Bridge check failed\n");
         printf("%s\n", health_result->error);
         if (health_result->http_status != 0)
             printf("http: %lu\n", (unsigned long)health_result->http_status);
-        printf("target: %s\n", health_url);
     } else {
         printf("Press A to check bridge health.\n");
         printf("Press B to Ask Hermes.\n");
-        printf("target: %s\n", health_url);
-        printf("token: %s\n", token_summary);
     }
-
-    printf("\n");
-    printf("A: check  B: ask  X: settings\n");
-    if (chat_result != NULL && chat_result->success && reply_page_count > 1)
-        printf("L/R: reply page  Y: clear\n");
-    else
-        printf("Y: clear\n");
-    printf("START: exit\n");
 }
 
-static void render_settings_screen(const HermesAppConfig* config, SettingsField selected_field, bool settings_dirty, const char* status_line, Result last_rc)
+static void render_home_bottom_screen(
+    const HermesAppConfig* config,
+    const BridgeHealthResult* health_result,
+    const BridgeChatResult* chat_result,
+    size_t reply_page
+)
+{
+    char health_url[HERMES_APP_HEALTH_URL_MAX];
+    char token_summary[48];
+    size_t page_count = 1;
+
+    consoleSelect(&bottom_console);
+    consoleClear();
+
+    format_token_summary(config, token_summary, sizeof(token_summary));
+    if (!hermes_app_config_build_health_url(config, health_url, sizeof(health_url)))
+        snprintf(health_url, sizeof(health_url), "<invalid local config>");
+
+    if (chat_result != NULL && chat_result->success)
+        page_count = wrapped_page_count(chat_result->reply, HOME_REPLY_LINES_PER_PAGE);
+
+    printf("Target:\n%s\n", health_url);
+    printf("Token: %s\n", token_summary);
+    printf("\n");
+
+    if (health_result->success)
+        printf("Health: %s %s\n", health_result->service, health_result->version);
+    else
+        printf("Health: ready\n");
+
+    if (chat_result != NULL && chat_result->success)
+        printf("Reply page: %lu/%lu\n", (unsigned long)(reply_page + 1), (unsigned long)page_count);
+    else
+        printf("Reply page: --\n");
+
+    printf("\n");
+    printf("A check   B ask   X settings\n");
+    printf("Y clear   START exit\n");
+    if (chat_result != NULL && chat_result->success && page_count > 1)
+        printf("L prev    R next\n");
+}
+
+static void render_settings_top_screen(const HermesAppConfig* config, SettingsField selected_field, bool settings_dirty, const char* status_line, Result last_rc)
 {
     char token_summary[48];
     const char* host_cursor = selected_field == SETTINGS_FIELD_HOST ? ">" : " ";
     const char* port_cursor = selected_field == SETTINGS_FIELD_PORT ? ">" : " ";
     const char* token_cursor = selected_field == SETTINGS_FIELD_TOKEN ? ">" : " ";
 
+    consoleSelect(&top_console);
+    consoleClear();
+
     format_token_summary(config, token_summary, sizeof(token_summary));
 
     printf("Hermes Agent 3DS\n");
-    printf("\n");
     printf("Settings\n");
+    printf("========\n");
     printf("Dirty: %s\n", settings_dirty ? "yes" : "no");
+    printf("Status: %s\n", status_line);
+    printf("rc: 0x%08lX\n", (unsigned long)last_rc);
     printf("\n");
-    printf("%s Host: %s\n", host_cursor, config->host);
-    printf("%s Port: %u\n", port_cursor, (unsigned int)config->port);
-    printf("%s Token: %s\n", token_cursor, token_summary);
-    printf("\n");
-    printf("Status:\n");
-    printf("%s\n", status_line);
-    printf("last rc: 0x%08lX\n", (unsigned long)last_rc);
-    printf("\n");
+    printf("%s Host\n", host_cursor);
+    printf("  %s\n", config->host);
+    printf("%s Port\n", port_cursor);
+    printf("  %u\n", (unsigned int)config->port);
+    printf("%s Token\n", token_cursor);
+    printf("  %s\n", token_summary);
+}
+
+static void render_settings_bottom_screen(void)
+{
+    consoleSelect(&bottom_console);
+    consoleClear();
+
+    printf("Settings controls\n");
+    printf("================\n");
+    printf("UP/DOWN: select field\n");
     printf("A: edit field\n");
     printf("X: save settings\n");
-    printf("Y: defaults\n");
-    printf("B: back\n");
-    printf("UP/DOWN: select\n");
+    printf("Y: restore defaults\n");
+    printf("B: back home\n");
     printf("START: exit\n");
 }
 
@@ -453,12 +486,13 @@ static void render_ui(
     Result last_rc
 )
 {
-    consoleClear();
-
-    if (screen == APP_SCREEN_SETTINGS)
-        render_settings_screen(config, selected_field, settings_dirty, status_line, last_rc);
-    else
-        render_home_screen(config, health_result, chat_result, last_message, reply_page, status_line, last_rc);
+    if (screen == APP_SCREEN_SETTINGS) {
+        render_settings_top_screen(config, selected_field, settings_dirty, status_line, last_rc);
+        render_settings_bottom_screen();
+    } else {
+        render_home_top_screen(health_result, chat_result, last_message, reply_page, status_line, last_rc);
+        render_home_bottom_screen(config, health_result, chat_result, reply_page);
+    }
 }
 
 int main(int argc, char* argv[])
@@ -493,9 +527,10 @@ int main(int argc, char* argv[])
     else
         snprintf(status_line, sizeof(status_line), "Config load failed. Using defaults.");
 
-    // Old 3DS-friendly UI: simple console rendering, low state count, no heavy graphics.
+    // Old 3DS-friendly UI: text-first rendering split across top and bottom screens.
     gfxInitDefault();
-    consoleInit(GFX_TOP, NULL);
+    consoleInit(GFX_TOP, &top_console);
+    consoleInit(GFX_BOTTOM, &bottom_console);
 
     init_rc = acInit();
     if (R_FAILED(init_rc)) {

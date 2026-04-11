@@ -68,3 +68,15 @@ def test_main_c_wraps_and_pages_long_reply_text_for_small_screens():
     assert "KEY_R" in main_c
     assert "reply_page" in main_c
     assert "Page %lu/%lu" in main_c
+
+
+def test_main_c_uses_both_top_and_bottom_screens_for_ui():
+    main_c = (CLIENT_DIR / "source" / "main.c").read_text()
+
+    assert "PrintConsole" in main_c
+    assert "consoleInit(GFX_TOP" in main_c
+    assert "consoleInit(GFX_BOTTOM" in main_c
+    assert "consoleSelect(&top_console)" in main_c
+    assert "consoleSelect(&bottom_console)" in main_c
+    assert "render_home_top_screen" in main_c
+    assert "render_home_bottom_screen" in main_c
