@@ -1,21 +1,19 @@
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import FastAPI, Header
 from fastapi.responses import JSONResponse
 
 from hermes_3ds_bridge.auth import verify_bearer_token, verify_request_token
 from hermes_3ds_bridge.config import BridgeSettings
 from hermes_3ds_bridge.models import ChatRequest, ChatSuccessResponse, ErrorResponse, HealthResponse
-from hermes_3ds_bridge.responder import EchoResponder, Responder
+from hermes_3ds_bridge.responder import HermesCLIResponder, Responder
 from hermes_3ds_bridge.shaping import shape_reply
 
 
 
 def create_app(settings: BridgeSettings | None = None, responder: Responder | None = None) -> FastAPI:
     resolved_settings = settings or BridgeSettings.from_env()
-    resolved_responder = responder or EchoResponder()
+    resolved_responder = responder or HermesCLIResponder(resolved_settings)
 
     app = FastAPI(
         title=resolved_settings.service_name,

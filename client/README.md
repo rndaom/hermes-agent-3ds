@@ -4,21 +4,58 @@ This directory contains the Nintendo 3DS homebrew app.
 
 ## Current status
 
-The first bootstrap scaffold is in place:
+The client now has:
 - devkitPro-style project layout
 - build Makefile
-- simple console app loop
-- app metadata
-- icon placeholder
+- simple Old 3DS-friendly console UI
+- app metadata + icon placeholder
+- bridge health-check flow over HTTP
+- SD-backed config load/save
+- settings screen for host, port, and token
+- software keyboard editing for settings fields
+- first chat request / reply flow over `POST /api/v1/chat`
+- in-app rendering for the last message and last reply
 
-The first target is a lightweight `.3dsx` build that runs cleanly on an original Old 3DS.
+Current controls:
+
+### Home
+- `A` — run bridge health check
+- `B` — Ask Hermes / open the message keyboard
+- `X` — open settings
+- `Y` — clear the current status
+- `START` — exit back to Homebrew Launcher
+
+### Settings
+- `UP/DOWN` — select host / port / token
+- `A` — edit selected field
+- `X` — save settings to SD
+- `Y` — restore defaults
+- `B` — return home
+
+Config is stored at:
+
+```text
+sdmc:/3ds/hermes-agent-3ds/config.ini
+```
+
+The saved token is reused in chat requests.
 
 ## Build
 
 Install the normal 3DS devkitPro toolchain, then run:
 
 ```bash
-make
+make clean && make
 ```
 
-That should produce the first `.3dsx` bootstrap build.
+That produces the `.3dsx` build.
+
+## Default bridge target
+
+First-launch defaults still point at:
+
+```text
+http://10.75.76.156:8787/api/v1/health
+```
+
+Those defaults now live in `include/app_config.h` and are only used until the user saves their own settings.

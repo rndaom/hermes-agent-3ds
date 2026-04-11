@@ -12,9 +12,11 @@ The bridge now has:
 - auth token support
 - `GET /api/v1/health`
 - `POST /api/v1/chat`
-- basic reply truncation
+- reply truncation for 3DS-sized output
+- a real Hermes CLI connector behind the chat endpoint
+- a real 3DS client target for setup and hardware testing
 
-Right now the chat endpoint uses a temporary local responder so the API can be exercised before the real Hermes connector is wired in.
+The chat endpoint now forwards requests into Hermes through the local `hermes chat -q` CLI flow and returns a cleaned text reply.
 
 ## Environment variables
 
@@ -22,6 +24,8 @@ Right now the chat endpoint uses a temporary local responder so the API can be e
 - `HERMES_3DS_BRIDGE_PORT`
 - `HERMES_3DS_BRIDGE_AUTH_TOKEN`
 - `HERMES_3DS_BRIDGE_MAX_REPLY_CHARS`
+- `HERMES_3DS_BRIDGE_HERMES_COMMAND`
+- `HERMES_3DS_BRIDGE_HERMES_TIMEOUT_SECONDS`
 
 ## Local run
 
@@ -29,7 +33,7 @@ Right now the chat endpoint uses a temporary local responder so the API can be e
 python -m venv .venv
 . .venv/bin/activate
 pip install -e './bridge[dev]'
-export HERMES_3DS_BRIDGE_AUTH_TOKEN='change-me'
+export HERMES_3DS_BRIDGE_AUTH_TOKEN='***'
 hermes-3ds-bridge
 ```
 
@@ -43,7 +47,7 @@ Accepts JSON like:
 
 ```json
 {
-  "token": "change-me",
+  "token": "***",
   "message": "hello from my 3ds"
 }
 ```
@@ -53,9 +57,9 @@ Returns JSON like:
 ```json
 {
   "ok": true,
-  "reply": "Bridge is up, but Hermes is not connected yet. You said: hello from my 3ds",
+  "reply": "Hi from Hermes on your 3DS!",
   "truncated": false
 }
 ```
 
-The real Hermes connector is the next step.
+The bridge cleans up Hermes CLI chrome like `session_id:` lines before returning text to the 3DS.

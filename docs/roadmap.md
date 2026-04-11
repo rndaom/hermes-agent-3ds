@@ -2,18 +2,18 @@
 
 ## v1
 
-- [ ] bridge request/response schema
-- [ ] bridge service skeleton
-- [ ] health endpoint
-- [ ] chat endpoint
-- [ ] response shaping
-- [ ] 3DS app bootstrap
-- [ ] graphics/input app loop
-- [ ] SD card config load/save
-- [ ] settings screen
-- [ ] software keyboard prompt input
-- [ ] bridge networking
-- [ ] chat screen
+- [x] bridge request/response schema
+- [x] bridge service skeleton
+- [x] health endpoint
+- [x] chat endpoint
+- [x] response shaping
+- [x] 3DS app bootstrap
+- [x] graphics/input app loop
+- [x] SD card config load/save
+- [x] settings screen
+- [x] software keyboard prompt input
+- [x] bridge networking
+- [x] chat screen
 - [ ] small-screen formatting
 - [ ] installable builds
 - [ ] end-user install docs
