@@ -16,7 +16,7 @@
 #include <unistd.h>
 
 #define BRIDGE_CHAT_CONNECT_TIMEOUT_SECONDS 5
-#define BRIDGE_CHAT_IO_TIMEOUT_SECONDS 8
+#define BRIDGE_CHAT_IO_TIMEOUT_SECONDS 30
 #define BRIDGE_CHAT_RESPONSE_MAX 4096
 
 static void set_error(BridgeChatResult* result, const char* message)

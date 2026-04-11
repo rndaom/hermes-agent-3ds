@@ -56,6 +56,7 @@ Last major verified milestone: **real 3DS settings persistence works on hardware
 - Removing the `SO_ERROR` check fixed the real-hardware health check.
 - Diagnostic UI fields (`last rc`, `socket errno`, `stage`) are still present for now.
 - Hermes CLI quiet mode still emitted decorative chrome / `session_id:` lines, so the bridge now strips those before returning text to the 3DS.
+- Real Hermes replies can take longer than the first placeholder responder, so the 3DS client chat receive timeout was raised from 8 seconds to 30 seconds.
 
 ## Current known-good behavior
 On the real 3DS, the app already shows:
