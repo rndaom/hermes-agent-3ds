@@ -14,10 +14,14 @@ out/
 .vscode/
 .idea/
 .DS_Store
+.venv/
+__pycache__/
+*.pyc
 
 # Local config
 .env
 .env.*
+!bridge/.env.example
 config.local.*
 
 # Logs

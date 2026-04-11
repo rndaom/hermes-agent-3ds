@@ -1,0 +1,2 @@
+[console_scripts]
+hermes-3ds-bridge = hermes_3ds_bridge.main:run
