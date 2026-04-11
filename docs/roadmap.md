@@ -2,14 +2,24 @@
 
 ## v1
 
-- [ ] project scaffold
-- [ ] bridge API shape
-- [ ] 3DS app skeleton
+- [ ] bridge request/response schema
+- [ ] bridge service skeleton
+- [ ] health endpoint
+- [ ] chat endpoint
+- [ ] response shaping
+- [ ] 3DS app bootstrap
+- [ ] graphics/input app loop
+- [ ] SD card config load/save
 - [ ] settings screen
-- [ ] single chat flow
-- [ ] basic error handling
-- [ ] small-screen response formatting
-- [ ] install and setup docs
+- [ ] software keyboard prompt input
+- [ ] bridge networking
+- [ ] chat screen
+- [ ] small-screen formatting
+- [ ] installable builds
+- [ ] end-user install docs
+- [ ] real hardware testing
+
+See [`docs/implementation-plan.md`](implementation-plan.md) for the task breakdown.
 
 ## after v1
 
