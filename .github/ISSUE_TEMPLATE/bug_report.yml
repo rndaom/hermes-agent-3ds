@@ -1,0 +1,35 @@
+name: Bug report
+description: Report something that is broken or behaving strangely
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      placeholder: Tell us what went wrong.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect instead?
+      placeholder: Tell us what you thought would happen.
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to ...
+        2. Open ...
+        3. See issue
+  - type: textarea
+    id: environment
+    attributes:
+      label: Setup details
+      placeholder: 3DS model, firmware/homebrew setup, app version, bridge version

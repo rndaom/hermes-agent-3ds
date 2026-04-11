@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest an improvement for the app or project
+title: "idea: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What's the idea?
+      placeholder: Describe the feature in a few lines.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would this help?
+      placeholder: What problem does it solve?
+  - type: textarea
+    id: extra
+    attributes:
+      label: Extra context
+      placeholder: Mockups, examples, links, whatever helps.

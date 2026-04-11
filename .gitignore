@@ -1,0 +1,24 @@
+# Build output
+build/
+dist/
+out/
+
+# 3DS artifacts
+*.3dsx
+*.cia
+*.elf
+*.smdh
+*.bnr
+
+# Tooling
+.vscode/
+.idea/
+.DS_Store
+
+# Local config
+.env
+.env.*
+config.local.*
+
+# Logs
+*.log
