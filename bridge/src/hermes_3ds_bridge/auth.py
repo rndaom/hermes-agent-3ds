@@ -17,3 +17,10 @@ def verify_bearer_token(authorization_header: str | None, settings: BridgeSettin
         return False
 
     return compare_digest(provided_token, settings.auth_token)
+
+
+def verify_request_token(body_token: str | None, settings: BridgeSettings) -> bool:
+    if not body_token:
+        return False
+
+    return compare_digest(body_token, settings.auth_token)
