@@ -82,9 +82,8 @@ On desktop-verified live bridge tests, chat now also supports:
 - surfacing HTTP / auth / timeout failures as short errors
 
 ## Recommended next step
-Run the next **real hardware Hermes chat validation**:
-- open the app on the 3DS
-- press `B` to write a message
-- confirm the reply now comes from real Hermes instead of the placeholder responder
-- note any readability / wrapping issues on the real screens
-- then tighten small-screen formatting based on what the hardware shows
+Tighten **small-screen formatting** based on the successful real-hardware chat test:
+- improve reply wrapping / clipping on the 3DS screens
+- reduce awkward long-line rendering
+- keep replies readable when Hermes answers in multiple sentences
+- re-test on hardware after each formatting pass
