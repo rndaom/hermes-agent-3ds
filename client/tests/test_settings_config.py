@@ -21,7 +21,7 @@ def test_app_config_module_exists_with_sdmc_config_path_and_defaults():
     assert "hermes_app_config_build_health_url" in header
 
 
-def test_app_config_source_reads_and_writes_host_port_and_token():
+def test_app_config_source_reads_and_writes_host_port_token_and_device_id():
     source = (CLIENT_DIR / "source" / "app_config.c").read_text()
     assert "mkdir(" in source
     assert "fopen(" in source
@@ -30,6 +30,7 @@ def test_app_config_source_reads_and_writes_host_port_and_token():
     assert '"host=%s\\n"' in source
     assert '"port=%u\\n"' in source
     assert '"token=%s\\n"' in source
+    assert '"device_id=%s\\n"' in source
     assert "DEFAULT_BRIDGE_HOST" in source
     assert "DEFAULT_BRIDGE_PORT" in source
 
@@ -55,5 +56,6 @@ def test_main_c_has_settings_screen_navigation_and_keyboard_editing():
     assert "Host" in main_c
     assert "Port" in main_c
     assert "Token" in main_c
+    assert "Device ID" in main_c
     assert "X: settings" in main_c or "Settings" in main_c
     assert "Save settings" in main_c or "X: save" in main_c

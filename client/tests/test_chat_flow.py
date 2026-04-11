@@ -49,9 +49,18 @@ def test_main_c_offers_message_prompt_and_reply_rendering():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
 
     assert '"bridge_chat.h"' in main_c
+    assert '"bridge_v2.h"' in main_c
     assert "BridgeChatResult" in main_c
-    assert "hermes_app_config_build_chat_url" in main_c
-    assert "bridge_chat_run" in main_c
+    assert "BridgeV2MessageResult" in main_c
+    assert "BridgeV2EventPollResult" in main_c
+    assert "hermes_app_config_build_messages_url" in main_c
+    assert "hermes_app_config_build_events_url" in main_c
+    assert "bridge_v2_send_message" in main_c
+    assert "bridge_v2_poll_events" in main_c
+    assert "bridge_v2_submit_interaction" in main_c
+    assert "hermes_app_config_build_interaction_url" in main_c
+    assert "Approval required" in main_c
+    assert "Command denied." in main_c
     assert "KEY_B" in main_c
     assert "Write a message" in main_c or "Ask Hermes" in main_c
     assert "Last message" in main_c

@@ -48,6 +48,7 @@ void hermes_app_config_set_defaults(HermesAppConfig* config)
     copy_string(config->host, sizeof(config->host), DEFAULT_BRIDGE_HOST);
     config->port = DEFAULT_BRIDGE_PORT;
     config->token[0] = '\0';
+    config->device_id[0] = '\0';
 }
 
 HermesAppConfigLoadStatus hermes_app_config_load(HermesAppConfig* config)
@@ -84,6 +85,10 @@ HermesAppConfigLoadStatus hermes_app_config_load(HermesAppConfig* config)
                 config->port = (u16)port_value;
         } else if (strncmp(value, "token=", 6) == 0) {
             copy_string(config->token, sizeof(config->token), value + 6);
+        } else if (strncmp(value, "device_id=", 10) == 0) {
+            char* device_id = lstrip(value + 10);
+            if (*device_id != '\0')
+                copy_string(config->device_id, sizeof(config->device_id), device_id);
         }
     }
 
@@ -113,7 +118,8 @@ bool hermes_app_config_save(const HermesAppConfig* config)
 
     if (fprintf(file, "host=%s\n", config->host) < 0 ||
         fprintf(file, "port=%u\n", (unsigned int)config->port) < 0 ||
-        fprintf(file, "token=%s\n", config->token) < 0) {
+        fprintf(file, "token=%s\n", config->token) < 0 ||
+        fprintf(file, "device_id=%s\n", config->device_id) < 0) {
         fclose(file);
         return false;
     }
@@ -144,4 +150,41 @@ bool hermes_app_config_build_health_url(const HermesAppConfig* config, char* out
 bool hermes_app_config_build_chat_url(const HermesAppConfig* config, char* out_url, size_t out_size)
 {
     return build_url(config, "/api/v1/chat", out_url, out_size);
+}
+
+bool hermes_app_config_build_capabilities_url(const HermesAppConfig* config, char* out_url, size_t out_size)
+{
+    return build_url(config, "/api/v2/capabilities", out_url, out_size);
+}
+
+bool hermes_app_config_build_messages_url(const HermesAppConfig* config, char* out_url, size_t out_size)
+{
+    return build_url(config, "/api/v2/messages", out_url, out_size);
+}
+
+bool hermes_app_config_build_events_url(const HermesAppConfig* config, char* out_url, size_t out_size)
+{
+    return build_url(config, "/api/v2/events", out_url, out_size);
+}
+
+bool hermes_app_config_build_interaction_url(const HermesAppConfig* config, const char* request_id, char* out_url, size_t out_size)
+{
+    int written;
+
+    if (config == NULL || request_id == NULL || out_url == NULL || out_size == 0)
+        return false;
+
+    if (config->host[0] == '\0' || config->port == 0 || request_id[0] == '\0')
+        return false;
+
+    written = snprintf(
+        out_url,
+        out_size,
+        "http://%s:%u%s%s/respond",
+        config->host,
+        (unsigned int)config->port,
+        "/api/v2/interactions/",
+        request_id
+    );
+    return written > 0 && (size_t)written < out_size;
 }
