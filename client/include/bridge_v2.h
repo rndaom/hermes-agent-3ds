@@ -20,6 +20,7 @@ typedef struct BridgeV2CapabilitiesResult {
 
 typedef struct BridgeV2MessageResult {
     bool success;
+    u32 cursor;
     char chat_id[64];
     char conversation_id[BRIDGE_V2_CONVERSATION_ID_MAX];
     char message_id[BRIDGE_V2_REQUEST_ID_MAX];

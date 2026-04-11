@@ -53,6 +53,7 @@ def test_main_c_offers_message_prompt_and_reply_rendering():
     assert "BridgeChatResult" in main_c
     assert "BridgeV2MessageResult" in main_c
     assert "BridgeV2EventPollResult" in main_c
+    assert "message_result.cursor" in main_c
     assert "hermes_app_config_build_messages_url" in main_c
     assert "hermes_app_config_build_events_url" in main_c
     assert "bridge_v2_send_message" in main_c

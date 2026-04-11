@@ -770,6 +770,7 @@ int main(int argc, char* argv[])
                 if (network_ready) {
                     request_rc = bridge_v2_send_message(messages_url, config.token, config.device_id, "main", message_buffer, &message_result);
                     if (R_SUCCEEDED(request_rc) && message_result.success) {
+                        event_cursor = message_result.cursor;
                         for (poll_attempt = 0; poll_attempt < 3; poll_attempt++) {
                             request_rc = bridge_v2_poll_events(events_url, config.token, config.device_id, message_result.conversation_id[0] != '\0' ? message_result.conversation_id : "main", event_cursor, 5000, &event_result);
                             if (R_FAILED(request_rc))

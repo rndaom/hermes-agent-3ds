@@ -42,6 +42,7 @@ def test_bridge_v2_module_exists_for_native_gateway_protocol():
     assert "BridgeV2MessageResult" in header
     assert "BridgeV2EventPollResult" in header
     assert "BridgeV2InteractionResult" in header
+    assert "u32 cursor;" in header
     assert "bridge_v2_get_capabilities" in header
     assert "bridge_v2_send_message" in header
     assert "bridge_v2_poll_events" in header
@@ -51,6 +52,7 @@ def test_bridge_v2_module_exists_for_native_gateway_protocol():
     assert "bridge_v2_send_message" in source or '"/api/v2/messages"' in source
     assert "device_id" in source
     assert "conversation_id" in source
+    assert "extract_json_u32(response_body, \"cursor\"" in source
     assert "cursor" in source
     assert "wait" in source
     assert "approval.request" in source

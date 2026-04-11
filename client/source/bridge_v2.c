@@ -680,6 +680,8 @@ Result bridge_v2_send_message(const char* url, const char* token, const char* de
         set_error(result->error, sizeof(result->error), "Message acknowledgement was incomplete.");
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
+    if (extract_json_u32(response_body, "cursor", &result->cursor) == false)
+        result->cursor = 0;
 
     result->success = true;
     result->error[0] = '\0';
