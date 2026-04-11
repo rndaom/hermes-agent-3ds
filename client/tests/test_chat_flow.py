@@ -57,3 +57,14 @@ def test_main_c_offers_message_prompt_and_reply_rendering():
     assert "Last reply" in main_c
     assert "swkbdInputText" in main_c
     assert "Checking bridge..." in main_c
+
+
+def test_main_c_wraps_and_pages_long_reply_text_for_small_screens():
+    main_c = (CLIENT_DIR / "source" / "main.c").read_text()
+
+    assert "wrap_text_for_console" in main_c
+    assert "render_wrapped_page" in main_c
+    assert "KEY_L" in main_c
+    assert "KEY_R" in main_c
+    assert "reply_page" in main_c
+    assert "Page %lu/%lu" in main_c

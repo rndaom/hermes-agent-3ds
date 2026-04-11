@@ -7,6 +7,11 @@
 #include "bridge_chat.h"
 #include "bridge_health.h"
 
+#define HOME_WRAP_WIDTH 38
+#define HOME_WRAP_MAX_LINES 128
+#define HOME_MESSAGE_LINES_PER_PAGE 3
+#define HOME_REPLY_LINES_PER_PAGE 8
+
 typedef enum AppScreen {
     APP_SCREEN_HOME = 0,
     APP_SCREEN_SETTINGS = 1,
@@ -67,32 +72,158 @@ static void format_token_summary(const HermesAppConfig* config, char* out, size_
         snprintf(out, out_size, "configured (%lu chars)", (unsigned long)token_length);
 }
 
-static void format_preview_text(const char* input, char* out, size_t out_size)
+static void add_truncation_marker(char* line)
 {
-    size_t input_length;
+    size_t length;
 
-    if (out == NULL || out_size == 0)
+    if (line == NULL)
         return;
+
+    length = strlen(line);
+    if (HOME_WRAP_WIDTH == 0)
+        return;
+
+    if (length == 0) {
+        line[0] = '~';
+        line[1] = '\0';
+        return;
+    }
+
+    if (length >= HOME_WRAP_WIDTH)
+        line[HOME_WRAP_WIDTH - 1] = '~';
+    else {
+        line[length] = '~';
+        line[length + 1] = '\0';
+    }
+}
+
+static size_t wrap_text_for_console(const char* input, char lines[][HOME_WRAP_WIDTH + 1], size_t max_lines)
+{
+    const char* cursor;
+    size_t line_count = 0;
+
+    if (lines == NULL || max_lines == 0)
+        return 0;
 
     if (input == NULL || input[0] == '\0') {
-        snprintf(out, out_size, "<none>");
-        return;
+        copy_bounded_string(lines[0], HOME_WRAP_WIDTH + 1, "<none>");
+        return 1;
     }
 
-    input_length = strlen(input);
-    if (input_length + 1 < out_size) {
-        snprintf(out, out_size, "%s", input);
-        return;
+    cursor = input;
+    while (*cursor != '\0' && line_count < max_lines) {
+        char line[HOME_WRAP_WIDTH + 1];
+        size_t line_len = 0;
+
+        if (*cursor == '\n') {
+            lines[line_count][0] = '\0';
+            line_count++;
+            cursor++;
+            continue;
+        }
+
+        while (*cursor == ' ' || *cursor == '\t' || *cursor == '\r')
+            cursor++;
+
+        while (*cursor != '\0' && *cursor != '\n') {
+            const char* word_start;
+            size_t word_len = 0;
+            size_t needed;
+
+            while (*cursor == ' ' || *cursor == '\t' || *cursor == '\r')
+                cursor++;
+            if (*cursor == '\0' || *cursor == '\n')
+                break;
+
+            word_start = cursor;
+            while (word_start[word_len] != '\0' &&
+                   word_start[word_len] != ' ' &&
+                   word_start[word_len] != '\t' &&
+                   word_start[word_len] != '\r' &&
+                   word_start[word_len] != '\n')
+                word_len++;
+
+            if (line_len == 0 && word_len > HOME_WRAP_WIDTH) {
+                memcpy(line, word_start, HOME_WRAP_WIDTH);
+                line[HOME_WRAP_WIDTH] = '\0';
+                cursor = word_start + HOME_WRAP_WIDTH;
+                line_len = HOME_WRAP_WIDTH;
+                break;
+            }
+
+            needed = word_len + (line_len > 0 ? 1 : 0);
+            if (line_len + needed > HOME_WRAP_WIDTH)
+                break;
+
+            if (line_len > 0)
+                line[line_len++] = ' ';
+
+            memcpy(line + line_len, word_start, word_len);
+            line_len += word_len;
+            line[line_len] = '\0';
+            cursor = word_start + word_len;
+        }
+
+        if (line_len == 0) {
+            line[0] = '\0';
+            if (*cursor == '\n')
+                cursor++;
+        }
+
+        copy_bounded_string(lines[line_count], HOME_WRAP_WIDTH + 1, line);
+        line_count++;
+
+        if (*cursor == '\n')
+            cursor++;
     }
 
-    if (out_size <= 2) {
-        out[0] = '\0';
-        return;
+    if (*cursor != '\0' && line_count > 0)
+        add_truncation_marker(lines[line_count - 1]);
+
+    if (line_count == 0) {
+        copy_bounded_string(lines[0], HOME_WRAP_WIDTH + 1, "<none>");
+        return 1;
     }
 
-    memcpy(out, input, out_size - 2);
-    out[out_size - 2] = '~';
-    out[out_size - 1] = '\0';
+    return line_count;
+}
+
+static size_t page_count_for_lines(size_t total_lines, size_t lines_per_page)
+{
+    if (total_lines == 0 || lines_per_page == 0)
+        return 1;
+
+    return (total_lines + lines_per_page - 1) / lines_per_page;
+}
+
+static size_t wrapped_page_count(const char* input, size_t lines_per_page)
+{
+    char wrapped_lines[HOME_WRAP_MAX_LINES][HOME_WRAP_WIDTH + 1];
+    size_t total_lines = wrap_text_for_console(input, wrapped_lines, HOME_WRAP_MAX_LINES);
+    return page_count_for_lines(total_lines, lines_per_page);
+}
+
+static void render_wrapped_page(
+    const char* label,
+    char lines[][HOME_WRAP_WIDTH + 1],
+    size_t total_lines,
+    size_t page,
+    size_t lines_per_page,
+    bool show_page_indicator
+)
+{
+    size_t page_count = page_count_for_lines(total_lines, lines_per_page);
+    size_t clamped_page = page < page_count ? page : page_count - 1;
+    size_t start = clamped_page * lines_per_page;
+    size_t end = start + lines_per_page;
+    size_t index;
+
+    printf("%s\n", label);
+    for (index = start; index < total_lines && index < end; index++)
+        printf("%s\n", lines[index]);
+
+    if (show_page_indicator)
+        printf("Page %lu/%lu\n", (unsigned long)(clamped_page + 1), (unsigned long)page_count);
 }
 
 static bool prompt_text_input(SwkbdType type, const char* hint, const char* initial_text, char* out_text, size_t out_size, bool password_mode)
@@ -197,32 +328,36 @@ static void render_home_screen(
     const BridgeHealthResult* health_result,
     const BridgeChatResult* chat_result,
     const char* last_message,
+    size_t reply_page,
     const char* status_line,
     Result last_rc
 )
 {
     char health_url[HERMES_APP_HEALTH_URL_MAX];
     char token_summary[48];
-    char message_preview[96];
-    char reply_preview[256];
+    char message_lines[16][HOME_WRAP_WIDTH + 1];
+    char reply_lines[HOME_WRAP_MAX_LINES][HOME_WRAP_WIDTH + 1];
+    size_t message_line_count = 0;
+    size_t reply_line_count = 0;
+    size_t reply_page_count = 1;
+    size_t clamped_reply_page = 0;
 
     format_token_summary(config, token_summary, sizeof(token_summary));
-    format_preview_text(last_message, message_preview, sizeof(message_preview));
-    format_preview_text(chat_result != NULL ? chat_result->reply : NULL, reply_preview, sizeof(reply_preview));
 
     if (!hermes_app_config_build_health_url(config, health_url, sizeof(health_url)))
         snprintf(health_url, sizeof(health_url), "<invalid local config>");
 
+    if (chat_result != NULL && (chat_result->success || chat_result->error[0] != '\0')) {
+        message_line_count = wrap_text_for_console(last_message, message_lines, 16);
+        reply_line_count = wrap_text_for_console(chat_result->success ? chat_result->reply : chat_result->error, reply_lines, HOME_WRAP_MAX_LINES);
+        reply_page_count = page_count_for_lines(reply_line_count, HOME_REPLY_LINES_PER_PAGE);
+        clamped_reply_page = reply_page < reply_page_count ? reply_page : reply_page_count - 1;
+    }
+
     printf("Hermes Agent 3DS\n");
-    printf("\n");
     printf("Home\n");
     printf("\n");
-    printf("Target:\n");
-    printf("%s\n", health_url);
-    printf("Token: %s\n", token_summary);
-    printf("\n");
-    printf("Status:\n");
-    printf("%s\n", status_line);
+    printf("Status: %s\n", status_line);
     printf("last rc: 0x%08lX\n", (unsigned long)last_rc);
 
     if (chat_result != NULL && (chat_result->success || chat_result->error[0] != '\0')) {
@@ -235,19 +370,15 @@ static void render_home_screen(
     printf("\n");
 
     if (chat_result != NULL && chat_result->success) {
-        printf("Last message:\n");
-        printf("%s\n", message_preview);
+        render_wrapped_page("Last message:", message_lines, message_line_count, 0, HOME_MESSAGE_LINES_PER_PAGE, false);
         printf("\n");
-        printf("Last reply:\n");
-        printf("%s\n", reply_preview);
+        render_wrapped_page("Last reply:", reply_lines, reply_line_count, clamped_reply_page, HOME_REPLY_LINES_PER_PAGE, true);
         if (chat_result->truncated)
             printf("(reply truncated)\n");
     } else if (chat_result != NULL && chat_result->error[0] != '\0') {
-        printf("Last message:\n");
-        printf("%s\n", message_preview);
+        render_wrapped_page("Last message:", message_lines, message_line_count, 0, HOME_MESSAGE_LINES_PER_PAGE, false);
         printf("\n");
-        printf("Chat failed\n");
-        printf("%s\n", chat_result->error);
+        render_wrapped_page("Chat failed:", reply_lines, reply_line_count, 0, HOME_REPLY_LINES_PER_PAGE, false);
         if (chat_result->http_status != 0)
             printf("http: %lu\n", (unsigned long)chat_result->http_status);
     } else if (health_result->success) {
@@ -255,21 +386,27 @@ static void render_home_screen(
         printf("service: %s\n", health_result->service);
         printf("version: %s\n", health_result->version);
         printf("http: %lu\n", (unsigned long)health_result->http_status);
+        printf("target: %s\n", health_url);
+        printf("token: %s\n", token_summary);
     } else if (health_result->error[0] != '\0') {
         printf("Bridge check failed\n");
         printf("%s\n", health_result->error);
         if (health_result->http_status != 0)
             printf("http: %lu\n", (unsigned long)health_result->http_status);
+        printf("target: %s\n", health_url);
     } else {
         printf("Press A to check bridge health.\n");
         printf("Press B to Ask Hermes.\n");
+        printf("target: %s\n", health_url);
+        printf("token: %s\n", token_summary);
     }
 
     printf("\n");
-    printf("A: check bridge\n");
-    printf("B: Ask Hermes\n");
-    printf("X: settings\n");
-    printf("Y: clear status\n");
+    printf("A: check  B: ask  X: settings\n");
+    if (chat_result != NULL && chat_result->success && reply_page_count > 1)
+        printf("L/R: reply page  Y: clear\n");
+    else
+        printf("Y: clear\n");
     printf("START: exit\n");
 }
 
@@ -311,6 +448,7 @@ static void render_ui(
     const BridgeHealthResult* health_result,
     const BridgeChatResult* chat_result,
     const char* last_message,
+    size_t reply_page,
     const char* status_line,
     Result last_rc
 )
@@ -320,7 +458,7 @@ static void render_ui(
     if (screen == APP_SCREEN_SETTINGS)
         render_settings_screen(config, selected_field, settings_dirty, status_line, last_rc);
     else
-        render_home_screen(config, health_result, chat_result, last_message, status_line, last_rc);
+        render_home_screen(config, health_result, chat_result, last_message, reply_page, status_line, last_rc);
 }
 
 int main(int argc, char* argv[])
@@ -338,6 +476,7 @@ int main(int argc, char* argv[])
     BridgeChatResult chat_result;
     char last_message[BRIDGE_CHAT_MESSAGE_MAX];
     char status_line[BRIDGE_CHAT_ERROR_MAX];
+    size_t reply_page = 0;
 
     (void)argc;
     (void)argv;
@@ -371,7 +510,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, status_line, init_rc);
+    render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, init_rc);
 
     while (aptMainLoop())
     {
@@ -389,15 +528,28 @@ int main(int argc, char* argv[])
                 bridge_health_result_reset(&health_result);
                 bridge_chat_result_reset(&chat_result);
                 last_message[0] = '\0';
+                reply_page = 0;
                 request_rc = 0;
                 snprintf(status_line, sizeof(status_line), "Status cleared. Ready to test again.");
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, status_line, request_rc);
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
 
             if ((kDown & KEY_X) != 0) {
                 screen = APP_SCREEN_SETTINGS;
                 snprintf(status_line, sizeof(status_line), "Settings opened.");
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, status_line, request_rc);
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
+            }
+
+            if ((kDown & KEY_L) != 0 && chat_result.success && reply_page > 0) {
+                reply_page--;
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
+            }
+
+            if ((kDown & KEY_R) != 0 && chat_result.success) {
+                size_t page_count = wrapped_page_count(chat_result.reply, HOME_REPLY_LINES_PER_PAGE);
+                if (reply_page + 1 < page_count)
+                    reply_page++;
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
 
             if ((kDown & KEY_A) != 0) {
@@ -405,15 +557,16 @@ int main(int argc, char* argv[])
 
                 bridge_health_result_reset(&health_result);
                 request_rc = 0;
+                reply_page = 0;
 
                 if (!hermes_app_config_build_health_url(&config, health_url, sizeof(health_url))) {
                     snprintf(status_line, sizeof(status_line), "Local config is incomplete.");
-                    render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, status_line, request_rc);
+                    render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
                     continue;
                 }
 
                 snprintf(status_line, sizeof(status_line), "Checking bridge...");
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, status_line, request_rc);
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
                 gfxFlushBuffers();
                 gfxSwapBuffers();
                 gspWaitForVBlank();
@@ -430,7 +583,7 @@ int main(int argc, char* argv[])
                     snprintf(status_line, sizeof(status_line), "Networking services failed to start.");
                 }
 
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, status_line, request_rc);
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
 
             if ((kDown & KEY_B) != 0) {
@@ -440,22 +593,23 @@ int main(int argc, char* argv[])
                 message_buffer[0] = '\0';
                 if (!prompt_message_input(message_buffer, sizeof(message_buffer))) {
                     snprintf(status_line, sizeof(status_line), "Ask Hermes canceled.");
-                    render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, status_line, request_rc);
+                    render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
                     continue;
                 }
 
                 copy_bounded_string(last_message, sizeof(last_message), message_buffer);
                 bridge_chat_result_reset(&chat_result);
                 request_rc = 0;
+                reply_page = 0;
 
                 if (!hermes_app_config_build_chat_url(&config, chat_url, sizeof(chat_url))) {
                     snprintf(status_line, sizeof(status_line), "Local config is incomplete.");
-                    render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, status_line, request_rc);
+                    render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
                     continue;
                 }
 
                 snprintf(status_line, sizeof(status_line), "Asking Hermes...");
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, status_line, request_rc);
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
                 gfxFlushBuffers();
                 gfxSwapBuffers();
                 gspWaitForVBlank();
@@ -472,13 +626,13 @@ int main(int argc, char* argv[])
                     snprintf(status_line, sizeof(status_line), "Networking services failed to start.");
                 }
 
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, status_line, request_rc);
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
         } else {
             if ((kDown & KEY_B) != 0) {
                 screen = APP_SCREEN_HOME;
                 snprintf(status_line, sizeof(status_line), settings_dirty ? "Settings closed with unsaved changes." : "Returned home.");
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, status_line, request_rc);
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
 
             if ((kDown & KEY_UP) != 0) {
@@ -487,26 +641,26 @@ int main(int argc, char* argv[])
                 else
                     selected_field = (SettingsField)(selected_field - 1);
                 snprintf(status_line, sizeof(status_line), "Selected %s.", settings_field_label(selected_field));
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, status_line, request_rc);
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
 
             if ((kDown & KEY_DOWN) != 0) {
                 selected_field = (SettingsField)((selected_field + 1) % SETTINGS_FIELD_COUNT);
                 snprintf(status_line, sizeof(status_line), "Selected %s.", settings_field_label(selected_field));
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, status_line, request_rc);
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
 
             if ((kDown & KEY_Y) != 0) {
                 hermes_app_config_set_defaults(&config);
                 settings_dirty = true;
                 snprintf(status_line, sizeof(status_line), "Defaults restored. Save settings to keep them.");
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, status_line, request_rc);
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
 
             if ((kDown & KEY_A) != 0) {
                 if (edit_selected_setting(&config, selected_field, status_line, sizeof(status_line)))
                     settings_dirty = true;
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, status_line, request_rc);
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
 
             if ((kDown & KEY_X) != 0) {
@@ -516,7 +670,7 @@ int main(int argc, char* argv[])
                 } else {
                     snprintf(status_line, sizeof(status_line), "Could not save settings to SD card.");
                 }
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, status_line, request_rc);
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
         }
 

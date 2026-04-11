@@ -40,6 +40,10 @@ Last major verified milestone: **real 3DS settings persistence works on hardware
   - token included in the request body
   - last message / last reply rendered on-screen
   - friendly error rendering for failed chat requests
+- A first small-screen formatting pass is now implemented in the client build:
+  - wrapped message/reply text instead of fixed preview-only truncation
+  - reply paging with `L/R`
+  - compact home-screen layout for longer Hermes replies
 
 ### Deployment / device workflow
 - FTP deploy to the 3DS works when FTPD is open and the SD card is mounted correctly.
@@ -87,3 +91,8 @@ Tighten **small-screen formatting** based on the successful real-hardware chat t
 - reduce awkward long-line rendering
 - keep replies readable when Hermes answers in multiple sentences
 - re-test on hardware after each formatting pass
+
+## New requested follow-ups
+- add microphone input as an option/button so the 3DS can send speech to the bridge for STT
+- replace the placeholder app image/icon with the provided portrait artwork
+- keep host-side Hermes capabilities available through the bridge flow
