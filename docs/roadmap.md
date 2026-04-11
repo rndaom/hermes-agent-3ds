@@ -14,10 +14,10 @@
 - [x] software keyboard prompt input
 - [x] bridge networking
 - [x] chat screen
-- [ ] small-screen formatting
-- [ ] installable builds
-- [ ] end-user install docs
-- [ ] real hardware testing
+- [x] small-screen formatting
+- [x] installable builds
+- [x] end-user install docs
+- [x] real hardware testing
 
 See [`docs/implementation-plan.md`](implementation-plan.md) for the task breakdown.
 
@@ -28,6 +28,8 @@ See [`docs/implementation-plan.md`](implementation-plan.md) for the task breakdo
 - [ ] response streaming or paging
 - [ ] QR-based setup
 - [ ] optional presets/macros
+- [ ] microphone input option on 3DS with bridge-side speech-to-text
+- [ ] replace placeholder app art/icon with the provided portrait image asset
 
 ## maybe later
 

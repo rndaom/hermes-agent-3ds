@@ -2,6 +2,7 @@
 build/
 dist/
 out/
+release/
 
 # 3DS artifacts
 *.3dsx

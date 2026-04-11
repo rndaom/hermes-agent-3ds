@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from hermes_3ds_bridge.auth import verify_bearer_token, verify_request_token
 from hermes_3ds_bridge.config import BridgeSettings
 from hermes_3ds_bridge.models import ChatRequest, ChatSuccessResponse, ErrorResponse, HealthResponse
-from hermes_3ds_bridge.responder import HermesCLIResponder, Responder
+from hermes_3ds_bridge.responder import HermesCLIResponder, HermesTimeoutError, Responder
 from hermes_3ds_bridge.shaping import shape_reply
 
 
@@ -64,6 +64,11 @@ def create_app(settings: BridgeSettings | None = None, responder: Responder | No
                 message=payload.message.strip(),
                 context=context,
                 client=payload.client,
+            )
+        except HermesTimeoutError as exc:
+            return JSONResponse(
+                status_code=504,
+                content=ErrorResponse(error=str(exc)).model_dump(),
             )
         except Exception:
             return JSONResponse(

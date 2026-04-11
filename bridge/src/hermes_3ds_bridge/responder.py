@@ -6,6 +6,10 @@ from typing import Any, Protocol
 from hermes_3ds_bridge.config import BridgeSettings
 
 
+class HermesTimeoutError(RuntimeError):
+    pass
+
+
 class Responder(Protocol):
     def generate_reply(self, *, message: str, context: list[dict[str, str]], client: dict[str, Any] | None) -> str: ...
 
@@ -18,6 +22,32 @@ class EchoResponder:
 class HermesCLIResponder:
     def __init__(self, settings: BridgeSettings):
         self.settings = settings
+
+    def _collapse_repeated_leading_block(self, cleaned_reply: str) -> str:
+        lines = cleaned_reply.splitlines()
+
+        if len(lines) < 8:
+            return cleaned_reply
+
+        for start in range(1, len(lines)):
+            if lines[start] != lines[0]:
+                continue
+
+            overlap = min(start, len(lines) - start)
+            matched = 0
+            while matched < overlap and lines[matched] == lines[start + matched]:
+                matched += 1
+
+            if matched < 4:
+                continue
+
+            matched_block = "\n".join(lines[:matched]).strip()
+            if len(matched_block) < 80:
+                continue
+
+            return "\n".join(lines[start:]).strip()
+
+        return cleaned_reply
 
     def _build_prompt(self, *, message: str, context: list[dict[str, str]], client: dict[str, Any] | None) -> str:
         lines = [
@@ -61,7 +91,7 @@ class HermesCLIResponder:
             cleaned_lines.append(line)
 
         cleaned = "\n".join(cleaned_lines).strip()
-        return cleaned
+        return self._collapse_repeated_leading_block(cleaned)
 
     def generate_reply(self, *, message: str, context: list[dict[str, str]], client: dict[str, Any] | None) -> str:
         prompt = self._build_prompt(message=message, context=context, client=client)
@@ -74,13 +104,16 @@ class HermesCLIResponder:
             "--source",
             "tool",
         ]
-        completed = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=self.settings.hermes_timeout_seconds,
-            check=False,
-        )
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=self.settings.hermes_timeout_seconds,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise HermesTimeoutError("Hermes took too long on the host. Try a shorter request.") from exc
 
         if completed.returncode != 0:
             stderr = (completed.stderr or "").strip()

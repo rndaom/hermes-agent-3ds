@@ -391,12 +391,10 @@ static void render_home_top_screen(
 
 static void render_home_bottom_screen(
     const HermesAppConfig* config,
-    const BridgeHealthResult* health_result,
-    const BridgeChatResult* chat_result,
-    size_t reply_page
+    const BridgeChatResult* chat_result
 )
 {
-    char health_url[HERMES_APP_HEALTH_URL_MAX];
+    char bridge_summary[80];
     char token_summary[48];
     size_t page_count = 1;
 
@@ -404,31 +402,20 @@ static void render_home_bottom_screen(
     consoleClear();
 
     format_token_summary(config, token_summary, sizeof(token_summary));
-    if (!hermes_app_config_build_health_url(config, health_url, sizeof(health_url)))
-        snprintf(health_url, sizeof(health_url), "<invalid local config>");
+    snprintf(bridge_summary, sizeof(bridge_summary), "%s:%u", config->host, (unsigned int)config->port);
 
     if (chat_result != NULL && chat_result->success)
         page_count = wrapped_page_count(chat_result->reply, HOME_REPLY_LINES_PER_PAGE);
 
-    printf("Target:\n%s\n", health_url);
+    printf("Bridge:\n%s\n", bridge_summary);
     printf("Token: %s\n", token_summary);
-    printf("\n");
-
-    if (health_result->success)
-        printf("Health: %s %s\n", health_result->service, health_result->version);
-    else
-        printf("Health: ready\n");
-
-    if (chat_result != NULL && chat_result->success)
-        printf("Reply page: %lu/%lu\n", (unsigned long)(reply_page + 1), (unsigned long)page_count);
-    else
-        printf("Reply page: --\n");
-
     printf("\n");
     printf("A check   B ask   X settings\n");
     printf("Y clear   START exit\n");
     if (chat_result != NULL && chat_result->success && page_count > 1)
-        printf("L prev    R next\n");
+        printf("L/R page reply\n");
+    else
+        printf("L/R when reply is long\n");
 }
 
 static void render_settings_top_screen(const HermesAppConfig* config, SettingsField selected_field, bool settings_dirty, const char* status_line, Result last_rc)
@@ -491,7 +478,7 @@ static void render_ui(
         render_settings_bottom_screen();
     } else {
         render_home_top_screen(health_result, chat_result, last_message, reply_page, status_line, last_rc);
-        render_home_bottom_screen(config, health_result, chat_result, reply_page);
+        render_home_bottom_screen(config, chat_result);
     }
 }
 

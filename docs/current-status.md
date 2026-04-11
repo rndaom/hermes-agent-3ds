@@ -1,6 +1,6 @@
 # Current status
 
-Last major verified milestone: **real 3DS settings persistence works on hardware; the bridge is now connected to real Hermes and returns cleaned replies**.
+Last major verified milestone: **the packaged v1 flow now passes real 3DS hardware validation end-to-end, including health checks, chat, long replies, paging, timeout handling, and duplicate-reply cleanup**.
 
 ## What is done
 
@@ -47,6 +47,13 @@ Last major verified milestone: **real 3DS settings persistence works on hardware
 - A dual-screen UI pass is now implemented in the client build:
   - top screen focuses on reply/status output
   - bottom screen focuses on actions, metadata, and page hints
+- The bottom screen has now been trimmed to avoid duplicating status/output that already appears on the top screen.
+- A release packaging target now exists in `client/Makefile`:
+  - `make release RELEASE_VERSION=<name>`
+  - outputs a zip with the Homebrew Launcher folder layout
+- End-user install docs now exist in:
+  - `README.md`
+  - `docs/install.md`
 
 ### Deployment / device workflow
 - FTP deploy to the 3DS works when FTPD is open and the SD card is mounted correctly.
@@ -63,7 +70,8 @@ Last major verified milestone: **real 3DS settings persistence works on hardware
 - Removing the `SO_ERROR` check fixed the real-hardware health check.
 - Diagnostic UI fields (`last rc`, `socket errno`, `stage`) are still present for now.
 - Hermes CLI quiet mode still emitted decorative chrome / `session_id:` lines, so the bridge now strips those before returning text to the 3DS.
-- Real Hermes replies can take longer than the first placeholder responder, so the 3DS client chat receive timeout was raised from 8 seconds to 30 seconds.
+- Real Hermes replies can take much longer than the first placeholder responder, so the 3DS client chat receive timeout was raised from 8 seconds to 180 seconds.
+- Some Hermes CLI replies repeated the same content block twice; the bridge now collapses repeated consecutive leading reply blocks before returning text to the 3DS.
 
 ## Current known-good behavior
 On the real 3DS, the app already shows:
@@ -81,19 +89,23 @@ On real hardware, the current app already supports:
 - reopening settings and seeing persisted values
 - reusing saved settings for health checks
 
-On desktop-verified live bridge tests, chat now also supports:
+On desktop-verified and real-hardware live bridge tests, chat now also supports:
 - entering a prompt with the software keyboard
 - sending chat requests to `/api/v1/chat`
 - forwarding the prompt into real Hermes
 - returning a cleaned text reply like `Hi from Hermes on your 3DS!`
 - surfacing HTTP / auth / timeout failures as short errors
 
+The latest real-hardware release-validation pass confirmed:
+- packaged install/update flow works on the real 3DS
+- health check passes
+- short chat passes
+- long/slower chat passes
+- reply paging passes
+- duplicate response blocks are no longer shown
+
 ## Recommended next step
-Run the next **real hardware UI validation**:
-- verify the new top/bottom split feels better on the real 3DS
-- check whether controls and page hints are readable on the bottom screen
-- confirm long replies page cleanly with `L/R`
-- note any remaining awkward wrapping or clipping to fix next
+Core v1 scope is now complete. The next work should come from the post-v1 follow-ups below, with timeout/session behavior tracked separately in GitHub issue #10.
 
 ## New requested follow-ups
 - add microphone input as an option/button so the 3DS can send speech to the bridge for STT

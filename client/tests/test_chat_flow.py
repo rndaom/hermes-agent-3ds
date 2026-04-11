@@ -37,7 +37,8 @@ def test_bridge_chat_module_exists_and_posts_json_to_chat_endpoint():
     assert 'app_version' in source
     assert "recv(" in source
     assert "BRIDGE_CHAT_IO_TIMEOUT_SECONDS" in source
-    assert "#define BRIDGE_CHAT_IO_TIMEOUT_SECONDS 30" in source
+    assert "#define BRIDGE_CHAT_IO_TIMEOUT_SECONDS 180" in source
+    assert "Timed out waiting for a Hermes reply." in source
     assert "extract_json_string(response_body, \"reply\"" in source
     assert "extract_json_string(response_body, \"error\"" in source
     assert '"\\\"truncated\\\":true"' in source

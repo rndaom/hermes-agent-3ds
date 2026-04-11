@@ -24,6 +24,9 @@ APP_TITLE	:=	Hermes Agent 3DS
 APP_DESCRIPTION	:=	Tiny Hermes client for modded 3DS systems.
 APP_AUTHOR	:=	rndaom
 ICON		:=	icon.png
+RELEASE_VERSION ?= dev
+RELEASE_ROOT := release/$(TARGET)-$(RELEASE_VERSION)
+RELEASE_APP_DIR := $(RELEASE_ROOT)/3ds/$(TARGET)
 
 #---------------------------------------------------------------------------------
 # Old 3DS-friendly defaults
@@ -87,10 +90,24 @@ export _3DSXDEPS	:=	$(OUTPUT).smdh
 export APP_ICON := $(TOPDIR)/$(ICON)
 export _3DSXFLAGS += --smdh=$(CURDIR)/$(TARGET).smdh
 
-.PHONY: all clean
+.PHONY: all clean release package
 
 all: $(BUILD) $(GFXBUILD) $(DEPSDIR)
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+
+release: all package
+
+package: all
+	@echo package ...
+	@rm -rf $(RELEASE_ROOT) $(RELEASE_ROOT).zip
+	@mkdir -p $(RELEASE_APP_DIR)
+	@cp $(TARGET).3dsx $(RELEASE_APP_DIR)/$(TARGET).3dsx
+	@cp $(TARGET).smdh $(RELEASE_APP_DIR)/$(TARGET).smdh
+	@cp README.md $(RELEASE_ROOT)/README.md
+	@python3 -m zipfile -c $(RELEASE_ROOT).zip \
+		$(RELEASE_ROOT)/README.md \
+		$(RELEASE_APP_DIR)/$(TARGET).3dsx \
+		$(RELEASE_APP_DIR)/$(TARGET).smdh
 
 $(BUILD):
 	@mkdir -p $@

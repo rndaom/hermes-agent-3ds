@@ -88,3 +88,42 @@ def test_hermes_cli_responder_raises_for_empty_stdout(monkeypatch, settings):
     responder = HermesCLIResponder(settings)
     with pytest.raises(RuntimeError, match="empty"):
         responder.generate_reply(message="hello", context=[], client=None)
+
+
+def test_hermes_cli_responder_collapses_repeated_consecutive_reply_blocks(monkeypatch, settings):
+    duplicated = (
+        "╭─ ⚕ Hermes ─────────╮\n"
+        "Top 3 right now:\n\n"
+        "1. Story one\n"
+        "2. Story two\n"
+        "3. Story three\n\n"
+        "If you want, I can also give:\n"
+        "- US-only top 3\n"
+        "- world-only top 3\n"
+        "Top 3 right now:\n\n"
+        "1. Story one\n"
+        "2. Story two\n"
+        "3. Story three\n\n"
+        "If you want, I can also give:\n"
+        "- US-only top 3\n"
+        "- world-only top 3\n"
+        "- tech top 3\n\n"
+        "session_id: abc123\n"
+    )
+
+    def fake_run(command: list[str], capture_output: bool, text: bool, timeout: int, check: bool):
+        return subprocess.CompletedProcess(command, 0, stdout=duplicated, stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    responder = HermesCLIResponder(settings)
+    assert responder.generate_reply(message="hello", context=[], client=None) == (
+        "Top 3 right now:\n\n"
+        "1. Story one\n"
+        "2. Story two\n"
+        "3. Story three\n\n"
+        "If you want, I can also give:\n"
+        "- US-only top 3\n"
+        "- world-only top 3\n"
+        "- tech top 3"
+    )

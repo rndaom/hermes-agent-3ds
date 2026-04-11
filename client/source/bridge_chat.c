@@ -16,7 +16,7 @@
 #include <unistd.h>
 
 #define BRIDGE_CHAT_CONNECT_TIMEOUT_SECONDS 5
-#define BRIDGE_CHAT_IO_TIMEOUT_SECONDS 30
+#define BRIDGE_CHAT_IO_TIMEOUT_SECONDS 180
 #define BRIDGE_CHAT_RESPONSE_MAX 4096
 
 static void set_error(BridgeChatResult* result, const char* message)
@@ -437,7 +437,7 @@ Result bridge_chat_run(const char* url, const char* token, const char* message, 
 
         if (R_FAILED(wait_rc)) {
             set_socket_debug(result, "recv-wait", errno);
-            set_error(result, "Bridge timed out.");
+            set_error(result, "Timed out waiting for a Hermes reply.");
             close(socket_fd);
             return wait_rc;
         }
