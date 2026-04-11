@@ -17,6 +17,7 @@ out/
 .venv/
 __pycache__/
 *.pyc
+*.egg-info/
 
 # Local config
 .env
