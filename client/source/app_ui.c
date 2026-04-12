@@ -166,6 +166,18 @@ static size_t page_count_for_lines(size_t total_lines, size_t lines_per_page)
     return (total_lines + lines_per_page - 1) / lines_per_page;
 }
 
+static void print_rule(void)
+{
+    printf("--------------------------------\n");
+}
+
+static void render_brand_header(const char* screen_title)
+{
+    printf("HERMES AGENT\n");
+    printf("%s\n", screen_title);
+    printf("================\n");
+}
+
 size_t hermes_app_ui_reply_page_count(const char* reply_text)
 {
     char wrapped_lines[HOME_WRAP_MAX_LINES][HOME_WRAP_WIDTH + 1];
@@ -260,13 +272,12 @@ static void render_home_top_screen(
     consoleSelect(top_console);
     consoleClear();
 
-    printf("Hermes Agent 3DS\n");
-    printf("=================\n");
+    render_brand_header("MESSENGER DECK");
     printf("%s\n", status_line);
     printf("last rc: 0x%08lX\n", (unsigned long)last_rc);
+    print_rule();
     format_active_conversation_label(config, conversation_list, conversation_label, sizeof(conversation_label));
-    printf("conversation: %s\n", conversation_label);
-
+    printf("MESSENGER LINK\n");
     if (chat_result != NULL && (chat_result->success || chat_result->error[0] != '\0')) {
         printf("socket errno: %d\n", chat_result->socket_errno);
         printf("stage: %s\n", chat_result->socket_stage[0] != '\0' ? chat_result->socket_stage : "n/a");
@@ -274,13 +285,16 @@ static void render_home_top_screen(
         printf("socket errno: %d\n", health_result->socket_errno);
         printf("stage: %s\n", health_result->socket_stage[0] != '\0' ? health_result->socket_stage : "n/a");
     }
-    printf("\n");
+    printf("ACTIVE THREAD\n");
+    printf("%s\n", conversation_label);
+    print_rule();
 
     if (chat_result != NULL && chat_result->success) {
         message_line_count = wrap_text_for_console(last_message, message_lines, 16);
         reply_line_count = wrap_text_for_console(chat_result->reply, reply_lines, HOME_WRAP_MAX_LINES);
         render_wrapped_page("Last message:", message_lines, message_line_count, 0, HOME_MESSAGE_LINES_PER_PAGE, false);
         printf("\n");
+        printf("Hermes reply\n");
         render_wrapped_page("Last reply:", reply_lines, reply_line_count, reply_page, HOME_REPLY_LINES_PER_PAGE, true);
         if (chat_result->truncated)
             printf("(reply truncated)\n");
@@ -289,6 +303,7 @@ static void render_home_top_screen(
         reply_line_count = wrap_text_for_console(chat_result->error, reply_lines, HOME_WRAP_MAX_LINES);
         render_wrapped_page("Last message:", message_lines, message_line_count, 0, HOME_MESSAGE_LINES_PER_PAGE, false);
         printf("\n");
+        printf("Hermes reply\n");
         render_wrapped_page("Chat failed:", reply_lines, reply_line_count, 0, HOME_REPLY_LINES_PER_PAGE, false);
         if (chat_result->http_status != 0)
             printf("http: %lu\n", (unsigned long)chat_result->http_status);
@@ -331,18 +346,20 @@ static void render_home_bottom_screen(
     if (chat_result != NULL && chat_result->success)
         page_count = hermes_app_ui_reply_page_count(chat_result->reply);
 
-    printf("Gateway:\n%s\n", bridge_summary);
-    printf("Conv: %s\n", conversation_label);
-    printf("Token: %s\n", token_summary);
-    printf("\n");
-    printf("A check   B ask\n");
-    printf("UP mic   X settings\n");
-    printf("SELECT conv   Y clear\n");
-    printf("START exit\n");
+    printf("COMMAND DECK\n");
+    printf("============\n");
+    printf("A Check     B Ask\n");
+    printf("UP Mic      X Config\n");
+    printf("SELECT Conv Y Clear\n");
+    printf("START Exit\n");
     if (chat_result != NULL && chat_result->success && page_count > 1)
         printf("L/R page reply\n");
     else
         printf("L/R when reply is long\n");
+    print_rule();
+    printf("Gateway:\n%s\n", bridge_summary);
+    printf("ACTIVE THREAD\n%s\n", conversation_label);
+    printf("Token: %s\n", token_summary);
 }
 
 static void render_settings_top_screen(
@@ -365,13 +382,11 @@ static void render_settings_top_screen(
 
     format_token_summary(config, token_summary, sizeof(token_summary));
 
-    printf("Hermes Agent 3DS\n");
-    printf("Settings\n");
-    printf("========\n");
+    render_brand_header("SYSTEM CONFIG");
     printf("Dirty: %s\n", settings_dirty ? "yes" : "no");
     printf("Status: %s\n", status_line);
     printf("rc: 0x%08lX\n", (unsigned long)last_rc);
-    printf("\n");
+    print_rule();
     printf("%s Host\n", host_cursor);
     printf("  %s\n", config->host);
     printf("%s Port\n", port_cursor);
@@ -387,14 +402,13 @@ static void render_settings_bottom_screen(PrintConsole* bottom_console)
     consoleSelect(bottom_console);
     consoleClear();
 
-    printf("Settings controls\n");
-    printf("================\n");
-    printf("UP/DOWN: select field\n");
-    printf("A: edit field\n");
-    printf("X: save settings\n");
-    printf("Y: restore defaults\n");
-    printf("B: back home\n");
-    printf("START: exit\n");
+    printf("CONFIG DECK\n");
+    printf("===========\n");
+    printf("UP/DOWN field\n");
+    printf("A edit value\n");
+    printf("X Save settings\n");
+    printf("Y restore defaults\n");
+    printf("B home   START exit\n");
 }
 
 static void render_conversations_top_screen(
@@ -414,12 +428,10 @@ static void render_conversations_top_screen(
     consoleSelect(top_console);
     consoleClear();
 
-    printf("Hermes Agent 3DS\n");
-    printf("Conversations\n");
-    printf("=============\n");
+    render_brand_header("THREADS / Conversations");
     printf("%s\n", status_line);
     printf("rc: 0x%08lX\n", (unsigned long)last_rc);
-    printf("\n");
+    print_rule();
 
     if (config == NULL || config->recent_conversation_count == 0) {
         printf("No saved conversations.\n");
@@ -464,11 +476,11 @@ static void render_conversations_bottom_screen(
     if (config != NULL && config->recent_conversation_count > 0)
         info = find_synced_conversation(conversation_list, config->recent_conversations[conversation_selection]);
 
-    printf("Conv controls\n");
-    printf("============\n");
+    printf("THREAD DECK\n");
+    printf("===========\n");
     printf("UP/DOWN select\n");
-    printf("A use conv\n");
-    printf("X new conv\n");
+    printf("A use thread\n");
+    printf("X new thread\n");
     printf("Y sync Hermes\n");
     printf("B home\n");
     if (info != NULL && info->session_id[0] != '\0')
