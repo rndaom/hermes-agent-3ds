@@ -733,7 +733,9 @@ int main(int argc, char* argv[])
                 char approval_choice[16];
                 BridgeV2MessageResult message_result;
                 BridgeV2EventPollResult event_result;
+                BridgeV2EventPollResult matched_event_result;
                 BridgeV2InteractionResult interaction_result;
+                bool matched_reply = false;
                 u32 event_cursor = 0;
                 int poll_attempt;
 
@@ -748,7 +750,9 @@ int main(int argc, char* argv[])
                 bridge_chat_result_reset(&chat_result);
                 bridge_v2_message_result_reset(&message_result);
                 bridge_v2_event_poll_result_reset(&event_result);
+                bridge_v2_event_poll_result_reset(&matched_event_result);
                 bridge_v2_interaction_result_reset(&interaction_result);
+                matched_reply = false;
                 approval_choice[0] = '\0';
                 request_rc = 0;
                 reply_page = 0;
@@ -771,7 +775,7 @@ int main(int argc, char* argv[])
                     request_rc = bridge_v2_send_message(messages_url, config.token, config.device_id, "main", message_buffer, &message_result);
                     if (R_SUCCEEDED(request_rc) && message_result.success) {
                         event_cursor = message_result.cursor;
-                        for (poll_attempt = 0; poll_attempt < 3; poll_attempt++) {
+                        for (poll_attempt = 0; poll_attempt < 6; poll_attempt++) {
                             request_rc = bridge_v2_poll_events(events_url, config.token, config.device_id, message_result.conversation_id[0] != '\0' ? message_result.conversation_id : "main", event_cursor, 5000, &event_result);
                             if (R_FAILED(request_rc))
                                 break;
@@ -783,8 +787,11 @@ int main(int argc, char* argv[])
                                 break;
 
                             if (event_result.reply_text[0] != '\0' &&
-                                strcmp(event_result.reply_to_message_id, message_result.message_id) == 0)
+                                strcmp(event_result.reply_to_message_id, message_result.message_id) == 0) {
+                                matched_event_result = event_result;
+                                matched_reply = true;
                                 break;
+                            }
                         }
 
                         if (R_SUCCEEDED(request_rc) && event_result.approval_required) {
@@ -802,7 +809,9 @@ int main(int argc, char* argv[])
                                         snprintf(chat_result.error, sizeof(chat_result.error), "Command denied.");
                                     } else {
                                         bridge_v2_event_poll_result_reset(&event_result);
-                                        for (poll_attempt = 0; poll_attempt < 3; poll_attempt++) {
+                                        bridge_v2_event_poll_result_reset(&matched_event_result);
+                                        matched_reply = false;
+                                        for (poll_attempt = 0; poll_attempt < 6; poll_attempt++) {
                                             request_rc = bridge_v2_poll_events(events_url, config.token, config.device_id, message_result.conversation_id[0] != '\0' ? message_result.conversation_id : "main", event_cursor, 5000, &event_result);
                                             if (R_FAILED(request_rc))
                                                 break;
@@ -814,10 +823,13 @@ int main(int argc, char* argv[])
                                                 break;
 
                                             if (event_result.reply_text[0] != '\0' &&
-                                                strcmp(event_result.reply_to_message_id, message_result.message_id) == 0)
+                                                strcmp(event_result.reply_to_message_id, message_result.message_id) == 0) {
+                                                matched_event_result = event_result;
+                                                matched_reply = true;
                                                 break;
+                                            }
                                         }
-                                        apply_v2_event_to_chat_result(&event_result, &chat_result);
+                                        apply_v2_event_to_chat_result(matched_reply ? &matched_event_result : &event_result, &chat_result);
                                     }
                                 } else {
                                     bridge_chat_result_reset(&chat_result);
@@ -825,7 +837,7 @@ int main(int argc, char* argv[])
                                 }
                             }
                         } else {
-                            apply_v2_event_to_chat_result(&event_result, &chat_result);
+                            apply_v2_event_to_chat_result(matched_reply ? &matched_event_result : &event_result, &chat_result);
                         }
 
                         if (chat_result.success) {
