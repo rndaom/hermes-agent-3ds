@@ -619,6 +619,7 @@ int main(int argc, char* argv[])
 
     // Old 3DS-friendly UI: text-first rendering split across top and bottom screens.
     gfxInitDefault();
+    gfxSet3D(false);
     consoleInit(GFX_TOP, &top_console);
     consoleInit(GFX_BOTTOM, &bottom_console);
 
