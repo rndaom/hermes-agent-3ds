@@ -33,6 +33,69 @@ static bool response_ok(const char* response_body)
     return strstr(response_body, "\"ok\":true") != NULL || strstr(response_body, "\"ok\": true") != NULL;
 }
 
+static int hex_digit_value(char ch)
+{
+    if (ch >= '0' && ch <= '9')
+        return ch - '0';
+    if (ch >= 'a' && ch <= 'f')
+        return 10 + (ch - 'a');
+    if (ch >= 'A' && ch <= 'F')
+        return 10 + (ch - 'A');
+    return -1;
+}
+
+static bool append_text(char* out, size_t out_size, size_t* io_used, const char* text)
+{
+    size_t length;
+
+    if (out == NULL || io_used == NULL || text == NULL)
+        return false;
+
+    length = strlen(text);
+    if (*io_used + length >= out_size)
+        return false;
+
+    memcpy(out + *io_used, text, length);
+    *io_used += length;
+    return true;
+}
+
+static bool append_codepoint_fallback(char* out, size_t out_size, size_t* io_used, unsigned int codepoint)
+{
+    switch (codepoint) {
+        case 0x2018:
+        case 0x2019:
+        case 0x201A:
+        case 0x201B:
+        case 0x2032:
+            return append_text(out, out_size, io_used, "'");
+        case 0x201C:
+        case 0x201D:
+        case 0x201E:
+        case 0x201F:
+        case 0x2033:
+            return append_text(out, out_size, io_used, "\"");
+        case 0x2010:
+        case 0x2011:
+        case 0x2012:
+        case 0x2013:
+        case 0x2014:
+        case 0x2015:
+        case 0x2212:
+            return append_text(out, out_size, io_used, "-");
+        case 0x2026:
+            return append_text(out, out_size, io_used, "...");
+        case 0x00A0:
+            return append_text(out, out_size, io_used, " ");
+        default:
+            if (codepoint >= 0x20 && codepoint <= 0x7E) {
+                char ch[2] = {(char)codepoint, '\0'};
+                return append_text(out, out_size, io_used, ch);
+            }
+            return append_text(out, out_size, io_used, "?");
+    }
+}
+
 static bool extract_json_string_v2(const char* json, const char* key, char* out, size_t out_size)
 {
     char pattern[64];
@@ -92,6 +155,24 @@ static bool extract_json_string_v2(const char* json, const char* key, char* out,
                 case 'f':
                     ch = '\f';
                     break;
+                case 'u': {
+                    int digit0 = hex_digit_value(cursor[0]);
+                    int digit1 = hex_digit_value(cursor[1]);
+                    int digit2 = hex_digit_value(cursor[2]);
+                    int digit3 = hex_digit_value(cursor[3]);
+                    unsigned int codepoint;
+
+                    if (digit0 < 0 || digit1 < 0 || digit2 < 0 || digit3 < 0)
+                        return false;
+
+                    codepoint = (unsigned int)((digit0 << 12) | (digit1 << 8) | (digit2 << 4) | digit3);
+                    cursor += 4;
+                    if (!append_codepoint_fallback(out, out_size, &used, codepoint)) {
+                        out[used] = '\0';
+                        return true;
+                    }
+                    continue;
+                }
                 case '\0':
                     return false;
                 default:

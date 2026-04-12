@@ -68,6 +68,17 @@ def test_bridge_v2_module_exists_for_native_gateway_protocol():
     assert "reply_to" in source
 
 
+def test_bridge_v2_decodes_common_json_unicode_punctuation_for_3ds_console():
+    source = (CLIENT_DIR / "source" / "bridge_v2.c").read_text()
+
+    assert "case 'u':" in source
+    assert "hex_digit_value" in source
+    assert "append_codepoint_fallback" in source
+    assert "0x2019" in source
+    assert "0x2014" in source
+    assert "0x2026" in source
+
+
 def test_makefile_picks_up_bridge_v2_sources_automatically():
     makefile = (CLIENT_DIR / "Makefile").read_text()
     assert "$(wildcard $(dir)/*.c)" in makefile
