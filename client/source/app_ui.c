@@ -440,7 +440,8 @@ static void render_conversations_top_screen(
         const char* title = (info != NULL && info->title[0] != '\0') ? info->title : config->recent_conversations[index];
 
         printf("%s%s %s\n", cursor, active, title);
-        printf("   %s\n", config->recent_conversations[index]);
+        if (strcmp(title, config->recent_conversations[index]) != 0)
+            printf("   %s\n", config->recent_conversations[index]);
         if (info != NULL && info->preview[0] != '\0')
             printf("   %s\n", info->preview);
         else

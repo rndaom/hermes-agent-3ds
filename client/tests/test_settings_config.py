@@ -96,5 +96,6 @@ def test_main_c_has_settings_and_conversation_picker_navigation():
     assert "Settings saved to SD card." in settings_c
     assert "edit_selected_setting" in settings_c
     assert "settings_field_label" in settings_c
+    assert "strcmp(title, config->recent_conversations[index]) != 0" in ui_c
     assert "SELECT conv" in ui_c or "Conversations" in ui_c
     assert "Save settings" in ui_c or "X: save" in ui_c
