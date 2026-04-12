@@ -35,22 +35,25 @@ def test_legacy_python_bridge_repo_folder_is_removed():
 
 def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
+    conv_h = (CLIENT_DIR / "include" / "app_conversations.h").read_text()
+    conv_c = (CLIENT_DIR / "source" / "app_conversations.c").read_text()
     input_c = (CLIENT_DIR / "source" / "app_input.c").read_text()
 
     assert '"bridge_chat.h"' in main_c
+    assert '"app_conversations.h"' in main_c
     assert '"bridge_v2.h"' in main_c
     assert "BridgeChatResult" in main_c
     assert "BridgeV2MessageResult" in main_c
     assert "BridgeV2EventPollResult" in main_c
-    assert "BridgeV2ConversationListResult" in main_c
+    assert "BridgeV2ConversationListResult" in conv_h
     assert "complete_v2_roundtrip" in main_c
     assert "poll_for_v2_reply" in main_c
     assert "hermes_app_config_build_messages_url" in main_c
     assert "hermes_app_config_build_events_url" in main_c
-    assert "hermes_app_config_build_conversations_url" in main_c
+    assert "hermes_app_config_build_conversations_url" in conv_c
     assert "bridge_v2_send_message" in main_c
     assert "bridge_v2_send_message(messages_url, config.token, config.device_id, config.active_conversation_id" in main_c
-    assert "bridge_v2_list_conversations" in main_c
+    assert "bridge_v2_list_conversations" in conv_c
     assert "bridge_v2_poll_events" in main_c
     assert "bridge_v2_submit_interaction" in main_c
     assert "hermes_app_config_build_interaction_url" in main_c
@@ -60,6 +63,7 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "KEY_B" in main_c
     assert "KEY_UP" in main_c
     assert "KEY_SELECT" in main_c
+    assert "KEY_DOWN" in conv_c
     assert "Write a message" in input_c
     assert "Record mic" in main_c or "mic" in main_c.lower()
     assert "bridge_v2_send_voice_message" in main_c

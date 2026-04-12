@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "app_config.h"
+#include "app_conversations.h"
 #include "app_input.h"
 #include "app_ui.h"
 #include "bridge_chat.h"
@@ -13,8 +14,7 @@
 
 static PrintConsole top_console;
 static PrintConsole bottom_console;
-static BridgeV2ConversationListResult g_conversation_list;
-static size_t g_conversation_selection = 0;
+static AppConversationState g_conversation_state;
 
 static bool prompt_v2_approval_choice(char* out_choice, size_t out_size);
 
@@ -351,52 +351,9 @@ static void render_ui(
         reply_page,
         status_line,
         last_rc,
-        &g_conversation_list,
-        g_conversation_selection
+        &g_conversation_state.list,
+        g_conversation_state.selection
     );
-}
-
-static size_t find_recent_conversation_index(const HermesAppConfig* config, const char* conversation_id)
-{
-    size_t index;
-
-    if (config == NULL || conversation_id == NULL || conversation_id[0] == '\0')
-        return 0;
-
-    for (index = 0; index < config->recent_conversation_count; index++) {
-        if (strcmp(config->recent_conversations[index], conversation_id) == 0)
-            return index;
-    }
-
-    return 0;
-}
-
-static void clamp_conversation_selection(const HermesAppConfig* config)
-{
-    if (config == NULL || config->recent_conversation_count == 0) {
-        g_conversation_selection = 0;
-        return;
-    }
-
-    if (g_conversation_selection >= config->recent_conversation_count)
-        g_conversation_selection = config->recent_conversation_count - 1;
-}
-
-static void merge_synced_conversations_into_config(HermesAppConfig* config)
-{
-    size_t index;
-
-    if (config == NULL)
-        return;
-
-    for (index = g_conversation_list.count; index > 0; index--)
-        hermes_app_config_touch_recent_conversation(config, g_conversation_list.conversations[index - 1].conversation_id);
-
-    if (config->active_conversation_id[0] == '\0')
-        hermes_app_config_set_active_conversation(config, DEFAULT_CONVERSATION_ID);
-
-    hermes_app_config_touch_recent_conversation(config, config->active_conversation_id);
-    clamp_conversation_selection(config);
 }
 
 static void handle_home_health_check(
@@ -450,117 +407,6 @@ static void handle_home_health_check(
     render_ui(APP_SCREEN_HOME, config, selected_field, settings_dirty, health_result, chat_result, last_message, *reply_page, status_line, *request_rc);
 }
 
-static void handle_activate_conversation(
-    HermesAppConfig* config,
-    AppScreen* screen,
-    BridgeChatResult* chat_result,
-    char* last_message,
-    size_t* reply_page,
-    char* status_line
-)
-{
-    if (config == NULL || screen == NULL || chat_result == NULL || last_message == NULL || reply_page == NULL || status_line == NULL)
-        return;
-
-    if (config->recent_conversation_count == 0) {
-        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "No saved conversations yet.");
-        return;
-    }
-    if (!hermes_app_config_set_active_conversation(config, config->recent_conversations[g_conversation_selection])) {
-        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Conversation selection was invalid.");
-        return;
-    }
-    if (!hermes_app_config_save(config)) {
-        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Could not save conversation selection.");
-        return;
-    }
-
-    bridge_chat_result_reset(chat_result);
-    last_message[0] = '\0';
-    *reply_page = 0;
-    *screen = APP_SCREEN_HOME;
-    snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Conversation %s selected.", config->active_conversation_id);
-}
-
-static void handle_create_conversation(
-    HermesAppConfig* config,
-    AppScreen* screen,
-    BridgeChatResult* chat_result,
-    char* last_message,
-    size_t* reply_page,
-    char* status_line
-)
-{
-    char conversation_id[HERMES_APP_CONVERSATION_ID_MAX];
-
-    if (config == NULL || screen == NULL || chat_result == NULL || last_message == NULL || reply_page == NULL || status_line == NULL)
-        return;
-
-    if (!prompt_conversation_input("", conversation_id, sizeof(conversation_id))) {
-        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "New conversation canceled.");
-        return;
-    }
-    if (!hermes_app_config_is_valid_conversation_id(conversation_id)) {
-        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Conversation IDs only allow letters, numbers, - _ .");
-        return;
-    }
-    if (!hermes_app_config_set_active_conversation(config, conversation_id)) {
-        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Could not activate that conversation.");
-        return;
-    }
-    if (!hermes_app_config_save(config)) {
-        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Could not save new conversation.");
-        return;
-    }
-
-    bridge_chat_result_reset(chat_result);
-    last_message[0] = '\0';
-    *reply_page = 0;
-    g_conversation_selection = find_recent_conversation_index(config, config->active_conversation_id);
-    *screen = APP_SCREEN_HOME;
-    snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Conversation %s created.", config->active_conversation_id);
-}
-
-static void handle_conversation_sync(
-    HermesAppConfig* config,
-    bool network_ready,
-    char* status_line,
-    Result* request_rc
-)
-{
-    char conversations_url[HERMES_APP_CONVERSATIONS_URL_MAX];
-    BridgeV2ConversationListResult fetched_conversations;
-
-    if (config == NULL || status_line == NULL || request_rc == NULL)
-        return;
-
-    bridge_v2_conversation_list_result_reset(&fetched_conversations);
-    *request_rc = 0;
-    if (!network_ready) {
-        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Networking services failed to start.");
-        return;
-    }
-    if (!hermes_app_config_build_conversations_url(config, conversations_url, sizeof(conversations_url)) ||
-        config->device_id[0] == '\0') {
-        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "V2 config is incomplete. Set device_id.");
-        return;
-    }
-
-    *request_rc = bridge_v2_list_conversations(conversations_url, config->token, config->device_id, &fetched_conversations);
-    if (R_SUCCEEDED(*request_rc) && fetched_conversations.success) {
-        g_conversation_list = fetched_conversations;
-        merge_synced_conversations_into_config(config);
-        if (!hermes_app_config_save(config))
-            snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Synced, but could not save conversations.");
-        else
-            snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Synced %lu conversations.", (unsigned long)g_conversation_list.count);
-    } else if (fetched_conversations.error[0] != '\0') {
-        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "%s", fetched_conversations.error);
-    } else {
-        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Conversation sync failed: 0x%08lX", (unsigned long)*request_rc);
-    }
-}
-
 int main(int argc, char* argv[])
 {
     Result init_rc = 0;
@@ -583,8 +429,7 @@ int main(int argc, char* argv[])
 
     bridge_health_result_reset(&health_result);
     bridge_chat_result_reset(&chat_result);
-    bridge_v2_conversation_list_result_reset(&g_conversation_list);
-    g_conversation_selection = 0;
+    hermes_app_conversations_init(&g_conversation_state);
     last_message[0] = '\0';
 
     load_status = hermes_app_config_load(&config);
@@ -595,8 +440,7 @@ int main(int argc, char* argv[])
     else
         snprintf(status_line, sizeof(status_line), "Config load failed. Using defaults.");
 
-    g_conversation_selection = find_recent_conversation_index(&config, config.active_conversation_id);
-    clamp_conversation_selection(&config);
+    hermes_app_conversations_refresh_selection_from_active(&g_conversation_state, &config);
 
     // Old 3DS-friendly UI: text-first rendering split across top and bottom screens.
     gfxInitDefault();
@@ -648,10 +492,7 @@ int main(int argc, char* argv[])
             }
 
             if ((kDown & KEY_SELECT) != 0) {
-                screen = APP_SCREEN_CONVERSATIONS;
-                g_conversation_selection = find_recent_conversation_index(&config, config.active_conversation_id);
-                clamp_conversation_selection(&config);
-                snprintf(status_line, sizeof(status_line), "Conversation picker opened.");
+                hermes_app_conversations_open_picker(&g_conversation_state, &config, &screen, status_line, sizeof(status_line));
                 render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
 
@@ -779,39 +620,20 @@ int main(int argc, char* argv[])
                 render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
         } else if (screen == APP_SCREEN_CONVERSATIONS) {
-            if ((kDown & KEY_B) != 0) {
-                screen = APP_SCREEN_HOME;
-                snprintf(status_line, sizeof(status_line), "Returned home.");
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
-            }
-
-            if ((kDown & KEY_UP) != 0 && config.recent_conversation_count > 0) {
-                if (g_conversation_selection == 0)
-                    g_conversation_selection = config.recent_conversation_count - 1;
-                else
-                    g_conversation_selection--;
-                snprintf(status_line, sizeof(status_line), "Selected %s.", config.recent_conversations[g_conversation_selection]);
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
-            }
-
-            if ((kDown & KEY_DOWN) != 0 && config.recent_conversation_count > 0) {
-                g_conversation_selection = (g_conversation_selection + 1) % config.recent_conversation_count;
-                snprintf(status_line, sizeof(status_line), "Selected %s.", config.recent_conversations[g_conversation_selection]);
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
-            }
-
-            if ((kDown & KEY_A) != 0) {
-                handle_activate_conversation(&config, &screen, &chat_result, last_message, &reply_page, status_line);
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
-            }
-
-            if ((kDown & KEY_X) != 0) {
-                handle_create_conversation(&config, &screen, &chat_result, last_message, &reply_page, status_line);
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
-            }
-
-            if ((kDown & KEY_Y) != 0) {
-                handle_conversation_sync(&config, network_ready, status_line, &request_rc);
+            if (hermes_app_conversations_handle_picker_input(
+                    &g_conversation_state,
+                    &config,
+                    network_ready,
+                    kDown,
+                    &screen,
+                    &chat_result,
+                    last_message,
+                    sizeof(last_message),
+                    &reply_page,
+                    status_line,
+                    sizeof(status_line),
+                    &request_rc
+                )) {
                 render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
         } else {
@@ -838,7 +660,7 @@ int main(int argc, char* argv[])
 
             if ((kDown & KEY_Y) != 0) {
                 hermes_app_config_set_defaults(&config);
-                g_conversation_selection = find_recent_conversation_index(&config, config.active_conversation_id);
+                hermes_app_conversations_refresh_selection_from_active(&g_conversation_state, &config);
                 settings_dirty = true;
                 snprintf(status_line, sizeof(status_line), "Defaults restored. Save settings to keep them.");
                 render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
