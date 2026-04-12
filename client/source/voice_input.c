@@ -1,5 +1,6 @@
 #include "voice_input.h"
 
+#include <limits.h>
 #include <malloc.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,21 +71,21 @@ static void copy_ring_audio(const u8* mic_buffer, u32 mic_data_size, u32* io_mic
     *io_mic_pos = write_pos;
 }
 
-static void render_recording_ui(PrintConsole* top_console, PrintConsole* bottom_console, size_t pcm_size, u64 start_ms)
+static unsigned long recording_tenths_elapsed(u64 start_ms)
 {
-    u64 elapsed_ms = osGetTime() - start_ms;
-    unsigned long tenths = (unsigned long)(elapsed_ms / 100);
-    unsigned long seconds = tenths / 10;
-    unsigned long tenth_digit = tenths % 10;
+    return (unsigned long)((osGetTime() - start_ms) / 100ULL);
+}
 
+static void render_recording_shell(PrintConsole* top_console, PrintConsole* bottom_console)
+{
     consoleSelect(top_console);
     consoleClear();
     printf("Hermes Agent 3DS\n");
     printf("Record mic\n");
     printf("==========\n");
     printf("Mic is recording now.\n");
-    printf("Time: %lu.%lus\n", seconds, tenth_digit);
-    printf("Audio: %lu bytes\n", (unsigned long)pcm_size);
+    printf("Time: 0.0s\n");
+    printf("Audio: 0 bytes\n");
     printf("\n");
     printf("Press UP to stop and send.\n");
     printf("Press B to cancel.\n");
@@ -97,6 +98,16 @@ static void render_recording_ui(PrintConsole* top_console, PrintConsole* bottom_
     printf("B: cancel\n");
     printf("5 min safety timeout\n");
     printf("START: exit app\n");
+}
+
+static void update_recording_status(PrintConsole* top_console, size_t pcm_size, unsigned long tenths)
+{
+    unsigned long seconds = tenths / 10;
+    unsigned long tenth_digit = tenths % 10;
+
+    consoleSelect(top_console);
+    printf("\x1b[5;1HTime: %lu.%lus            ", seconds, tenth_digit);
+    printf("\x1b[6;1HAudio: %lu bytes        ", (unsigned long)pcm_size);
 }
 
 bool voice_input_record_prompt(
@@ -119,6 +130,7 @@ bool voice_input_record_prompt(
     bool success = false;
     bool waiting_for_up_release = true;
     u64 start_ms = 0;
+    unsigned long last_render_tenths = ULONG_MAX;
 
     if (out_wav_data == NULL || out_wav_size == NULL || top_console == NULL || bottom_console == NULL) {
         set_status(status_line, status_line_size, "Mic input is not available.");
@@ -153,17 +165,28 @@ bool voice_input_record_prompt(
     sampling_started = true;
     start_ms = osGetTime();
 
+    render_recording_shell(top_console, bottom_console);
+    update_recording_status(top_console, pcm_size, 0);
+    gfxFlushBuffers();
+    gfxSwapBuffers();
+    last_render_tenths = 0;
+
     while (aptMainLoop()) {
         u32 kDown;
+        unsigned long current_tenths;
 
         gspWaitForVBlank();
         hidScanInput();
         kDown = hidKeysDown();
 
         copy_ring_audio(mic_buffer, mic_data_size, &mic_pos, pcm_buffer, &pcm_size);
-        render_recording_ui(top_console, bottom_console, pcm_size, start_ms);
-        gfxFlushBuffers();
-        gfxSwapBuffers();
+        current_tenths = recording_tenths_elapsed(start_ms);
+        if (current_tenths != last_render_tenths) {
+            update_recording_status(top_console, pcm_size, current_tenths);
+            gfxFlushBuffers();
+            gfxSwapBuffers();
+            last_render_tenths = current_tenths;
+        }
 
         if (waiting_for_up_release) {
             if ((hidKeysHeld() & KEY_UP) == 0)

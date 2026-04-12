@@ -82,6 +82,17 @@ def test_voice_input_waits_for_up_release_before_allowing_stop():
     assert "waiting_for_up_release" in voice_input_c
 
 
+def test_voice_input_avoids_full_console_redraws_every_recording_frame():
+    voice_input_c = (CLIENT_DIR / "source" / "voice_input.c").read_text()
+
+    assert "render_recording_shell" in voice_input_c
+    assert "update_recording_status" in voice_input_c
+    assert 'printf("\\x1b[5;1HTime:' in voice_input_c
+    assert 'printf("\\x1b[6;1HAudio:' in voice_input_c
+    assert "current_tenths != last_render_tenths" in voice_input_c
+
+
+
 def test_main_c_uses_both_top_and_bottom_screens_for_ui():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
 
