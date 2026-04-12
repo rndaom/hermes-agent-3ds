@@ -7,11 +7,12 @@ CLIENT_DIR = REPO_DIR / "client"
 
 def test_home_bottom_screen_avoids_duplicate_output_sections():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
+    ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
     assert 'printf("Health:' not in main_c
     assert 'printf("Reply page:' not in main_c
-    assert 'printf("Gateway:' in main_c
-    assert 'printf("Token:' in main_c
+    assert 'printf("Gateway:' in ui_c
+    assert 'printf("Token:' in ui_c
 
 
 def test_makefile_supports_packaged_release_zip_output():

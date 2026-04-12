@@ -55,6 +55,7 @@ def test_main_c_has_settings_and_conversation_picker_navigation():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
     input_header = (CLIENT_DIR / "include" / "app_input.h").read_text()
     input_c = (CLIENT_DIR / "source" / "app_input.c").read_text()
+    ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
     assert "APP_SCREEN_SETTINGS" in main_c
     assert "APP_SCREEN_CONVERSATIONS" in main_c
     assert "KEY_X" in main_c
@@ -72,5 +73,5 @@ def test_main_c_has_settings_and_conversation_picker_navigation():
     assert "Conversation picker opened" in main_c
     assert "bridge_v2_list_conversations" in main_c
     assert "active_conversation_id" in main_c
-    assert "SELECT conv" in main_c or "Conversations" in main_c
+    assert "SELECT conv" in ui_c or "Conversations" in ui_c
     assert "Save settings" in main_c or "X: save" in main_c

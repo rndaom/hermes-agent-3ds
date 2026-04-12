@@ -65,8 +65,8 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "bridge_v2_send_voice_message" in main_c
     assert "bridge_v2_send_voice_message(voice_url, config.token, config.device_id, config.active_conversation_id" in main_c
     assert "MICU_StartSampling" in main_c or "voice_input_record_prompt" in main_c
-    assert "Last message" in main_c
-    assert "Last reply" in main_c
+    assert "Last message" in main_c or "Last message" in (CLIENT_DIR / "source" / "app_ui.c").read_text()
+    assert "Last reply" in main_c or "Last reply" in (CLIENT_DIR / "source" / "app_ui.c").read_text()
     assert "swkbdInputText" in input_c
     assert "Asking Hermes over v2..." in main_c
     assert '"/api/v1/chat"' not in main_c
@@ -74,13 +74,15 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
 
 def test_main_c_wraps_and_pages_long_reply_text_for_small_screens():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
+    ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
-    assert "wrap_text_for_console" in main_c
-    assert "render_wrapped_page" in main_c
     assert "KEY_L" in main_c
     assert "KEY_R" in main_c
     assert "reply_page" in main_c
-    assert "Page %lu/%lu" in main_c
+    assert "hermes_app_ui_reply_page_count" in main_c
+    assert "wrap_text_for_console" in ui_c
+    assert "render_wrapped_page" in ui_c
+    assert "Page %lu/%lu" in ui_c
 
 
 def test_voice_input_waits_for_up_release_before_allowing_stop():
@@ -103,11 +105,13 @@ def test_voice_input_avoids_full_console_redraws_every_recording_frame():
 
 def test_main_c_uses_both_top_and_bottom_screens_for_ui():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
+    ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
+    ui_h = (CLIENT_DIR / "include" / "app_ui.h").read_text()
 
     assert "PrintConsole" in main_c
     assert "consoleInit(GFX_TOP" in main_c
     assert "consoleInit(GFX_BOTTOM" in main_c
-    assert "consoleSelect(&top_console)" in main_c
-    assert "consoleSelect(&bottom_console)" in main_c
-    assert "render_home_top_screen" in main_c
-    assert "render_home_bottom_screen" in main_c
+    assert "hermes_app_ui_render" in main_c
+    assert "hermes_app_ui_render" in ui_h
+    assert "render_home_top_screen" in ui_c
+    assert "render_home_bottom_screen" in ui_c

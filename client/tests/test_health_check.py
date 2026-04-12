@@ -37,7 +37,8 @@ def test_health_check_implementation_uses_wifi_and_timeout_based_socket_networki
 
 def test_main_c_offers_a_button_driven_native_v2_gateway_health_check_ui():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
-    assert "Press A to check Hermes gateway." in main_c
+    ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
+    assert "Press A to check Hermes gateway." in ui_c
     assert "Checking Hermes gateway..." in main_c
     assert "Reply received over native v2." in main_c
     assert "KEY_A" in main_c
