@@ -35,6 +35,7 @@ def test_legacy_python_bridge_repo_folder_is_removed():
 
 def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
+    input_c = (CLIENT_DIR / "source" / "app_input.c").read_text()
 
     assert '"bridge_chat.h"' in main_c
     assert '"bridge_v2.h"' in main_c
@@ -59,14 +60,14 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "KEY_B" in main_c
     assert "KEY_UP" in main_c
     assert "KEY_SELECT" in main_c
-    assert "Write a message" in main_c or "Ask Hermes" in main_c
+    assert "Write a message" in input_c
     assert "Record mic" in main_c or "mic" in main_c.lower()
     assert "bridge_v2_send_voice_message" in main_c
     assert "bridge_v2_send_voice_message(voice_url, config.token, config.device_id, config.active_conversation_id" in main_c
     assert "MICU_StartSampling" in main_c or "voice_input_record_prompt" in main_c
     assert "Last message" in main_c
     assert "Last reply" in main_c
-    assert "swkbdInputText" in main_c
+    assert "swkbdInputText" in input_c
     assert "Asking Hermes over v2..." in main_c
     assert '"/api/v1/chat"' not in main_c
 

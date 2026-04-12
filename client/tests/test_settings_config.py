@@ -53,18 +53,22 @@ def test_main_c_loads_saved_config_and_uses_it_for_health_checks():
 
 def test_main_c_has_settings_and_conversation_picker_navigation():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
+    input_header = (CLIENT_DIR / "include" / "app_input.h").read_text()
+    input_c = (CLIENT_DIR / "source" / "app_input.c").read_text()
     assert "APP_SCREEN_SETTINGS" in main_c
     assert "APP_SCREEN_CONVERSATIONS" in main_c
     assert "KEY_X" in main_c
     assert "KEY_UP" in main_c
     assert "KEY_DOWN" in main_c
     assert "KEY_SELECT" in main_c
-    assert "swkbdInit" in main_c
-    assert "swkbdInputText" in main_c
-    assert "Host" in main_c
-    assert "Port" in main_c
-    assert "Token" in main_c
-    assert "Device ID" in main_c
+    assert "swkbdInit" in input_c
+    assert "swkbdInputText" in input_c
+    assert "SettingsField" in input_header
+    assert "settings_field_label" in input_header
+    assert "Host" in input_c
+    assert "Port" in input_c
+    assert "Token" in input_c
+    assert "Device ID" in input_c
     assert "Conversation picker opened" in main_c
     assert "bridge_v2_list_conversations" in main_c
     assert "active_conversation_id" in main_c
