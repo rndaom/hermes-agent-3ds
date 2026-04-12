@@ -324,7 +324,7 @@ static void render_home_top_screen(
     consoleSelect(top_console);
     consoleClear();
 
-    render_brand_header("RELAY DECK");
+    render_brand_header("MESSENGER DECK");
     format_active_conversation_label(config, conversation_list, conversation_label, sizeof(conversation_label));
 
     if (chat_result != NULL && (chat_result->success || chat_result->error[0] != '\0')) {
@@ -334,20 +334,25 @@ static void render_home_top_screen(
         snprintf(link_errno_line, sizeof(link_errno_line), "Socket: %d", health_result->socket_errno);
         snprintf(link_stage_line, sizeof(link_stage_line), "Stage : %s", health_result->socket_stage[0] != '\0' ? health_result->socket_stage : "n/a");
     }
-    snprintf(relay_status_line, sizeof(relay_status_line), "%s / %s", status_line, link_errno_line);
+    snprintf(relay_status_line, sizeof(relay_status_line), "Status: %s", status_line);
 
     print_at(5, 1, "+---------------------------+--------------------+");
     print_at(6, 1, "| [ MESSENGER LINK ]        | [ RELAY CREST ]    |");
     /* ACTIVE THREAD remains a first-class top-screen field. */
-    /* LINK STATE stays visible in source for compatibility with earlier UI phases. */
-    print_at(7, 1, "| Current Channel          |                    |");
-    print_field_at(8, 3, 25, conversation_label);
-    print_at(8, 30, render_pixel_crest_line(0));
-    print_at(9, 1, "| Link Status              |                    |");
-    print_field_at(10, 3, 25, relay_status_line);
-    print_at(10, 30, render_pixel_crest_line(1));
-    print_field_at(11, 3, 25, link_stage_line);
-    print_at(11, 30, render_pixel_crest_line(2));
+    print_at(7, 1, "| Thread:                   |                    |");
+    print_field_at(7, 11, 17, conversation_label);
+    print_at(7, 30, render_pixel_crest_line(0));
+    print_at(8, 1, "| Status:                   |                    |");
+    print_field_at(8, 11, 17, status_line);
+    print_at(8, 30, render_pixel_crest_line(1));
+    print_at(9, 1, "| LINK STATE                |                    |");
+    print_at(9, 30, render_pixel_crest_line(2));
+    print_at(10, 1, "| Socket:                   |                    |");
+    print_field_at(10, 11, 17, link_errno_line + 8);
+    print_at(10, 30, render_pixel_crest_line(3));
+    print_at(11, 1, "| Stage :                   |                    |");
+    print_field_at(11, 11, 17, link_stage_line + 8);
+    print_at(11, 30, render_pixel_crest_line(4));
     print_at(12, 1, "+---------------------------+--------------------+");
     print_at(13, 1, "[ SESSION ]");
     print_at(14, 1, "----------------------------------------------");
@@ -422,18 +427,11 @@ static void render_home_bottom_screen(
 
     printf("+--------------------------------------+\n");
     printf("|             COMMAND DECK             |\n");
-    printf("|             COMMAND MENU             |\n");
     printf("+--------------------------------------+\n");
-    printf("> Ask Hermes\n");
-    printf("  Check Link\n");
-    printf("  Threads\n");
-    printf("  Config\n");
-    printf("  Mic Input\n");
-    printf("  Clear Reply\n");
-    print_rule();
-    printf("A Check  B Ask  X Config\n");
-    printf("UP Mic   SELECT Conversations\n");
-    printf("Y Clear  START Exit\n");
+    printf("A Check     B Ask\n");
+    printf("UP Mic      X Config\n");
+    printf("SELECT Conv Y Clear\n");
+    printf("START Exit\n");
     if (chat_result != NULL && chat_result->success && page_count > 1)
         printf("L/R page reply\n");
     else
@@ -477,7 +475,6 @@ static void render_settings_top_screen(
     render_split_line(rc_line, 2);
     print_rule();
     render_panel_title("LINK SETTINGS");
-    printf("OPTIONS MENU\n");
     printf("%s Host\n", host_cursor);
     printf("  %s\n", config->host);
     printf("%s Port\n", port_cursor);
@@ -495,16 +492,12 @@ static void render_settings_bottom_screen(PrintConsole* bottom_console)
 
     printf("+--------------------------------------+\n");
     printf("|             CONFIG DECK              |\n");
-    printf("|             OPTIONS MENU             |\n");
     printf("+--------------------------------------+\n");
-    printf("> Edit value\n");
-    printf("  Save settings\n");
-    printf("  Restore defaults\n");
-    printf("  Back home\n");
-    print_rule();
-    printf("UP/DOWN field  A edit\n");
-    printf("X save  Y defaults\n");
-    printf("B home  START exit\n");
+    printf("UP/DOWN field\n");
+    printf("A edit value\n");
+    printf("X Save settings\n");
+    printf("Y restore defaults\n");
+    printf("B home   START exit\n");
 }
 
 static void render_conversations_top_screen(
@@ -526,7 +519,7 @@ static void render_conversations_top_screen(
     consoleSelect(top_console);
     consoleClear();
 
-    render_brand_header("THREAD LOG");
+    render_brand_header("THREADS / Conversations");
     render_relay_crest();
     render_split_line(status_line, 0);
     snprintf(rc_line, sizeof(rc_line), "rc: 0x%08lX", (unsigned long)last_rc);
@@ -579,15 +572,11 @@ static void render_conversations_bottom_screen(
 
     printf("+--------------------------------------+\n");
     printf("|             THREAD DECK              |\n");
-    printf("|              THREAD LOG              |\n");
     printf("+--------------------------------------+\n");
-    printf("> Use thread\n");
-    printf("  New thread\n");
-    printf("  Sync Hermes\n");
-    printf("  Back home\n");
-    print_rule();
     printf("UP/DOWN select\n");
-    printf("A use  X new  Y sync\n");
+    printf("A use thread\n");
+    printf("X new thread\n");
+    printf("Y sync Hermes\n");
     printf("B home\n");
     if (info != NULL && info->session_id[0] != '\0')
         printf("sid %s\n", info->session_id);
