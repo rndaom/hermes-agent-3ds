@@ -22,9 +22,9 @@ def test_phase1_ui_refresh_doc_defines_hermes_handheld_direction():
 def test_app_ui_uses_phase1_command_deck_language_and_branding():
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
-    assert "COMMAND DECK" in ui_c
-    assert "MESSENGER LINK" in ui_c
+    assert "COMMAND MENU" in ui_c
+    assert "RELAY DECK" in ui_c
     assert "ACTIVE THREAD" in ui_c
-    assert "Hermes reply" in ui_c
-    assert "THREAD DECK" in ui_c
+    assert "HERMES REPLY" in ui_c
+    assert "THREAD ARCHIVE" in ui_c
     assert "SYSTEM CONFIG" in ui_c

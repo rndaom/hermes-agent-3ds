@@ -26,8 +26,6 @@ typedef void (*AppRequestRenderFn)(
 );
 
 typedef struct AppRequestUiContext {
-    PrintConsole* top_console;
-    PrintConsole* bottom_console;
     SettingsField selected_field;
     bool settings_dirty;
     const BridgeHealthResult* health_result;

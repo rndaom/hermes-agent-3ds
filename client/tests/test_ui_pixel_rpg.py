@@ -27,8 +27,10 @@ def test_actual_gui_plan_doc_exists_for_moving_off_console_ui():
     assert "Old 3DS" in doc
 
 
-def test_main_c_still_uses_console_renderer_before_actual_gui_lands():
+def test_main_c_still_uses_the_graphical_renderer_while_historical_gui_doc_remains_for_reference():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
 
-    assert "consoleInit(GFX_TOP, &top_console);" in main_c
-    assert "consoleInit(GFX_BOTTOM, &bottom_console);" in main_c
+    assert "hermes_app_ui_init()" in main_c
+    assert "hermes_app_ui_exit()" in main_c
+    assert "consoleInit(GFX_TOP, &top_console);" not in main_c
+    assert "consoleInit(GFX_BOTTOM, &bottom_console);" not in main_c

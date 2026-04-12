@@ -167,94 +167,11 @@ static size_t page_count_for_lines(size_t total_lines, size_t lines_per_page)
     return (total_lines + lines_per_page - 1) / lines_per_page;
 }
 
-static void print_rule(void)
-{
-    printf("------------------------------------------------\n");
-}
-
-static void render_brand_header(const char* screen_title)
-{
-    printf("+------------------------------------------------+\n");
-    printf("| HERMES AGENT                                   |\n");
-    printf("| %-46.46s |\n", screen_title != NULL ? screen_title : "");
-    printf("+------------------------------------------------+\n");
-}
-
-static void render_relay_crest(void)
-{
-    printf("o==[ HERMES RELAY ]==o\n");
-}
-
-static const char* render_pixel_crest_line(size_t index)
-{
-    static const char* crest_lines[] = {
-        "      /\\      ",
-        "   .-====-.   ",
-        "  /  HRMS  \\",
-        "  | RELAY |  ",
-        "  \\__--__/   ",
-        "    /__\\     ",
-    };
-    size_t count = sizeof(crest_lines) / sizeof(crest_lines[0]);
-    if (index >= count)
-        return "              ";
-    return crest_lines[index];
-}
-
-static void render_split_line(const char* left, size_t crest_index)
-{
-    printf("%-24.24s %s\n", left != NULL ? left : "", render_pixel_crest_line(crest_index));
-}
-
-static void print_at(int row, int col, const char* text)
-{
-    printf("\x1b[%d;%dH%s", row, col, text != NULL ? text : "");
-}
-
-static void clear_text_area(int row, int col, int width)
-{
-    printf("\x1b[%d;%dH%*s", row, col, width, "");
-}
-
-static void print_field_at(int row, int col, int width, const char* text)
-{
-    clear_text_area(row, col, width);
-    printf("\x1b[%d;%dH%-*.*s", row, col, width, width, text != NULL ? text : "");
-}
-
-static void render_panel_title(const char* label)
-{
-    printf("[ %s ]\n", label != NULL ? label : "");
-}
-
 size_t hermes_app_ui_reply_page_count(const char* reply_text)
 {
     char wrapped_lines[HOME_WRAP_MAX_LINES][HOME_WRAP_WIDTH + 1];
     size_t total_lines = wrap_text_for_console(reply_text, wrapped_lines, HOME_WRAP_MAX_LINES);
     return page_count_for_lines(total_lines, HOME_REPLY_LINES_PER_PAGE);
-}
-
-static void render_wrapped_page(
-    const char* label,
-    char lines[][HOME_WRAP_WIDTH + 1],
-    size_t total_lines,
-    size_t page,
-    size_t lines_per_page,
-    bool show_page_indicator
-)
-{
-    size_t page_count = page_count_for_lines(total_lines, lines_per_page);
-    size_t clamped_page = page < page_count ? page : page_count - 1;
-    size_t start = clamped_page * lines_per_page;
-    size_t end = start + lines_per_page;
-    size_t index;
-
-    printf("%s\n", label);
-    for (index = start; index < total_lines && index < end; index++)
-        printf("%s\n", lines[index]);
-
-    if (show_page_indicator)
-        printf("Page %lu/%lu\n", (unsigned long)(clamped_page + 1), (unsigned long)page_count);
 }
 
 static const BridgeV2ConversationInfo* find_synced_conversation(
@@ -298,289 +215,6 @@ static void format_active_conversation_label(
         snprintf(out_label, out_size, "%s", info->title);
     else
         snprintf(out_label, out_size, "%s", config->active_conversation_id);
-}
-
-static void render_home_top_screen(
-    PrintConsole* top_console,
-    const HermesAppConfig* config,
-    const BridgeHealthResult* health_result,
-    const BridgeChatResult* chat_result,
-    const char* last_message,
-    size_t reply_page,
-    const char* status_line,
-    Result last_rc,
-    const BridgeV2ConversationListResult* conversation_list
-)
-{
-    char message_lines[16][HOME_WRAP_WIDTH + 1];
-    char reply_lines[HOME_WRAP_MAX_LINES][HOME_WRAP_WIDTH + 1];
-    char conversation_label[HERMES_APP_CONVERSATION_ID_MAX];
-    size_t message_line_count = 0;
-    size_t reply_line_count = 0;
-
-    char link_errno_line[32];
-    char link_stage_line[40];
-    char relay_status_line[40];
-
-    consoleSelect(top_console);
-    consoleClear();
-
-    render_brand_header("MESSENGER DECK");
-    format_active_conversation_label(config, conversation_list, conversation_label, sizeof(conversation_label));
-
-    if (chat_result != NULL && (chat_result->success || chat_result->error[0] != '\0')) {
-        snprintf(link_errno_line, sizeof(link_errno_line), "Socket: %d", chat_result->socket_errno);
-        snprintf(link_stage_line, sizeof(link_stage_line), "Stage : %s", chat_result->socket_stage[0] != '\0' ? chat_result->socket_stage : "n/a");
-    } else {
-        snprintf(link_errno_line, sizeof(link_errno_line), "Socket: %d", health_result->socket_errno);
-        snprintf(link_stage_line, sizeof(link_stage_line), "Stage : %s", health_result->socket_stage[0] != '\0' ? health_result->socket_stage : "n/a");
-    }
-    snprintf(relay_status_line, sizeof(relay_status_line), "Status: %s", status_line);
-
-    print_at(5, 1, "+---------------------------+--------------------+");
-    print_at(6, 1, "| [ MESSENGER LINK ]        | [ RELAY CREST ]    |");
-    /* ACTIVE THREAD remains a first-class top-screen field. */
-    print_at(7, 1, "| Thread:                   |                    |");
-    print_field_at(7, 11, 17, conversation_label);
-    print_at(7, 30, render_pixel_crest_line(0));
-    print_at(8, 1, "| Status:                   |                    |");
-    print_field_at(8, 11, 17, status_line);
-    print_at(8, 30, render_pixel_crest_line(1));
-    print_at(9, 1, "| LINK STATE                |                    |");
-    print_at(9, 30, render_pixel_crest_line(2));
-    print_at(10, 1, "| Socket:                   |                    |");
-    print_field_at(10, 11, 17, link_errno_line + 8);
-    print_at(10, 30, render_pixel_crest_line(3));
-    print_at(11, 1, "| Stage :                   |                    |");
-    print_field_at(11, 11, 17, link_stage_line + 8);
-    print_at(11, 30, render_pixel_crest_line(4));
-    print_at(12, 1, "+---------------------------+--------------------+");
-    print_at(13, 1, "[ SESSION ]");
-    print_at(14, 1, "----------------------------------------------");
-
-    if (chat_result != NULL && chat_result->success) {
-        print_at(15, 1, "Last message:");
-        message_line_count = wrap_text_for_console(last_message, message_lines, 16);
-        reply_line_count = wrap_text_for_console(chat_result->reply, reply_lines, HOME_WRAP_MAX_LINES);
-        printf("\x1b[16;1H");
-        render_wrapped_page("", message_lines, message_line_count, 0, HOME_MESSAGE_LINES_PER_PAGE, false);
-        /* Hermes reply panel uses the wider lower top-screen area. */
-        print_at(20, 1, "[ HERMES REPLY ]");
-        print_at(21, 1, "Last reply:");
-        printf("\x1b[22;1H");
-        render_wrapped_page("", reply_lines, reply_line_count, reply_page, HOME_REPLY_LINES_PER_PAGE, true);
-        if (chat_result->truncated)
-            printf("(reply truncated)\n");
-    } else if (chat_result != NULL && chat_result->error[0] != '\0') {
-        print_at(15, 1, "Last message:");
-        message_line_count = wrap_text_for_console(last_message, message_lines, 16);
-        reply_line_count = wrap_text_for_console(chat_result->error, reply_lines, HOME_WRAP_MAX_LINES);
-        printf("\x1b[16;1H");
-        render_wrapped_page("", message_lines, message_line_count, 0, HOME_MESSAGE_LINES_PER_PAGE, false);
-        /* Hermes reply panel uses the wider lower top-screen area. */
-        print_at(20, 1, "[ HERMES REPLY ]");
-        print_at(21, 1, "Last reply:");
-        printf("\x1b[22;1H");
-        render_wrapped_page("", reply_lines, reply_line_count, 0, HOME_REPLY_LINES_PER_PAGE, false);
-        if (chat_result->http_status != 0)
-            printf("http: %lu\n", (unsigned long)chat_result->http_status);
-    } else if (health_result->success) {
-        print_at(15, 1, "Hermes gateway OK");
-        print_at(16, 1, health_result->service);
-        print_at(17, 1, health_result->version);
-        snprintf(relay_status_line, sizeof(relay_status_line), "http: %lu", (unsigned long)health_result->http_status);
-        print_at(18, 1, relay_status_line);
-    } else if (health_result->error[0] != '\0') {
-        print_at(15, 1, "Gateway check failed");
-        print_at(16, 1, health_result->error);
-        if (health_result->http_status != 0) {
-            snprintf(relay_status_line, sizeof(relay_status_line), "http: %lu", (unsigned long)health_result->http_status);
-            print_at(17, 1, relay_status_line);
-        }
-    } else {
-        print_at(15, 1, "Ready for a request.");
-        print_at(16, 1, "Use COMMAND DECK below.");
-        print_at(17, 1, "Hermes relay is standing by.");
-    }
-}
-
-static void render_home_bottom_screen(
-    PrintConsole* bottom_console,
-    const HermesAppConfig* config,
-    const BridgeChatResult* chat_result,
-    const BridgeV2ConversationListResult* conversation_list
-)
-{
-    char bridge_summary[80];
-    char token_summary[48];
-    size_t page_count = 1;
-
-    (void)conversation_list;
-
-    consoleSelect(bottom_console);
-    consoleClear();
-
-    format_token_summary(config, token_summary, sizeof(token_summary));
-    snprintf(bridge_summary, sizeof(bridge_summary), "%s:%u", config->host, (unsigned int)config->port);
-
-    if (chat_result != NULL && chat_result->success)
-        page_count = hermes_app_ui_reply_page_count(chat_result->reply);
-
-    printf("+--------------------------------------+\n");
-    printf("|             COMMAND DECK             |\n");
-    printf("+--------------------------------------+\n");
-    printf("A Check     B Ask\n");
-    printf("UP Mic      X Config\n");
-    printf("SELECT Conv Y Clear\n");
-    printf("START Exit\n");
-    if (chat_result != NULL && chat_result->success && page_count > 1)
-        printf("L/R page reply\n");
-    else
-        printf("L/R when reply is long\n");
-    print_rule();
-    printf("Gateway:\n%s\n", bridge_summary);
-    printf("Token: %s\n", token_summary);
-}
-
-static void render_settings_top_screen(
-    PrintConsole* top_console,
-    const HermesAppConfig* config,
-    SettingsField selected_field,
-    bool settings_dirty,
-    const char* status_line,
-    Result last_rc
-)
-{
-    char token_summary[48];
-    const char* host_cursor = selected_field == SETTINGS_FIELD_HOST ? ">" : " ";
-    const char* port_cursor = selected_field == SETTINGS_FIELD_PORT ? ">" : " ";
-    const char* token_cursor = selected_field == SETTINGS_FIELD_TOKEN ? ">" : " ";
-    const char* device_id_cursor = selected_field == SETTINGS_FIELD_DEVICE_ID ? ">" : " ";
-
-    char dirty_line[24];
-    char status_summary[40];
-    char rc_line[32];
-
-    consoleSelect(top_console);
-    consoleClear();
-
-    format_token_summary(config, token_summary, sizeof(token_summary));
-
-    render_brand_header("SYSTEM CONFIG");
-    render_relay_crest();
-    snprintf(dirty_line, sizeof(dirty_line), "Dirty: %s", settings_dirty ? "yes" : "no");
-    snprintf(status_summary, sizeof(status_summary), "Status: %s", status_line);
-    snprintf(rc_line, sizeof(rc_line), "rc: 0x%08lX", (unsigned long)last_rc);
-    render_split_line(dirty_line, 0);
-    render_split_line(status_summary, 1);
-    render_split_line(rc_line, 2);
-    print_rule();
-    render_panel_title("LINK SETTINGS");
-    printf("%s Host\n", host_cursor);
-    printf("  %s\n", config->host);
-    printf("%s Port\n", port_cursor);
-    printf("  %u\n", (unsigned int)config->port);
-    printf("%s Token\n", token_cursor);
-    printf("  %s\n", token_summary);
-    printf("%s Device ID\n", device_id_cursor);
-    printf("  %s\n", config->device_id[0] != '\0' ? config->device_id : "<empty>");
-}
-
-static void render_settings_bottom_screen(PrintConsole* bottom_console)
-{
-    consoleSelect(bottom_console);
-    consoleClear();
-
-    printf("+--------------------------------------+\n");
-    printf("|             CONFIG DECK              |\n");
-    printf("+--------------------------------------+\n");
-    printf("UP/DOWN field\n");
-    printf("A edit value\n");
-    printf("X Save settings\n");
-    printf("Y restore defaults\n");
-    printf("B home   START exit\n");
-}
-
-static void render_conversations_top_screen(
-    PrintConsole* top_console,
-    const HermesAppConfig* config,
-    const char* status_line,
-    Result last_rc,
-    const BridgeV2ConversationListResult* conversation_list,
-    size_t conversation_selection
-)
-{
-    size_t visible = 4;
-    size_t start = 0;
-    size_t end;
-    size_t index;
-
-    char rc_line[32];
-
-    consoleSelect(top_console);
-    consoleClear();
-
-    render_brand_header("THREADS / Conversations");
-    render_relay_crest();
-    render_split_line(status_line, 0);
-    snprintf(rc_line, sizeof(rc_line), "rc: 0x%08lX", (unsigned long)last_rc);
-    render_split_line(rc_line, 1);
-    print_rule();
-    render_panel_title("THREAD ARCHIVE");
-
-    if (config == NULL || config->recent_conversation_count == 0) {
-        printf("No saved conversations.\n");
-        printf("Press X to add one.\n");
-        return;
-    }
-
-    if (conversation_selection >= visible)
-        start = conversation_selection - (visible - 1);
-    end = start + visible;
-    if (end > config->recent_conversation_count)
-        end = config->recent_conversation_count;
-
-    for (index = start; index < end; index++) {
-        const BridgeV2ConversationInfo* info = find_synced_conversation(conversation_list, config->recent_conversations[index]);
-        const char* cursor = index == conversation_selection ? ">" : " ";
-        const char* active = strcmp(config->active_conversation_id, config->recent_conversations[index]) == 0 ? "*" : " ";
-        const char* title = (info != NULL && info->title[0] != '\0') ? info->title : config->recent_conversations[index];
-
-        printf("%s%s %s\n", cursor, active, title);
-        if (strcmp(title, config->recent_conversations[index]) != 0)
-            printf("   %s\n", config->recent_conversations[index]);
-        if (info != NULL && info->preview[0] != '\0')
-            printf("   %s\n", info->preview);
-        else
-            printf("\n");
-    }
-}
-
-static void render_conversations_bottom_screen(
-    PrintConsole* bottom_console,
-    const HermesAppConfig* config,
-    const BridgeV2ConversationListResult* conversation_list,
-    size_t conversation_selection
-)
-{
-    const BridgeV2ConversationInfo* info = NULL;
-
-    consoleSelect(bottom_console);
-    consoleClear();
-
-    if (config != NULL && config->recent_conversation_count > 0)
-        info = find_synced_conversation(conversation_list, config->recent_conversations[conversation_selection]);
-
-    printf("+--------------------------------------+\n");
-    printf("|             THREAD DECK              |\n");
-    printf("+--------------------------------------+\n");
-    printf("UP/DOWN select\n");
-    printf("A use thread\n");
-    printf("X new thread\n");
-    printf("Y sync Hermes\n");
-    printf("B home\n");
-    if (info != NULL && info->session_id[0] != '\0')
-        printf("sid %s\n", info->session_id);
 }
 
 #define UI_BG_TOP C2D_Color32(0x1C, 0x1D, 0x25, 0xFF)
@@ -840,6 +474,73 @@ static void render_conversations_graphical(
     draw_menu_row(16.0f, 98.0f, 288.0f, "Y Sync Hermes", false);
     draw_menu_row(16.0f, 118.0f, 288.0f, "B Home", false);
     draw_menu_row(16.0f, 138.0f, 288.0f, "START Exit", false);
+}
+
+void hermes_app_ui_render_approval_prompt(const char* request_id)
+{
+    char request_line[96];
+
+    if (request_id != NULL && request_id[0] != '\0')
+        snprintf(request_line, sizeof(request_line), "Request %s", request_id);
+    else
+        snprintf(request_line, sizeof(request_line), "Approval request pending");
+
+    app_gfx_begin_frame();
+
+    app_gfx_begin_top(UI_BG_TOP);
+    draw_header("HERMES AGENT", "APPROVAL");
+    app_gfx_panel_inset(24.0f, 56.0f, 352.0f, 156.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
+    app_gfx_text(36.0f, 72.0f, 0.46f, 0.46f, UI_TEXT, "Approval required");
+    app_gfx_text_fit(36.0f, 92.0f, 328.0f, 0.32f, 0.32f, UI_MUTED, request_line);
+    app_gfx_text_fit(36.0f, 120.0f, 328.0f, 0.34f, 0.34f, UI_HILITE, "Hermes needs a response before it can continue.");
+    app_gfx_text_fit(36.0f, 144.0f, 328.0f, 0.32f, 0.32f, UI_TEXT, "Choose how long to allow the action, or deny it.");
+
+    app_gfx_begin_bottom(UI_BG_BOTTOM);
+    draw_bottom_header("APPROVAL CONTROLS");
+    app_gfx_panel_inset(8.0f, 46.0f, 304.0f, 138.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
+    draw_menu_row(16.0f, 58.0f, 288.0f, "A Allow once", false);
+    draw_menu_row(16.0f, 78.0f, 288.0f, "X Allow session", false);
+    draw_menu_row(16.0f, 98.0f, 288.0f, "Y Allow always", false);
+    draw_menu_row(16.0f, 118.0f, 288.0f, "B Deny", false);
+    draw_menu_row(16.0f, 138.0f, 288.0f, "START Cancel", false);
+
+    app_gfx_end_frame();
+}
+
+void hermes_app_ui_render_voice_recording(unsigned long tenths, size_t pcm_size, const char* status_line, bool waiting_for_up_release)
+{
+    char time_line[32];
+    char audio_line[48];
+    const char* capture_state = waiting_for_up_release ? "Release UP to arm stop." : "Press UP to stop and send.";
+
+    snprintf(time_line, sizeof(time_line), "%lu.%lus", tenths / 10, tenths % 10);
+    snprintf(audio_line, sizeof(audio_line), "%lu bytes", (unsigned long)pcm_size);
+
+    app_gfx_begin_frame();
+
+    app_gfx_begin_top(UI_BG_TOP);
+    draw_header("HERMES AGENT", "MIC INPUT");
+    app_gfx_panel_inset(20.0f, 54.0f, 360.0f, 160.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
+    app_gfx_text(32.0f, 70.0f, 0.46f, 0.46f, UI_TEXT, "Recording microphone");
+    app_gfx_text_fit(32.0f, 92.0f, 316.0f, 0.32f, 0.32f, UI_MUTED, status_line != NULL && status_line[0] != '\0' ? status_line : "Mic is recording now.");
+    app_gfx_text(32.0f, 122.0f, 0.34f, 0.34f, UI_HILITE, "TIME");
+    app_gfx_panel(96.0f, 118.0f, 100.0f, 24.0f, UI_PANEL_ALT, UI_BORDER);
+    app_gfx_text(106.0f, 124.0f, 0.34f, 0.34f, UI_TEXT, time_line);
+    app_gfx_text(220.0f, 122.0f, 0.34f, 0.34f, UI_HILITE, "AUDIO");
+    app_gfx_panel(286.0f, 118.0f, 74.0f, 24.0f, UI_PANEL_ALT, UI_BORDER);
+    app_gfx_text_fit(292.0f, 124.0f, 62.0f, 0.30f, 0.30f, UI_TEXT, audio_line);
+    app_gfx_text(32.0f, 162.0f, 0.34f, 0.34f, UI_TEXT, capture_state);
+
+    app_gfx_begin_bottom(UI_BG_BOTTOM);
+    draw_bottom_header("MIC CONTROLS");
+    app_gfx_panel_inset(8.0f, 46.0f, 304.0f, 138.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
+    draw_menu_row(16.0f, 58.0f, 288.0f, "UP Stop + send", !waiting_for_up_release);
+    draw_menu_row(16.0f, 78.0f, 288.0f, "B Cancel", false);
+    draw_menu_row(16.0f, 98.0f, 288.0f, "START Cancel", false);
+    draw_menu_row(16.0f, 118.0f, 288.0f, "5 min safety timeout", false);
+    draw_menu_row(16.0f, 138.0f, 288.0f, capture_state, false);
+
+    app_gfx_end_frame();
 }
 
 void hermes_app_ui_render(

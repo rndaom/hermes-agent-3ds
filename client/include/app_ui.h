@@ -35,3 +35,6 @@ void hermes_app_ui_render(
     const BridgeV2ConversationListResult* conversation_list,
     size_t conversation_selection
 );
+
+void hermes_app_ui_render_approval_prompt(const char* request_id);
+void hermes_app_ui_render_voice_recording(unsigned long tenths, size_t pcm_size, const char* status_line, bool waiting_for_up_release);

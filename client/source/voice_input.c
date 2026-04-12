@@ -1,4 +1,5 @@
 #include "voice_input.h"
+#include "app_ui.h"
 
 #include <limits.h>
 #include <malloc.h>
@@ -76,43 +77,12 @@ static unsigned long recording_tenths_elapsed(u64 start_ms)
     return (unsigned long)((osGetTime() - start_ms) / 100ULL);
 }
 
-static void render_recording_shell(PrintConsole* top_console, PrintConsole* bottom_console)
+static void render_recording_status(unsigned long tenths, size_t pcm_size, const char* status_line, bool waiting_for_up_release)
 {
-    consoleSelect(top_console);
-    consoleClear();
-    printf("Hermes Agent 3DS\n");
-    printf("Record mic\n");
-    printf("==========\n");
-    printf("Mic is recording now.\n");
-    printf("Time: 0.0s\n");
-    printf("Audio: 0 bytes\n");
-    printf("\n");
-    printf("Press UP to stop and send.\n");
-    printf("Press B to cancel.\n");
-
-    consoleSelect(bottom_console);
-    consoleClear();
-    printf("Mic controls\n");
-    printf("============\n");
-    printf("UP: stop + send\n");
-    printf("B: cancel\n");
-    printf("5 min safety timeout\n");
-    printf("START: exit app\n");
-}
-
-static void update_recording_status(PrintConsole* top_console, size_t pcm_size, unsigned long tenths)
-{
-    unsigned long seconds = tenths / 10;
-    unsigned long tenth_digit = tenths % 10;
-
-    consoleSelect(top_console);
-    printf("\x1b[5;1HTime: %lu.%lus            ", seconds, tenth_digit);
-    printf("\x1b[6;1HAudio: %lu bytes        ", (unsigned long)pcm_size);
+    hermes_app_ui_render_voice_recording(tenths, pcm_size, status_line, waiting_for_up_release);
 }
 
 bool voice_input_record_prompt(
-    PrintConsole* top_console,
-    PrintConsole* bottom_console,
     u8** out_wav_data,
     size_t* out_wav_size,
     char* status_line,
@@ -129,10 +99,11 @@ bool voice_input_record_prompt(
     bool canceled = false;
     bool success = false;
     bool waiting_for_up_release = true;
+    bool last_waiting_for_up_release = true;
     u64 start_ms = 0;
     unsigned long last_render_tenths = ULONG_MAX;
 
-    if (out_wav_data == NULL || out_wav_size == NULL || top_console == NULL || bottom_console == NULL) {
+    if (out_wav_data == NULL || out_wav_size == NULL) {
         set_status(status_line, status_line_size, "Mic input is not available.");
         return false;
     }
@@ -165,10 +136,8 @@ bool voice_input_record_prompt(
     sampling_started = true;
     start_ms = osGetTime();
 
-    render_recording_shell(top_console, bottom_console);
-    update_recording_status(top_console, pcm_size, 0);
-    gfxFlushBuffers();
-    gfxSwapBuffers();
+    set_status(status_line, status_line_size, "Mic is recording now.");
+    render_recording_status(0, pcm_size, status_line, waiting_for_up_release);
     last_render_tenths = 0;
 
     while (aptMainLoop()) {
@@ -181,17 +150,10 @@ bool voice_input_record_prompt(
 
         copy_ring_audio(mic_buffer, mic_data_size, &mic_pos, pcm_buffer, &pcm_size);
         current_tenths = recording_tenths_elapsed(start_ms);
-        if (current_tenths != last_render_tenths) {
-            update_recording_status(top_console, pcm_size, current_tenths);
-            gfxFlushBuffers();
-            gfxSwapBuffers();
+        if (current_tenths != last_render_tenths || waiting_for_up_release != last_waiting_for_up_release) {
+            render_recording_status(current_tenths, pcm_size, status_line, waiting_for_up_release);
             last_render_tenths = current_tenths;
-        }
-
-        if (waiting_for_up_release) {
-            if ((hidKeysHeld() & KEY_UP) == 0)
-                waiting_for_up_release = false;
-            continue;
+            last_waiting_for_up_release = waiting_for_up_release;
         }
 
         if ((kDown & KEY_START) != 0) {
@@ -204,6 +166,15 @@ bool voice_input_record_prompt(
             set_status(status_line, status_line_size, "Mic input canceled.");
             break;
         }
+
+        if (waiting_for_up_release) {
+            if ((hidKeysHeld() & KEY_UP) == 0) {
+                waiting_for_up_release = false;
+                set_status(status_line, status_line_size, "Mic is recording now.");
+            }
+            continue;
+        }
+
         if ((kDown & KEY_UP) != 0) {
             set_status(status_line, status_line_size, "Mic captured. Sending to Hermes...");
             break;

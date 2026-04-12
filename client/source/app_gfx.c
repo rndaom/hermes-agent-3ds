@@ -1,10 +1,31 @@
 #include "app_gfx.h"
 
+#include <stdio.h>
 #include <string.h>
 
 static C3D_RenderTarget* g_top_target = NULL;
 static C3D_RenderTarget* g_bottom_target = NULL;
 static C2D_TextBuf g_text_buf = NULL;
+static C2D_TextBuf g_measure_buf = NULL;
+
+static bool app_gfx_measure_text_dimensions(const char* text, float scale_x, float scale_y, float* out_width, float* out_height)
+{
+    C2D_Text draw_text;
+
+    if (g_measure_buf == NULL || text == NULL || text[0] == '\0') {
+        if (out_width != NULL)
+            *out_width = 0.0f;
+        if (out_height != NULL)
+            *out_height = 0.0f;
+        return false;
+    }
+
+    C2D_TextBufClear(g_measure_buf);
+    C2D_TextParse(&draw_text, g_measure_buf, text);
+    C2D_TextOptimize(&draw_text);
+    C2D_TextGetDimensions(&draw_text, scale_x, scale_y, out_width, out_height);
+    return true;
+}
 
 bool app_gfx_init(void)
 {
@@ -18,12 +39,18 @@ bool app_gfx_init(void)
     g_top_target = C2D_CreateScreenTarget(GFX_TOP, GFX_LEFT);
     g_bottom_target = C2D_CreateScreenTarget(GFX_BOTTOM, GFX_LEFT);
     g_text_buf = C2D_TextBufNew(8192);
+    g_measure_buf = C2D_TextBufNew(4096);
 
-    return g_top_target != NULL && g_bottom_target != NULL && g_text_buf != NULL;
+    return g_top_target != NULL && g_bottom_target != NULL && g_text_buf != NULL && g_measure_buf != NULL;
 }
 
 void app_gfx_fini(void)
 {
+    if (g_measure_buf != NULL) {
+        C2D_TextBufDelete(g_measure_buf);
+        g_measure_buf = NULL;
+    }
+
     if (g_text_buf != NULL) {
         C2D_TextBufDelete(g_text_buf);
         g_text_buf = NULL;
@@ -86,6 +113,70 @@ void app_gfx_text(float x, float y, float scale_x, float scale_y, u32 color, con
     C2D_TextParse(&draw_text, g_text_buf, text);
     C2D_TextOptimize(&draw_text);
     C2D_DrawText(&draw_text, C2D_WithColor, x, y, 0.5f, scale_x, scale_y, color);
+}
+
+void app_gfx_text_fit(float x, float y, float max_width, float scale_x, float scale_y, u32 color, const char* text)
+{
+    char fitted[128];
+    float width = 0.0f;
+    float height = 0.0f;
+    size_t full_length;
+    size_t low;
+    size_t high;
+    size_t best = 0;
+
+    if (text == NULL || text[0] == '\0' || max_width <= 0.0f) {
+        app_gfx_text(x, y, scale_x, scale_y, color, text);
+        return;
+    }
+
+    if (app_gfx_measure_text_dimensions(text, scale_x, scale_y, &width, &height) && width <= max_width) {
+        app_gfx_text(x, y, scale_x, scale_y, color, text);
+        return;
+    }
+
+    full_length = strlen(text);
+    if (full_length >= sizeof(fitted))
+        full_length = sizeof(fitted) - 1;
+
+    low = 0;
+    high = full_length;
+    while (low <= high) {
+        size_t mid = low + (high - low) / 2;
+
+        if (mid == 0) {
+            snprintf(fitted, sizeof(fitted), "...");
+        } else if (mid <= 3) {
+            snprintf(fitted, sizeof(fitted), "...");
+        } else {
+            memcpy(fitted, text, mid - 3);
+            fitted[mid - 3] = '.';
+            fitted[mid - 2] = '.';
+            fitted[mid - 1] = '.';
+            fitted[mid] = '\0';
+        }
+
+        if (app_gfx_measure_text_dimensions(fitted, scale_x, scale_y, &width, &height) && width <= max_width) {
+            best = mid;
+            low = mid + 1;
+        } else {
+            if (mid == 0)
+                break;
+            high = mid - 1;
+        }
+    }
+
+    if (best <= 3) {
+        snprintf(fitted, sizeof(fitted), "...");
+    } else {
+        memcpy(fitted, text, best - 3);
+        fitted[best - 3] = '.';
+        fitted[best - 2] = '.';
+        fitted[best - 1] = '.';
+        fitted[best] = '\0';
+    }
+
+    app_gfx_text(x, y, scale_x, scale_y, color, fitted);
 }
 
 void app_gfx_text_right(float right_x, float y, float scale_x, float scale_y, u32 color, const char* text)

@@ -20,12 +20,13 @@ def test_main_c_bootstraps_a_basic_old_3ds_friendly_loop():
     assert main_c.exists(), "client/source/main.c should exist"
 
     content = main_c.read_text()
-    assert "gfxInitDefault" in content
-    assert "gfxSet3D(false)" in content
-    assert "consoleInit" in content
+    assert '"app_gfx.h"' in content
+    assert "hermes_app_ui_init()" in content
+    assert "hermes_app_ui_exit()" in content
     assert "aptMainLoop" in content
     assert "KEY_START" in content
     assert "Old 3DS" in content
+    assert "consoleInit" not in content
 
 
 def test_icon_and_include_dir_exist():

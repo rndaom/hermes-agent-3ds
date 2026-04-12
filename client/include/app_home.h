@@ -26,8 +26,6 @@ typedef void (*AppHomeRenderFn)(
 
 typedef struct AppHomeContext {
     AppConversationState* conversation_state;
-    PrintConsole* top_console;
-    PrintConsole* bottom_console;
     SettingsField selected_field;
     bool settings_dirty;
     BridgeHealthResult* health_result;

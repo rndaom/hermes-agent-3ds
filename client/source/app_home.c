@@ -86,8 +86,6 @@ bool hermes_app_home_handle_input(
         return false;
     }
 
-    request_ui.top_console = context->top_console;
-    request_ui.bottom_console = context->bottom_console;
     request_ui.selected_field = context->selected_field;
     request_ui.settings_dirty = context->settings_dirty;
     request_ui.health_result = context->health_result;

@@ -41,7 +41,7 @@ def test_main_c_offers_a_button_driven_native_v2_gateway_health_check_ui():
     home_c = (CLIENT_DIR / "source" / "app_home.c").read_text()
     request_c = (CLIENT_DIR / "source" / "app_requests.c").read_text()
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
-    assert "Use COMMAND DECK below." in ui_c
+    assert "COMMAND MENU" in ui_c
     assert "AppHomeContext" in home_h
     assert "Checking Hermes gateway..." in home_c
     assert "Reply received over native v2." in request_c

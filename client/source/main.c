@@ -13,8 +13,6 @@
 #include "bridge_chat.h"
 #include "bridge_health.h"
 
-static PrintConsole top_console;
-static PrintConsole bottom_console;
 static AppConversationState g_conversation_state;
 
 static void render_ui(
@@ -88,8 +86,6 @@ int main(int argc, char* argv[])
     if (!hermes_app_ui_init()) {
         return 1;
     }
-    consoleInit(GFX_TOP, &top_console);
-    consoleInit(GFX_BOTTOM, &bottom_console);
 
     init_rc = acInit();
     if (R_FAILED(init_rc)) {
@@ -120,8 +116,6 @@ int main(int argc, char* argv[])
         if (screen == APP_SCREEN_HOME) {
             AppHomeContext home_context = {
                 &g_conversation_state,
-                &top_console,
-                &bottom_console,
                 selected_field,
                 settings_dirty,
                 &health_result,

@@ -164,16 +164,9 @@ static void render_home_request_ui(
     );
 }
 
-static void flush_request_ui(void)
+static bool prompt_v2_approval_choice(const char* request_id, char* out_choice, size_t out_size)
 {
-    gfxFlushBuffers();
-    gfxSwapBuffers();
-    gspWaitForVBlank();
-}
-
-static bool prompt_v2_approval_choice(PrintConsole* top_console, PrintConsole* bottom_console, char* out_choice, size_t out_size)
-{
-    if (top_console == NULL || bottom_console == NULL || out_choice == NULL || out_size == 0)
+    if (out_choice == NULL || out_size == 0)
         return false;
 
     out_choice[0] = '\0';
@@ -181,25 +174,8 @@ static bool prompt_v2_approval_choice(PrintConsole* top_console, PrintConsole* b
     while (aptMainLoop()) {
         u32 kDown;
 
-        consoleSelect(top_console);
-        consoleClear();
-        printf("Hermes Agent 3DS\n");
-        printf("Approval required\n");
-        printf("=================\n");
-        printf("A: allow once\n");
-        printf("X: allow session\n");
-        printf("Y: allow always\n");
-        printf("B: deny\n");
-
-        consoleSelect(bottom_console);
-        consoleClear();
-        printf("Approval controls\n");
-        printf("================\n");
-        printf("A once   X session\n");
-        printf("Y always B deny\n");
-        printf("START cancel\n");
-
-        flush_request_ui();
+        hermes_app_ui_render_approval_prompt(request_id);
+        gspWaitForVBlank();
         hidScanInput();
         kDown = hidKeysDown();
 
@@ -278,7 +254,7 @@ static Result complete_v2_roundtrip(
             set_chat_result_error(chat_result, "Approval URL could not be built.");
             goto done;
         }
-        if (!prompt_v2_approval_choice(ui->top_console, ui->bottom_console, approval_choice, sizeof(approval_choice))) {
+        if (!prompt_v2_approval_choice(event_result.request_id, approval_choice, sizeof(approval_choice))) {
             set_chat_result_error(chat_result, "Approval canceled.");
             goto done;
         }
@@ -391,7 +367,7 @@ void hermes_app_requests_handle_text(
 
     snprintf(status_line, status_line_size, "Asking Hermes over v2...");
     render_home_request_ui(config, ui, chat_result, last_message, *reply_page, status_line, *request_rc);
-    flush_request_ui();
+    gspWaitForVBlank();
 
     if (network_ready) {
         *request_rc = bridge_v2_send_message(messages_url, config->token, config->device_id, config->active_conversation_id, message_buffer, &message_result);
@@ -454,7 +430,7 @@ void hermes_app_requests_handle_voice(
         return;
     }
 
-    if (!voice_input_record_prompt(ui->top_console, ui->bottom_console, &wav_data, &wav_size, status_line, status_line_size)) {
+    if (!voice_input_record_prompt(&wav_data, &wav_size, status_line, status_line_size)) {
         render_home_request_ui(config, ui, chat_result, last_message, *reply_page, status_line, *request_rc);
         return;
     }
@@ -464,7 +440,7 @@ void hermes_app_requests_handle_voice(
 
     snprintf(status_line, status_line_size, "Sending mic input to Hermes...");
     render_home_request_ui(config, ui, chat_result, last_message, *reply_page, status_line, *request_rc);
-    flush_request_ui();
+    gspWaitForVBlank();
 
     *request_rc = bridge_v2_send_voice_message(voice_url, config->token, config->device_id, config->active_conversation_id, wav_data, wav_size, &message_result);
     free(wav_data);
