@@ -16,8 +16,10 @@ Last major verified milestone: **the V2-only 3DS client is validated end-to-end 
   - token
   - device ID
 - settings fields are editable with the 3DS software keyboard
+- active conversation + recent conversation list are persisted on SD
 - top/bottom-screen UI split is implemented
 - long replies page cleanly with `L/R`
+- conversation picker exists on `SELECT` for switching/syncing saved conversation slots
 - native V2 chat flow is implemented with:
   - `POST /api/v2/messages`
   - `POST /api/v2/voice`
@@ -35,6 +37,7 @@ Last major verified milestone: **the V2-only 3DS client is validated end-to-end 
 - the gateway exposes the expected V2 surface:
   - `GET /api/v2/health`
   - `GET /api/v2/capabilities`
+  - `GET /api/v2/conversations`
   - `POST /api/v2/messages`
   - `POST /api/v2/voice`
   - `GET /api/v2/events`
@@ -78,5 +81,5 @@ Latest built artifact:
 
 ## Recommended next steps
 
-1. add saved sessions / conversation selection
-2. keep tightening UI polish for Old 3DS readability and speed
+1. keep tightening UI polish for Old 3DS readability and speed
+2. expand conversation metadata polish if the handheld needs richer labels/previews later

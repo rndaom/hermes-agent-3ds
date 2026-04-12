@@ -18,10 +18,13 @@ def test_app_config_module_exists_with_sdmc_config_path_and_defaults():
     assert "DEFAULT_BRIDGE_PORT" in header
     assert "hermes_app_config_load" in header
     assert "hermes_app_config_save" in header
+    assert "active_conversation_id" in header
+    assert "recent_conversations" in header
     assert "hermes_app_config_build_health_url" in header
+    assert "hermes_app_config_build_conversations_url" in header
 
 
-def test_app_config_source_reads_and_writes_host_port_token_and_device_id():
+def test_app_config_source_reads_and_writes_host_port_token_device_id_and_conversations():
     source = (CLIENT_DIR / "source" / "app_config.c").read_text()
     assert "mkdir(" in source
     assert "fopen(" in source
@@ -31,8 +34,11 @@ def test_app_config_source_reads_and_writes_host_port_token_and_device_id():
     assert '"port=%u\\n"' in source
     assert '"token=%s\\n"' in source
     assert '"device_id=%s\\n"' in source
+    assert '"active_conversation_id=%s\\n"' in source
+    assert '"recent_conversations="' in source
     assert "DEFAULT_BRIDGE_HOST" in source
     assert "DEFAULT_BRIDGE_PORT" in source
+    assert "DEFAULT_CONVERSATION_ID" in source
 
 
 def test_main_c_loads_saved_config_and_uses_it_for_health_checks():
@@ -45,17 +51,22 @@ def test_main_c_loads_saved_config_and_uses_it_for_health_checks():
     assert "bridge_health_check_run(DEFAULT_BRIDGE_HEALTH_URL" not in main_c
 
 
-def test_main_c_has_settings_screen_navigation_and_keyboard_editing():
+def test_main_c_has_settings_and_conversation_picker_navigation():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
     assert "APP_SCREEN_SETTINGS" in main_c
+    assert "APP_SCREEN_CONVERSATIONS" in main_c
     assert "KEY_X" in main_c
     assert "KEY_UP" in main_c
     assert "KEY_DOWN" in main_c
+    assert "KEY_SELECT" in main_c
     assert "swkbdInit" in main_c
     assert "swkbdInputText" in main_c
     assert "Host" in main_c
     assert "Port" in main_c
     assert "Token" in main_c
     assert "Device ID" in main_c
-    assert "X: settings" in main_c or "Settings" in main_c
+    assert "Conversation picker opened" in main_c
+    assert "bridge_v2_list_conversations" in main_c
+    assert "active_conversation_id" in main_c
+    assert "SELECT conv" in main_c or "Conversations" in main_c
     assert "Save settings" in main_c or "X: save" in main_c

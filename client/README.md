@@ -11,7 +11,9 @@ The client now has:
 - simple Old 3DS-friendly console UI
 - SD-backed config load/save
 - settings screen for host, port, token, and device ID
+- SD-backed active conversation + recent conversation cache
 - native V2 gateway health check over HTTP
+- native V2 conversation-slot sync via `GET /api/v2/conversations`
 - native V2 message send / event poll flow
 - on-device approval handling
 - in-app rendering for the last message and last reply
@@ -21,12 +23,20 @@ Current controls:
 
 ### Home
 - `A` — check Hermes gateway health
-- `B` — Ask Hermes / open the message keyboard
+- `B` — Ask Hermes / open the message keyboard in the active conversation
 - `UP` — start mic input and send it for host-side speech-to-text
 - `X` — open settings
+- `SELECT` — open the conversation picker
 - `Y` — clear the current status
 - `L/R` — page long replies
 - `START` — exit back to Homebrew Launcher
+
+### Conversations
+- `UP/DOWN` — select a saved conversation slot
+- `A` — activate the highlighted conversation
+- `X` — create a new conversation ID
+- `Y` — sync recent conversation slots from Hermes
+- `B` — return home
 
 ### Settings
 - `UP/DOWN` — select host / port / token / device ID
@@ -40,6 +50,10 @@ Config is stored at:
 ```text
 sdmc:/3ds/hermes-agent-3ds/config.ini
 ```
+
+That file now also persists:
+- the active `conversation_id`
+- a small recent-conversation list used by the on-device picker
 
 ## Build
 

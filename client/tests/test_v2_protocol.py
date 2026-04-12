@@ -27,6 +27,7 @@ def test_app_config_supports_native_v2_urls_and_device_identity():
     assert '"/api/v2/messages"' in source
     assert '"/api/v2/events"' in source
     assert '"/api/v2/voice"' in source
+    assert '"/api/v2/conversations"' in source
     assert '"/api/v2/interactions/"' in source
     assert "device_id=" in source
 
@@ -56,6 +57,7 @@ def test_bridge_v2_module_exists_for_native_gateway_protocol():
     assert "Authorization: Bearer " in source
     assert "bridge_v2_send_message" in source or '"/api/v2/messages"' in source
     assert "bridge_v2_send_voice_message" in source or '"/api/v2/voice"' in source
+    assert "bridge_v2_list_conversations" in source
     assert "device_id" in source
     assert "conversation_id" in source
     assert "audio/wav" in source

@@ -641,6 +641,13 @@ void bridge_v2_capabilities_result_reset(BridgeV2CapabilitiesResult* result)
     memset(result, 0, sizeof(*result));
 }
 
+void bridge_v2_conversation_list_result_reset(BridgeV2ConversationListResult* result)
+{
+    if (result == NULL)
+        return;
+    memset(result, 0, sizeof(*result));
+}
+
 void bridge_v2_message_result_reset(BridgeV2MessageResult* result)
 {
     if (result == NULL)
@@ -730,6 +737,80 @@ Result bridge_v2_get_capabilities(const char* url, const char* token, BridgeV2Ca
     extract_json_string_v2(body, "service", result->service, sizeof(result->service));
     extract_json_string_v2(body, "platform", result->platform, sizeof(result->platform));
     extract_json_string_v2(body, "transport", result->transport, sizeof(result->transport));
+    result->success = true;
+    result->error[0] = '\0';
+    return 0;
+}
+
+Result bridge_v2_list_conversations(const char* url, const char* token, const char* device_id, BridgeV2ConversationListResult* result)
+{
+    char host[64];
+    char path[192];
+    char path_with_query[320];
+    char full_url[512];
+    char response[BRIDGE_V2_RESPONSE_MAX];
+    const char* body;
+    const char* cursor;
+    u16 port = 0;
+    u32 status_code = 0;
+    Result rc;
+
+    bridge_v2_conversation_list_result_reset(result);
+    if (result == NULL)
+        return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_POINTER);
+
+    if (url == NULL || device_id == NULL || device_id[0] == '\0') {
+        set_error(result->error, sizeof(result->error), "device_id is required.");
+        return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
+    }
+    if (!is_safe_query_value(device_id)) {
+        set_error(result->error, sizeof(result->error), "device_id contains unsupported characters.");
+        return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
+    }
+
+    if (!parse_http_url(url, host, sizeof(host), &port, path, sizeof(path))) {
+        set_error(result->error, sizeof(result->error), "Bridge URL is invalid.");
+        return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
+    }
+
+    snprintf(path_with_query, sizeof(path_with_query), "%s?device_id=%s&limit=%u", path, device_id, (unsigned int)BRIDGE_V2_CONVERSATION_COUNT_MAX);
+    snprintf(full_url, sizeof(full_url), "http://%s:%u%s", host, (unsigned int)port, path_with_query);
+
+    rc = perform_request("GET", full_url, token, NULL, 0, NULL, response, sizeof(response), &status_code, result->error, sizeof(result->error));
+    if (R_FAILED(rc))
+        return rc;
+
+    body = response_body_start(response);
+    if (body == NULL) {
+        set_error(result->error, sizeof(result->error), "Bridge response body was missing.");
+        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
+    }
+    if (status_code != 200) {
+        if (!extract_json_string_v2(body, "error", result->error, sizeof(result->error)))
+            snprintf(result->error, sizeof(result->error), "Bridge returned HTTP %lu.", (unsigned long)status_code);
+        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
+    }
+    if (!response_ok(body)) {
+        if (!extract_json_string_v2(body, "error", result->error, sizeof(result->error)))
+            set_error(result->error, sizeof(result->error), "Conversations response was not OK.");
+        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
+    }
+
+    cursor = strstr(body, "\"conversations\"");
+    if (cursor != NULL)
+        cursor = strstr(cursor, "\"conversation_id\"");
+    while (cursor != NULL && result->count < BRIDGE_V2_CONVERSATION_COUNT_MAX) {
+        BridgeV2ConversationInfo* info = &result->conversations[result->count];
+        if (!extract_json_string_v2(cursor, "conversation_id", info->conversation_id, sizeof(info->conversation_id)))
+            break;
+        extract_json_string_v2(cursor, "session_id", info->session_id, sizeof(info->session_id));
+        extract_json_string_v2(cursor, "title", info->title, sizeof(info->title));
+        extract_json_string_v2(cursor, "preview", info->preview, sizeof(info->preview));
+        extract_json_string_v2(cursor, "updated_at", info->updated_at, sizeof(info->updated_at));
+        result->count++;
+        cursor = strstr(cursor + 1, "\"conversation_id\"");
+    }
+
     result->success = true;
     result->error[0] = '\0';
     return 0;

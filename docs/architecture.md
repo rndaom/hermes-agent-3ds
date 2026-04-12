@@ -19,6 +19,7 @@ This repo owns the left side. `hermes-agent` should own the right side.
 Owns:
 - 3DS UI
 - settings and SD persistence
+- active conversation selection + recent-conversation cache
 - HTTP client transport
 - approval UX
 - packaging / deploy artifacts
@@ -51,6 +52,7 @@ The client should only accept final replies that match the current user message.
 The native 3DS gateway should expose:
 - `GET /api/v2/health`
 - `GET /api/v2/capabilities`
+- `GET /api/v2/conversations`
 - `POST /api/v2/messages`
 - `GET /api/v2/events`
 - `POST /api/v2/interactions/{request_id}/respond`
@@ -62,14 +64,23 @@ Persist on SD card:
 - port
 - token
 - device ID
+- active conversation ID
+- recent conversation IDs
 
 Path:
 - `sdmc:/3ds/hermes-agent-3ds/config.ini`
 
+## Conversation flow
+
+1. The 3DS keeps a small local list of recent `conversation_id` values.
+2. The user picks one from the handheld conversation screen or creates a new ID.
+3. Hermes derives the real session from `device_id + conversation_id`, just like other gateway platforms derive it from chat/thread identity.
+4. When online, the client can sync recent conversation slots from `GET /api/v2/conversations`.
+
 ## Message flow
 
 1. User writes a message on the 3DS
-2. Client sends `POST /api/v2/messages`
+2. Client sends `POST /api/v2/messages` for the active `conversation_id`
 3. Gateway acknowledges with `message_id`, `conversation_id`, and `cursor`
 4. Client begins polling `GET /api/v2/events` from that cursor
 5. Client ignores stale or unrelated events

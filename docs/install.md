@@ -47,6 +47,7 @@ Run Hermes from the main `hermes-agent` repo with the 3DS gateway enabled on you
 
 - `GET /api/v2/health`
 - `GET /api/v2/capabilities`
+- `GET /api/v2/conversations`
 - `POST /api/v2/messages`
 - `GET /api/v2/events`
 - `POST /api/v2/interactions/{request_id}/respond`
@@ -70,7 +71,9 @@ On the home screen:
 
 On the home screen:
 - press `A` to run a health check
-- if that succeeds, press `B` and send a test message
+- if that succeeds, press `SELECT` and make sure the conversation picker opens
+- press `X` there if you want to create a new conversation ID, or `Y` to sync recent conversation slots from Hermes
+- return home and press `B` to send a test message in the active conversation
 - or press `UP` to record mic input and send it through host-side speech-to-text
 - use `L/R` if the reply spans multiple pages
 

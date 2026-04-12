@@ -39,6 +39,145 @@ static void copy_string(char* dest, size_t dest_size, const char* src)
     snprintf(dest, dest_size, "%s", src);
 }
 
+static bool is_safe_conversation_id(const char* value)
+{
+    if (value == NULL || value[0] == '\0')
+        return false;
+
+    while (*value != '\0') {
+        if ((*value >= 'a' && *value <= 'z') ||
+            (*value >= 'A' && *value <= 'Z') ||
+            (*value >= '0' && *value <= '9') ||
+            *value == '-' || *value == '_' || *value == '.') {
+            value++;
+            continue;
+        }
+        return false;
+    }
+
+    return true;
+}
+
+static void clear_recent_conversations(HermesAppConfig* config)
+{
+    size_t index;
+
+    if (config == NULL)
+        return;
+
+    config->recent_conversation_count = 0;
+    for (index = 0; index < HERMES_APP_RECENT_CONVERSATIONS_MAX; index++)
+        config->recent_conversations[index][0] = '\0';
+}
+
+static void ensure_conversation_defaults(HermesAppConfig* config)
+{
+    if (config == NULL)
+        return;
+
+    if (!is_safe_conversation_id(config->active_conversation_id))
+        copy_string(config->active_conversation_id, sizeof(config->active_conversation_id), DEFAULT_CONVERSATION_ID);
+
+    if (config->recent_conversation_count == 0 || !is_safe_conversation_id(config->recent_conversations[0])) {
+        clear_recent_conversations(config);
+        copy_string(config->recent_conversations[0], sizeof(config->recent_conversations[0]), DEFAULT_CONVERSATION_ID);
+        config->recent_conversation_count = 1;
+    }
+}
+
+bool hermes_app_config_is_valid_conversation_id(const char* conversation_id)
+{
+    return is_safe_conversation_id(conversation_id);
+}
+
+void hermes_app_config_touch_recent_conversation(HermesAppConfig* config, const char* conversation_id)
+{
+    size_t existing_index = HERMES_APP_RECENT_CONVERSATIONS_MAX;
+    size_t write_index;
+
+    if (config == NULL || !is_safe_conversation_id(conversation_id))
+        return;
+
+    for (write_index = 0; write_index < config->recent_conversation_count; write_index++) {
+        if (strcmp(config->recent_conversations[write_index], conversation_id) == 0) {
+            existing_index = write_index;
+            break;
+        }
+    }
+
+    if (existing_index == HERMES_APP_RECENT_CONVERSATIONS_MAX) {
+        if (config->recent_conversation_count < HERMES_APP_RECENT_CONVERSATIONS_MAX)
+            config->recent_conversation_count++;
+        existing_index = config->recent_conversation_count - 1;
+    }
+
+    while (existing_index > 0) {
+        copy_string(
+            config->recent_conversations[existing_index],
+            sizeof(config->recent_conversations[existing_index]),
+            config->recent_conversations[existing_index - 1]
+        );
+        existing_index--;
+    }
+
+    copy_string(config->recent_conversations[0], sizeof(config->recent_conversations[0]), conversation_id);
+
+    for (write_index = config->recent_conversation_count; write_index < HERMES_APP_RECENT_CONVERSATIONS_MAX; write_index++)
+        config->recent_conversations[write_index][0] = '\0';
+}
+
+bool hermes_app_config_set_active_conversation(HermesAppConfig* config, const char* conversation_id)
+{
+    if (config == NULL || !is_safe_conversation_id(conversation_id))
+        return false;
+
+    copy_string(config->active_conversation_id, sizeof(config->active_conversation_id), conversation_id);
+    hermes_app_config_touch_recent_conversation(config, conversation_id);
+    return true;
+}
+
+static void parse_recent_conversations(HermesAppConfig* config, const char* recent_text)
+{
+    char buffer[(HERMES_APP_CONVERSATION_ID_MAX + 1) * HERMES_APP_RECENT_CONVERSATIONS_MAX];
+    char* token;
+    char* rest;
+
+    if (config == NULL || recent_text == NULL || recent_text[0] == '\0')
+        return;
+
+    clear_recent_conversations(config);
+    copy_string(buffer, sizeof(buffer), recent_text);
+    rest = buffer;
+    while ((token = strtok(rest, ",")) != NULL) {
+        bool duplicate = false;
+        size_t index;
+
+        rest = NULL;
+        token = lstrip(token);
+        rstrip(token);
+        if (!is_safe_conversation_id(token))
+            continue;
+
+        for (index = 0; index < config->recent_conversation_count; index++) {
+            if (strcmp(config->recent_conversations[index], token) == 0) {
+                duplicate = true;
+                break;
+            }
+        }
+        if (duplicate)
+            continue;
+        if (config->recent_conversation_count >= HERMES_APP_RECENT_CONVERSATIONS_MAX)
+            break;
+
+        copy_string(
+            config->recent_conversations[config->recent_conversation_count],
+            sizeof(config->recent_conversations[config->recent_conversation_count]),
+            token
+        );
+        config->recent_conversation_count++;
+    }
+}
+
 void hermes_app_config_set_defaults(HermesAppConfig* config)
 {
     if (config == NULL)
@@ -49,6 +188,10 @@ void hermes_app_config_set_defaults(HermesAppConfig* config)
     config->port = DEFAULT_BRIDGE_PORT;
     config->token[0] = '\0';
     config->device_id[0] = '\0';
+    copy_string(config->active_conversation_id, sizeof(config->active_conversation_id), DEFAULT_CONVERSATION_ID);
+    clear_recent_conversations(config);
+    copy_string(config->recent_conversations[0], sizeof(config->recent_conversations[0]), DEFAULT_CONVERSATION_ID);
+    config->recent_conversation_count = 1;
 }
 
 HermesAppConfigLoadStatus hermes_app_config_load(HermesAppConfig* config)
@@ -89,6 +232,12 @@ HermesAppConfigLoadStatus hermes_app_config_load(HermesAppConfig* config)
             char* device_id = lstrip(value + 10);
             if (*device_id != '\0')
                 copy_string(config->device_id, sizeof(config->device_id), device_id);
+        } else if (strncmp(value, "active_conversation_id=", 23) == 0) {
+            char* conversation_id = lstrip(value + 23);
+            if (*conversation_id != '\0' && is_safe_conversation_id(conversation_id))
+                copy_string(config->active_conversation_id, sizeof(config->active_conversation_id), conversation_id);
+        } else if (strncmp(value, "recent_conversations=", 21) == 0) {
+            parse_recent_conversations(config, lstrip(value + 21));
         }
     }
 
@@ -99,12 +248,16 @@ HermesAppConfigLoadStatus hermes_app_config_load(HermesAppConfig* config)
     if (config->port == 0)
         config->port = DEFAULT_BRIDGE_PORT;
 
+    ensure_conversation_defaults(config);
+    hermes_app_config_touch_recent_conversation(config, config->active_conversation_id);
+
     return HERMES_APP_CONFIG_LOAD_OK;
 }
 
 bool hermes_app_config_save(const HermesAppConfig* config)
 {
     FILE* file;
+    size_t index;
 
     if (config == NULL)
         return false;
@@ -119,7 +272,25 @@ bool hermes_app_config_save(const HermesAppConfig* config)
     if (fprintf(file, "host=%s\n", config->host) < 0 ||
         fprintf(file, "port=%u\n", (unsigned int)config->port) < 0 ||
         fprintf(file, "token=%s\n", config->token) < 0 ||
-        fprintf(file, "device_id=%s\n", config->device_id) < 0) {
+        fprintf(file, "device_id=%s\n", config->device_id) < 0 ||
+        fprintf(file, "active_conversation_id=%s\n", config->active_conversation_id) < 0 ||
+        fprintf(file, "recent_conversations=") < 0) {
+        fclose(file);
+        return false;
+    }
+
+    for (index = 0; index < config->recent_conversation_count; index++) {
+        if (index > 0 && fprintf(file, ",") < 0) {
+            fclose(file);
+            return false;
+        }
+        if (fprintf(file, "%s", config->recent_conversations[index]) < 0) {
+            fclose(file);
+            return false;
+        }
+    }
+
+    if (fprintf(file, "\n") < 0) {
         fclose(file);
         return false;
     }
@@ -150,6 +321,11 @@ bool hermes_app_config_build_health_url(const HermesAppConfig* config, char* out
 bool hermes_app_config_build_capabilities_url(const HermesAppConfig* config, char* out_url, size_t out_size)
 {
     return build_url(config, "/api/v2/capabilities", out_url, out_size);
+}
+
+bool hermes_app_config_build_conversations_url(const HermesAppConfig* config, char* out_url, size_t out_size)
+{
+    return build_url(config, "/api/v2/conversations", out_url, out_size);
 }
 
 bool hermes_app_config_build_messages_url(const HermesAppConfig* config, char* out_url, size_t out_size)
