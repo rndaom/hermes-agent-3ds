@@ -35,6 +35,8 @@ def test_legacy_python_bridge_repo_folder_is_removed():
 
 def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
+    home_h = (CLIENT_DIR / "include" / "app_home.h").read_text()
+    home_c = (CLIENT_DIR / "source" / "app_home.c").read_text()
     conv_h = (CLIENT_DIR / "include" / "app_conversations.h").read_text()
     conv_c = (CLIENT_DIR / "source" / "app_conversations.c").read_text()
     request_h = (CLIENT_DIR / "include" / "app_requests.h").read_text()
@@ -42,10 +44,13 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     input_c = (CLIENT_DIR / "source" / "app_input.c").read_text()
 
     assert '"bridge_chat.h"' in main_c
+    assert '"app_home.h"' in main_c
     assert '"app_conversations.h"' in main_c
-    assert '"app_requests.h"' in main_c
-    assert '"bridge_v2.h"' in main_c
+    assert '"app_requests.h"' in home_c
+    assert '"bridge_v2.h"' in request_h
     assert "BridgeChatResult" in main_c
+    assert "AppHomeContext" in home_h
+    assert "hermes_app_home_handle_input" in home_h
     assert "BridgeV2MessageResult" in request_h
     assert "BridgeV2EventPollResult" in request_h
     assert "BridgeV2ConversationListResult" in conv_h
@@ -64,9 +69,9 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "reply_to_message_id" in request_c
     assert "Approval required" in request_c
     assert "Command denied." in request_c
-    assert "KEY_B" in main_c
-    assert "KEY_UP" in main_c
-    assert "KEY_SELECT" in main_c
+    assert "KEY_B" in home_c
+    assert "KEY_UP" in home_c
+    assert "KEY_SELECT" in home_c
     assert "KEY_DOWN" in conv_c
     assert "Write a message" in input_c
     assert "Record mic" in request_c or "mic" in request_c.lower()
@@ -77,8 +82,9 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "Last message" in main_c or "Last message" in (CLIENT_DIR / "source" / "app_ui.c").read_text()
     assert "Last reply" in main_c or "Last reply" in (CLIENT_DIR / "source" / "app_ui.c").read_text()
     assert "swkbdInputText" in input_c
-    assert "hermes_app_requests_handle_text" in main_c
-    assert "hermes_app_requests_handle_voice" in main_c
+    assert "hermes_app_home_handle_input" in main_c
+    assert "hermes_app_requests_handle_text" in home_c
+    assert "hermes_app_requests_handle_voice" in home_c
     assert "Asking Hermes over v2..." in request_c
     assert "Sending mic input to Hermes..." in request_c
     assert '"/api/v1/chat"' not in main_c
@@ -86,12 +92,13 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
 
 def test_main_c_wraps_and_pages_long_reply_text_for_small_screens():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
+    home_c = (CLIENT_DIR / "source" / "app_home.c").read_text()
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
-    assert "KEY_L" in main_c
-    assert "KEY_R" in main_c
+    assert "KEY_L" in home_c
+    assert "KEY_R" in home_c
     assert "reply_page" in main_c
-    assert "hermes_app_ui_reply_page_count" in main_c
+    assert "hermes_app_ui_reply_page_count" in home_c
     assert "wrap_text_for_console" in ui_c
     assert "render_wrapped_page" in ui_c
     assert "Page %lu/%lu" in ui_c

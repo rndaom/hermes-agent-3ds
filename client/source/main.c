@@ -4,15 +4,13 @@
 #include <string.h>
 
 #include "app_config.h"
+#include "app_home.h"
 #include "app_conversations.h"
 #include "app_input.h"
-#include "app_requests.h"
 #include "app_settings.h"
 #include "app_ui.h"
 #include "bridge_chat.h"
 #include "bridge_health.h"
-#include "bridge_v2.h"
-#include "voice_input.h"
 
 static PrintConsole top_console;
 static PrintConsole bottom_console;
@@ -47,57 +45,6 @@ static void render_ui(
         &g_conversation_state.list,
         g_conversation_state.selection
     );
-}
-
-static void handle_home_health_check(
-    const HermesAppConfig* config,
-    bool network_ready,
-    SettingsField selected_field,
-    bool settings_dirty,
-    BridgeHealthResult* health_result,
-    const BridgeChatResult* chat_result,
-    const char* last_message,
-    size_t* reply_page,
-    char* status_line,
-    Result* request_rc
-)
-{
-    char health_url[HERMES_APP_HEALTH_URL_MAX];
-
-    if (health_result == NULL || status_line == NULL || request_rc == NULL || reply_page == NULL)
-        return;
-
-    bridge_health_result_reset(health_result);
-    *request_rc = 0;
-    *reply_page = 0;
-
-    if (!network_ready) {
-        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Networking services failed to start.");
-        render_ui(APP_SCREEN_HOME, config, selected_field, settings_dirty, health_result, chat_result, last_message, *reply_page, status_line, *request_rc);
-        return;
-    }
-
-    if (!hermes_app_config_build_health_url(config, health_url, sizeof(health_url))) {
-        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Local config is incomplete.");
-        render_ui(APP_SCREEN_HOME, config, selected_field, settings_dirty, health_result, chat_result, last_message, *reply_page, status_line, *request_rc);
-        return;
-    }
-
-    snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Checking Hermes gateway...");
-    render_ui(APP_SCREEN_HOME, config, selected_field, settings_dirty, health_result, chat_result, last_message, *reply_page, status_line, *request_rc);
-    gfxFlushBuffers();
-    gfxSwapBuffers();
-    gspWaitForVBlank();
-
-    *request_rc = bridge_health_check_run(health_url, health_result);
-    if (R_SUCCEEDED(*request_rc) && health_result->success)
-        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Hermes gateway OK.");
-    else if (health_result->error[0] == '\0')
-        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Gateway check failed: 0x%08lX", (unsigned long)*request_rc);
-    else
-        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "%s", health_result->error);
-
-    render_ui(APP_SCREEN_HOME, config, selected_field, settings_dirty, health_result, chat_result, last_message, *reply_page, status_line, *request_rc);
 }
 
 int main(int argc, char* argv[])
@@ -168,56 +115,24 @@ int main(int argc, char* argv[])
             break;
 
         if (screen == APP_SCREEN_HOME) {
-            AppRequestUiContext request_ui = {
+            AppHomeContext home_context = {
+                &g_conversation_state,
                 &top_console,
                 &bottom_console,
                 selected_field,
                 settings_dirty,
                 &health_result,
+                &chat_result,
+                last_message,
+                sizeof(last_message),
+                &reply_page,
+                status_line,
+                sizeof(status_line),
+                &request_rc,
                 render_ui,
             };
 
-            if ((kDown & KEY_Y) != 0) {
-                bridge_health_result_reset(&health_result);
-                bridge_chat_result_reset(&chat_result);
-                last_message[0] = '\0';
-                reply_page = 0;
-                request_rc = 0;
-                snprintf(status_line, sizeof(status_line), "Status cleared. Ready to test again.");
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
-            }
-
-            if ((kDown & KEY_X) != 0) {
-                screen = APP_SCREEN_SETTINGS;
-                snprintf(status_line, sizeof(status_line), "Settings opened.");
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
-            }
-
-            if ((kDown & KEY_SELECT) != 0) {
-                hermes_app_conversations_open_picker(&g_conversation_state, &config, &screen, status_line, sizeof(status_line));
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
-            }
-
-            if ((kDown & KEY_L) != 0 && chat_result.success && reply_page > 0) {
-                reply_page--;
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
-            }
-
-            if ((kDown & KEY_R) != 0 && chat_result.success) {
-                size_t page_count = hermes_app_ui_reply_page_count(chat_result.reply);
-                if (reply_page + 1 < page_count)
-                    reply_page++;
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
-            }
-
-            if ((kDown & KEY_A) != 0)
-                handle_home_health_check(&config, network_ready, selected_field, settings_dirty, &health_result, &chat_result, last_message, &reply_page, status_line, &request_rc);
-
-            if ((kDown & KEY_B) != 0)
-                hermes_app_requests_handle_text(&config, network_ready, &request_ui, &chat_result, last_message, sizeof(last_message), &reply_page, status_line, sizeof(status_line), &request_rc);
-
-            if ((kDown & KEY_UP) != 0)
-                hermes_app_requests_handle_voice(&config, network_ready, &request_ui, &chat_result, last_message, sizeof(last_message), &reply_page, status_line, sizeof(status_line), &request_rc);
+            hermes_app_home_handle_input(kDown, &config, network_ready, &screen, &home_context);
         } else if (screen == APP_SCREEN_CONVERSATIONS) {
             if (hermes_app_conversations_handle_picker_input(
                     &g_conversation_state,

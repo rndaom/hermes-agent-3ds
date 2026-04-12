@@ -37,12 +37,15 @@ def test_health_check_implementation_uses_wifi_and_timeout_based_socket_networki
 
 def test_main_c_offers_a_button_driven_native_v2_gateway_health_check_ui():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
+    home_h = (CLIENT_DIR / "include" / "app_home.h").read_text()
+    home_c = (CLIENT_DIR / "source" / "app_home.c").read_text()
     request_c = (CLIENT_DIR / "source" / "app_requests.c").read_text()
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
     assert "Press A to check Hermes gateway." in ui_c
-    assert "Checking Hermes gateway..." in main_c
+    assert "AppHomeContext" in home_h
+    assert "Checking Hermes gateway..." in home_c
     assert "Reply received over native v2." in request_c
-    assert "KEY_A" in main_c
-    assert "bridge_health_check_run" in main_c
+    assert "KEY_A" in home_c
+    assert "bridge_health_check_run" in home_c
     assert "bridge_v2_get_capabilities" not in main_c
     assert "Native v2 responded even though v1 health failed." not in main_c
