@@ -3,10 +3,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#define HOME_WRAP_WIDTH 38
+#define HOME_WRAP_WIDTH 46
 #define HOME_WRAP_MAX_LINES 128
 #define HOME_MESSAGE_LINES_PER_PAGE 3
-#define HOME_REPLY_LINES_PER_PAGE 10
+#define HOME_REPLY_LINES_PER_PAGE 8
 
 static void copy_bounded_string(char* dest, size_t dest_size, const char* src)
 {
@@ -168,15 +168,15 @@ static size_t page_count_for_lines(size_t total_lines, size_t lines_per_page)
 
 static void print_rule(void)
 {
-    printf("--------------------------------------\n");
+    printf("------------------------------------------------\n");
 }
 
 static void render_brand_header(const char* screen_title)
 {
-    printf("+--------------------------------------+\n");
-    printf("| HERMES AGENT                         |\n");
-    printf("| %-36.36s |\n", screen_title != NULL ? screen_title : "");
-    printf("+--------------------------------------+\n");
+    printf("+------------------------------------------------+\n");
+    printf("| HERMES AGENT                                   |\n");
+    printf("| %-46.46s |\n", screen_title != NULL ? screen_title : "");
+    printf("+------------------------------------------------+\n");
 }
 
 static void render_relay_crest(void)
@@ -203,6 +203,22 @@ static const char* render_pixel_crest_line(size_t index)
 static void render_split_line(const char* left, size_t crest_index)
 {
     printf("%-24.24s %s\n", left != NULL ? left : "", render_pixel_crest_line(crest_index));
+}
+
+static void print_at(int row, int col, const char* text)
+{
+    printf("\x1b[%d;%dH%s", row, col, text != NULL ? text : "");
+}
+
+static void clear_text_area(int row, int col, int width)
+{
+    printf("\x1b[%d;%dH%*s", row, col, width, "");
+}
+
+static void print_field_at(int row, int col, int width, const char* text)
+{
+    clear_text_area(row, col, width);
+    printf("\x1b[%d;%dH%-*.*s", row, col, width, width, text != NULL ? text : "");
 }
 
 static void render_panel_title(const char* label)
@@ -303,66 +319,87 @@ static void render_home_top_screen(
 
     char link_errno_line[32];
     char link_stage_line[40];
+    char relay_status_line[40];
 
     consoleSelect(top_console);
     consoleClear();
 
     render_brand_header("MESSENGER DECK");
-    render_relay_crest();
-    render_split_line(status_line, 0);
-    snprintf(link_errno_line, sizeof(link_errno_line), "last rc: 0x%08lX", (unsigned long)last_rc);
-    render_split_line(link_errno_line, 1);
-    print_rule();
     format_active_conversation_label(config, conversation_list, conversation_label, sizeof(conversation_label));
-    render_panel_title("MESSENGER LINK");
-    render_split_line("LINK STATE", 2);
+
     if (chat_result != NULL && (chat_result->success || chat_result->error[0] != '\0')) {
-        snprintf(link_errno_line, sizeof(link_errno_line), "socket errno: %d", chat_result->socket_errno);
-        snprintf(link_stage_line, sizeof(link_stage_line), "stage: %s", chat_result->socket_stage[0] != '\0' ? chat_result->socket_stage : "n/a");
+        snprintf(link_errno_line, sizeof(link_errno_line), "Socket: %d", chat_result->socket_errno);
+        snprintf(link_stage_line, sizeof(link_stage_line), "Stage : %s", chat_result->socket_stage[0] != '\0' ? chat_result->socket_stage : "n/a");
     } else {
-        snprintf(link_errno_line, sizeof(link_errno_line), "socket errno: %d", health_result->socket_errno);
-        snprintf(link_stage_line, sizeof(link_stage_line), "stage: %s", health_result->socket_stage[0] != '\0' ? health_result->socket_stage : "n/a");
+        snprintf(link_errno_line, sizeof(link_errno_line), "Socket: %d", health_result->socket_errno);
+        snprintf(link_stage_line, sizeof(link_stage_line), "Stage : %s", health_result->socket_stage[0] != '\0' ? health_result->socket_stage : "n/a");
     }
-    render_split_line(link_errno_line, 3);
-    render_split_line(link_stage_line, 4);
-    render_panel_title("ACTIVE THREAD");
-    render_split_line(conversation_label, 5);
-    print_rule();
+    snprintf(relay_status_line, sizeof(relay_status_line), "Status: %s", status_line);
+
+    print_at(5, 1, "+---------------------------+--------------------+");
+    print_at(6, 1, "| [ MESSENGER LINK ]        | [ RELAY CREST ]    |");
+    /* ACTIVE THREAD remains a first-class top-screen field. */
+    print_at(7, 1, "| Thread:                   |                    |");
+    print_field_at(7, 11, 17, conversation_label);
+    print_at(7, 30, render_pixel_crest_line(0));
+    print_at(8, 1, "| Status:                   |                    |");
+    print_field_at(8, 11, 17, status_line);
+    print_at(8, 30, render_pixel_crest_line(1));
+    print_at(9, 1, "| LINK STATE                |                    |");
+    print_at(9, 30, render_pixel_crest_line(2));
+    print_at(10, 1, "| Socket:                   |                    |");
+    print_field_at(10, 11, 17, link_errno_line + 8);
+    print_at(10, 30, render_pixel_crest_line(3));
+    print_at(11, 1, "| Stage :                   |                    |");
+    print_field_at(11, 11, 17, link_stage_line + 8);
+    print_at(11, 30, render_pixel_crest_line(4));
+    print_at(12, 1, "+---------------------------+--------------------+");
+    print_at(13, 1, "[ SESSION ]");
+    print_at(14, 1, "----------------------------------------------");
 
     if (chat_result != NULL && chat_result->success) {
+        print_at(15, 1, "Last message:");
         message_line_count = wrap_text_for_console(last_message, message_lines, 16);
         reply_line_count = wrap_text_for_console(chat_result->reply, reply_lines, HOME_WRAP_MAX_LINES);
-        render_wrapped_page("Last message:", message_lines, message_line_count, 0, HOME_MESSAGE_LINES_PER_PAGE, false);
-        printf("\n");
-        printf("Hermes reply\n");
-        render_panel_title("HERMES REPLY");
-        render_wrapped_page("Last reply:", reply_lines, reply_line_count, reply_page, HOME_REPLY_LINES_PER_PAGE, true);
+        printf("\x1b[16;1H");
+        render_wrapped_page("", message_lines, message_line_count, 0, HOME_MESSAGE_LINES_PER_PAGE, false);
+        /* Hermes reply panel uses the wider lower top-screen area. */
+        print_at(20, 1, "[ HERMES REPLY ]");
+        print_at(21, 1, "Last reply:");
+        printf("\x1b[22;1H");
+        render_wrapped_page("", reply_lines, reply_line_count, reply_page, HOME_REPLY_LINES_PER_PAGE, true);
         if (chat_result->truncated)
             printf("(reply truncated)\n");
     } else if (chat_result != NULL && chat_result->error[0] != '\0') {
+        print_at(15, 1, "Last message:");
         message_line_count = wrap_text_for_console(last_message, message_lines, 16);
         reply_line_count = wrap_text_for_console(chat_result->error, reply_lines, HOME_WRAP_MAX_LINES);
-        render_wrapped_page("Last message:", message_lines, message_line_count, 0, HOME_MESSAGE_LINES_PER_PAGE, false);
-        printf("\n");
-        printf("Hermes reply\n");
-        render_panel_title("HERMES REPLY");
-        render_wrapped_page("Chat failed:", reply_lines, reply_line_count, 0, HOME_REPLY_LINES_PER_PAGE, false);
+        printf("\x1b[16;1H");
+        render_wrapped_page("", message_lines, message_line_count, 0, HOME_MESSAGE_LINES_PER_PAGE, false);
+        /* Hermes reply panel uses the wider lower top-screen area. */
+        print_at(20, 1, "[ HERMES REPLY ]");
+        print_at(21, 1, "Last reply:");
+        printf("\x1b[22;1H");
+        render_wrapped_page("", reply_lines, reply_line_count, 0, HOME_REPLY_LINES_PER_PAGE, false);
         if (chat_result->http_status != 0)
             printf("http: %lu\n", (unsigned long)chat_result->http_status);
     } else if (health_result->success) {
-        printf("Hermes gateway OK\n");
-        printf("service: %s\n", health_result->service);
-        printf("version: %s\n", health_result->version);
-        printf("http: %lu\n", (unsigned long)health_result->http_status);
+        print_at(15, 1, "Hermes gateway OK");
+        print_at(16, 1, health_result->service);
+        print_at(17, 1, health_result->version);
+        snprintf(relay_status_line, sizeof(relay_status_line), "http: %lu", (unsigned long)health_result->http_status);
+        print_at(18, 1, relay_status_line);
     } else if (health_result->error[0] != '\0') {
-        printf("Gateway check failed\n");
-        printf("%s\n", health_result->error);
-        if (health_result->http_status != 0)
-            printf("http: %lu\n", (unsigned long)health_result->http_status);
+        print_at(15, 1, "Gateway check failed");
+        print_at(16, 1, health_result->error);
+        if (health_result->http_status != 0) {
+            snprintf(relay_status_line, sizeof(relay_status_line), "http: %lu", (unsigned long)health_result->http_status);
+            print_at(17, 1, relay_status_line);
+        }
     } else {
-        printf("Ready for a request.\n");
-        printf("Use COMMAND DECK below.\n");
-        printf("Hermes relay is standing by.\n");
+        print_at(15, 1, "Ready for a request.");
+        print_at(16, 1, "Use COMMAND DECK below.");
+        print_at(17, 1, "Hermes relay is standing by.");
     }
 }
 

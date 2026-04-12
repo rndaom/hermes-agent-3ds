@@ -25,3 +25,14 @@ def test_app_ui_has_phase3_split_layout_and_pixel_crest_helpers():
     assert "render_pixel_crest_line" in ui_c
     assert "crest_lines" in ui_c
     assert "Use COMMAND DECK below." in ui_c
+
+
+def test_phase3_followup_uses_explicit_top_screen_cursor_layout():
+    ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
+
+    assert "print_at(" in ui_c
+    assert "clear_text_area(" in ui_c
+    assert "\\x1b[%d;%dH" in ui_c
+    assert "[ MESSENGER LINK ]" in ui_c
+    assert "[ RELAY CREST ]" in ui_c
+    assert "[ SESSION ]" in ui_c
