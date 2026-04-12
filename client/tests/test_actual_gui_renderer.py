@@ -66,3 +66,25 @@ def test_transient_ui_paths_do_not_expose_printconsole_or_manual_buffer_swaps():
     assert "gfxFlushBuffers" not in voice_c
     assert "hermes_app_ui_render_approval_prompt" in ui_h
     assert "hermes_app_ui_render_voice_recording" in ui_h
+
+
+def test_graphical_ui_bounds_variable_length_fields_and_removes_fake_static_menu_selection():
+    ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
+
+    assert "app_gfx_text_fit(210.0f, 70.0f" in ui_c
+    assert "app_gfx_text_fit(210.0f, 102.0f" in ui_c
+    assert "app_gfx_text_fit(206.0f, 80.0f" in ui_c
+    assert "app_gfx_text_fit(206.0f, 148.0f" in ui_c
+    assert "app_gfx_text_fit(24.0f, row_y + 2.0f" in ui_c
+    assert '"B Ask Hermes", true' not in ui_c
+    assert '"A Edit value", true' not in ui_c
+    assert '"A Use thread", true' not in ui_c
+
+
+def test_home_reply_card_uses_note_card_styling_helpers():
+    ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
+
+    assert "draw_note_lines" in ui_c
+    assert "draw_chip" in ui_c
+    assert 'draw_chip(20.0f, 138.0f, 88.0f, "HERMES REPLY"' in ui_c
+    assert 'draw_note_lines(20.0f, 184.0f, 360.0f, 4)' in ui_c

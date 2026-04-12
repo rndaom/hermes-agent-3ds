@@ -27,6 +27,55 @@ static bool app_gfx_measure_text_dimensions(const char* text, float scale_x, flo
     return true;
 }
 
+static size_t app_gfx_utf8_prefix_boundary(const char* text, size_t max_bytes)
+{
+    size_t index = 0;
+    size_t last_valid = 0;
+
+    while (text != NULL && text[index] != '\0' && index < max_bytes) {
+        unsigned char byte = (unsigned char)text[index];
+        size_t codepoint_len = 1;
+        size_t continuation_index;
+        bool valid = true;
+
+        if ((byte & 0x80U) == 0x00U) {
+            codepoint_len = 1;
+        } else if ((byte & 0xE0U) == 0xC0U) {
+            codepoint_len = 2;
+        } else if ((byte & 0xF0U) == 0xE0U) {
+            codepoint_len = 3;
+        } else if ((byte & 0xF8U) == 0xF0U) {
+            codepoint_len = 4;
+        } else {
+            index++;
+            last_valid = index;
+            continue;
+        }
+
+        if (index + codepoint_len > max_bytes)
+            break;
+
+        for (continuation_index = 1; continuation_index < codepoint_len; continuation_index++) {
+            unsigned char continuation = (unsigned char)text[index + continuation_index];
+            if (continuation == '\0' || (continuation & 0xC0U) != 0x80U) {
+                valid = false;
+                break;
+            }
+        }
+
+        if (!valid) {
+            index++;
+            last_valid = index;
+            continue;
+        }
+
+        index += codepoint_len;
+        last_valid = index;
+    }
+
+    return last_valid;
+}
+
 bool app_gfx_init(void)
 {
     gfxInitDefault();
@@ -144,16 +193,19 @@ void app_gfx_text_fit(float x, float y, float max_width, float scale_x, float sc
     while (low <= high) {
         size_t mid = low + (high - low) / 2;
 
-        if (mid == 0) {
-            snprintf(fitted, sizeof(fitted), "...");
-        } else if (mid <= 3) {
+        if (mid <= 3) {
             snprintf(fitted, sizeof(fitted), "...");
         } else {
-            memcpy(fitted, text, mid - 3);
-            fitted[mid - 3] = '.';
-            fitted[mid - 2] = '.';
-            fitted[mid - 1] = '.';
-            fitted[mid] = '\0';
+            size_t keep = app_gfx_utf8_prefix_boundary(text, mid - 3);
+            if (keep == 0) {
+                snprintf(fitted, sizeof(fitted), "...");
+            } else {
+                memcpy(fitted, text, keep);
+                fitted[keep] = '.';
+                fitted[keep + 1] = '.';
+                fitted[keep + 2] = '.';
+                fitted[keep + 3] = '\0';
+            }
         }
 
         if (app_gfx_measure_text_dimensions(fitted, scale_x, scale_y, &width, &height) && width <= max_width) {
@@ -169,11 +221,16 @@ void app_gfx_text_fit(float x, float y, float max_width, float scale_x, float sc
     if (best <= 3) {
         snprintf(fitted, sizeof(fitted), "...");
     } else {
-        memcpy(fitted, text, best - 3);
-        fitted[best - 3] = '.';
-        fitted[best - 2] = '.';
-        fitted[best - 1] = '.';
-        fitted[best] = '\0';
+        size_t keep = app_gfx_utf8_prefix_boundary(text, best - 3);
+        if (keep == 0) {
+            snprintf(fitted, sizeof(fitted), "...");
+        } else {
+            memcpy(fitted, text, keep);
+            fitted[keep] = '.';
+            fitted[keep + 1] = '.';
+            fitted[keep + 2] = '.';
+            fitted[keep + 3] = '\0';
+        }
     }
 
     app_gfx_text(x, y, scale_x, scale_y, color, fitted);

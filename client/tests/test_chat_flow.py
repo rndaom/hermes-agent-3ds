@@ -101,7 +101,15 @@ def test_main_c_wraps_and_pages_long_reply_text_for_small_screens():
     assert "hermes_app_ui_reply_page_count" in home_c
     assert "wrap_text_for_console" in ui_c
     assert "page_count_for_lines" in ui_c
+    assert "#define HOME_REPLY_LINES_PER_PAGE 4" in ui_c
     assert "reply_start = reply_page * HOME_REPLY_LINES_PER_PAGE" in ui_c
+
+
+def test_ui_wraps_truncated_lines_on_utf8_boundaries_before_graphical_fit():
+    ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
+
+    assert "utf8_prefix_boundary" in ui_c
+    assert "word_len > HOME_WRAP_WIDTH" in ui_c
 
 
 def test_voice_input_waits_for_up_release_before_allowing_stop():

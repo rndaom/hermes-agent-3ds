@@ -6,8 +6,8 @@
 
 #define HOME_WRAP_WIDTH 46
 #define HOME_WRAP_MAX_LINES 128
-#define HOME_MESSAGE_LINES_PER_PAGE 3
-#define HOME_REPLY_LINES_PER_PAGE 8
+#define HOME_MESSAGE_LINES_PER_PAGE 2
+#define HOME_REPLY_LINES_PER_PAGE 4
 
 static void copy_bounded_string(char* dest, size_t dest_size, const char* src)
 {
@@ -68,6 +68,55 @@ static void add_truncation_marker(char* line)
     }
 }
 
+static size_t utf8_prefix_boundary(const char* text, size_t max_bytes)
+{
+    size_t index = 0;
+    size_t last_valid = 0;
+
+    while (text != NULL && text[index] != '\0' && index < max_bytes) {
+        unsigned char byte = (unsigned char)text[index];
+        size_t codepoint_len = 1;
+        size_t continuation_index;
+        bool valid = true;
+
+        if ((byte & 0x80U) == 0x00U) {
+            codepoint_len = 1;
+        } else if ((byte & 0xE0U) == 0xC0U) {
+            codepoint_len = 2;
+        } else if ((byte & 0xF0U) == 0xE0U) {
+            codepoint_len = 3;
+        } else if ((byte & 0xF8U) == 0xF0U) {
+            codepoint_len = 4;
+        } else {
+            index++;
+            last_valid = index;
+            continue;
+        }
+
+        if (index + codepoint_len > max_bytes)
+            break;
+
+        for (continuation_index = 1; continuation_index < codepoint_len; continuation_index++) {
+            unsigned char continuation = (unsigned char)text[index + continuation_index];
+            if (continuation == '\0' || (continuation & 0xC0U) != 0x80U) {
+                valid = false;
+                break;
+            }
+        }
+
+        if (!valid) {
+            index++;
+            last_valid = index;
+            continue;
+        }
+
+        index += codepoint_len;
+        last_valid = index;
+    }
+
+    return last_valid;
+}
+
 static size_t wrap_text_for_console(const char* input, char lines[][HOME_WRAP_WIDTH + 1], size_t max_lines)
 {
     const char* cursor;
@@ -115,10 +164,13 @@ static size_t wrap_text_for_console(const char* input, char lines[][HOME_WRAP_WI
                 word_len++;
 
             if (line_len == 0 && word_len > HOME_WRAP_WIDTH) {
-                memcpy(line, word_start, HOME_WRAP_WIDTH);
-                line[HOME_WRAP_WIDTH] = '\0';
-                cursor = word_start + HOME_WRAP_WIDTH;
-                line_len = HOME_WRAP_WIDTH;
+                size_t safe_len = utf8_prefix_boundary(word_start, HOME_WRAP_WIDTH);
+                if (safe_len == 0)
+                    safe_len = HOME_WRAP_WIDTH;
+                memcpy(line, word_start, safe_len);
+                line[safe_len] = '\0';
+                cursor = word_start + safe_len;
+                line_len = safe_len;
                 break;
             }
 
@@ -217,15 +269,20 @@ static void format_active_conversation_label(
         snprintf(out_label, out_size, "%s", config->active_conversation_id);
 }
 
-#define UI_BG_TOP C2D_Color32(0x1C, 0x1D, 0x25, 0xFF)
-#define UI_BG_BOTTOM C2D_Color32(0x22, 0x25, 0x31, 0xFF)
-#define UI_PANEL C2D_Color32(0x2D, 0x33, 0x47, 0xFF)
-#define UI_PANEL_ALT C2D_Color32(0x3C, 0x46, 0x5E, 0xFF)
-#define UI_BORDER C2D_Color32(0xD9, 0xB4, 0x5F, 0xFF)
-#define UI_ACCENT C2D_Color32(0x58, 0xC7, 0xC2, 0xFF)
-#define UI_TEXT C2D_Color32(0xF4, 0xF1, 0xE6, 0xFF)
-#define UI_MUTED C2D_Color32(0xC8, 0xD0, 0xD8, 0xFF)
-#define UI_HILITE C2D_Color32(0x8A, 0xE7, 0xE3, 0xFF)
+#define UI_BG_TOP C2D_Color32(0x1B, 0x1F, 0x29, 0xFF)
+#define UI_BG_BOTTOM C2D_Color32(0x20, 0x25, 0x32, 0xFF)
+#define UI_PANEL C2D_Color32(0x24, 0x2A, 0x37, 0xFF)
+#define UI_PANEL_ALT C2D_Color32(0x2D, 0x34, 0x45, 0xFF)
+#define UI_REPLY_CARD C2D_Color32(0x1F, 0x24, 0x31, 0xFF)
+#define UI_BORDER C2D_Color32(0x55, 0x61, 0x7A, 0xFF)
+#define UI_BORDER_STRONG C2D_Color32(0x93, 0xA1, 0xBB, 0xFF)
+#define UI_ACCENT C2D_Color32(0x5C, 0x83, 0xB1, 0xFF)
+#define UI_ACCENT_HI C2D_Color32(0x82, 0xA8, 0xD6, 0xFF)
+#define UI_SIGNAL C2D_Color32(0x62, 0xD1, 0xCF, 0xFF)
+#define UI_SIGNAL_HI C2D_Color32(0x9D, 0xE8, 0xE4, 0xFF)
+#define UI_TEXT C2D_Color32(0xF1, 0xF3, 0xF7, 0xFF)
+#define UI_MUTED C2D_Color32(0xC5, 0xCF, 0xDB, 0xFF)
+#define UI_META C2D_Color32(0x8B, 0x97, 0xAB, 0xFF)
 
 bool hermes_app_ui_init(void)
 {
@@ -241,7 +298,7 @@ static void draw_header(const char* title, const char* subtitle)
 {
     app_gfx_panel_inset(10.0f, 10.0f, 380.0f, 28.0f, UI_PANEL_ALT, UI_BORDER, UI_ACCENT);
     app_gfx_text(18.0f, 16.0f, 0.55f, 0.55f, UI_TEXT, title);
-    app_gfx_text_right(382.0f, 16.0f, 0.42f, 0.42f, UI_HILITE, subtitle);
+    app_gfx_text_right(382.0f, 16.0f, 0.42f, 0.42f, UI_SIGNAL_HI, subtitle);
 }
 
 static void draw_bottom_header(const char* title)
@@ -250,10 +307,25 @@ static void draw_bottom_header(const char* title)
     app_gfx_text(16.0f, 16.0f, 0.50f, 0.50f, UI_TEXT, title);
 }
 
+static void draw_chip(float x, float y, float w, const char* label, u32 fill, u32 text_color)
+{
+    app_gfx_panel(x, y, w, 16.0f, fill, UI_BORDER_STRONG);
+    app_gfx_text_fit(x + 6.0f, y + 3.0f, w - 12.0f, 0.30f, 0.30f, text_color, label);
+}
+
+static void draw_note_lines(float x, float y, float w, size_t count)
+{
+    size_t index;
+
+    for (index = 0; index < count; index++)
+        app_gfx_highlight_bar(x, y + (float)index * 10.0f, w, 1.0f, UI_BORDER);
+}
+
 static void draw_text_lines(
     float x,
     float y,
     float line_height,
+    float max_width,
     float scale_x,
     float scale_y,
     u32 color,
@@ -266,20 +338,20 @@ static void draw_text_lines(
     size_t index;
 
     for (index = 0; index < max_lines && start + index < total_lines; index++)
-        app_gfx_text(x, y + (float)index * line_height, scale_x, scale_y, color, lines[start + index]);
+        app_gfx_text_fit(x, y + (float)index * line_height, max_width, scale_x, scale_y, color, lines[start + index]);
 }
 
 static void draw_menu_row(float x, float y, float w, const char* label, bool selected)
 {
     if (selected)
         app_gfx_highlight_bar(x, y, w, 16.0f, UI_ACCENT);
-    app_gfx_text(x + 8.0f, y + 3.0f, 0.43f, 0.43f, selected ? UI_BG_TOP : UI_TEXT, label);
+    app_gfx_text_fit(x + 8.0f, y + 3.0f, w - 16.0f, 0.43f, 0.43f, selected ? UI_BG_TOP : UI_TEXT, label);
 }
 
-static void draw_status_line(float x, float y, const char* label, const char* value)
+static void draw_status_line(float x, float y, float max_width, const char* label, const char* value)
 {
-    app_gfx_text(x, y, 0.38f, 0.38f, UI_HILITE, label);
-    app_gfx_text(x, y + 10.0f, 0.36f, 0.36f, UI_TEXT, value != NULL ? value : "<none>");
+    app_gfx_text(x, y, 0.38f, 0.38f, UI_SIGNAL_HI, label);
+    app_gfx_text_fit(x, y + 10.0f, max_width, 0.36f, 0.36f, UI_TEXT, value != NULL ? value : "<none>");
 }
 
 static void render_home_graphical(
@@ -329,26 +401,29 @@ static void render_home_graphical(
     app_gfx_begin_top(UI_BG_TOP);
     draw_header("HERMES AGENT", "RELAY DECK");
     app_gfx_panel_inset(12.0f, 48.0f, 226.0f, 76.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
-    draw_status_line(22.0f, 58.0f, "ACTIVE THREAD", conversation_label);
-    draw_status_line(22.0f, 82.0f, "LINK STATUS", status_line);
-    app_gfx_text(22.0f, 106.0f, 0.34f, 0.34f, UI_MUTED, health_result != NULL && health_result->success ? "bridge healthy" : "awaiting relay");
+    draw_chip(22.0f, 54.0f, 86.0f, "ACTIVE THREAD", UI_ACCENT, UI_TEXT);
+    draw_status_line(22.0f, 76.0f, 190.0f, "ROOM", conversation_label);
+    draw_status_line(22.0f, 100.0f, 190.0f, "LINK STATUS", status_line);
 
     app_gfx_panel_inset(248.0f, 48.0f, 140.0f, 76.0f, UI_PANEL_ALT, UI_BORDER, UI_ACCENT);
-    app_gfx_panel(284.0f, 66.0f, 40.0f, 40.0f, UI_ACCENT, UI_BORDER);
-    app_gfx_panel(296.0f, 58.0f, 16.0f, 8.0f, UI_HILITE, UI_BORDER);
-    app_gfx_text(266.0f, 108.0f, 0.34f, 0.34f, UI_TEXT, "relay crest");
+    draw_chip(258.0f, 54.0f, 72.0f, "RELAY", UI_SIGNAL, UI_BG_TOP);
+    app_gfx_panel(284.0f, 70.0f, 40.0f, 32.0f, UI_ACCENT, UI_BORDER_STRONG);
+    app_gfx_panel(292.0f, 62.0f, 24.0f, 8.0f, UI_SIGNAL_HI, UI_BORDER_STRONG);
+    app_gfx_panel(298.0f, 82.0f, 12.0f, 14.0f, UI_SIGNAL_HI, UI_BORDER_STRONG);
+    app_gfx_text_fit(258.0f, 108.0f, 118.0f, 0.30f, 0.30f, UI_MUTED, health_result != NULL && health_result->success ? "relay crest ready" : "relay crest standby");
 
-    app_gfx_panel_inset(12.0f, 132.0f, 376.0f, 96.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
-    app_gfx_text(20.0f, 140.0f, 0.46f, 0.46f, UI_TEXT, "HERMES REPLY");
-    app_gfx_text_right(380.0f, 140.0f, 0.36f, 0.36f, UI_HILITE, page_label);
-    app_gfx_text(20.0f, 156.0f, 0.32f, 0.32f, UI_MUTED, "Last message:");
-    draw_text_lines(20.0f, 166.0f, 10.0f, 0.32f, 0.32f, UI_TEXT, message_lines, message_line_count, 0, 2);
-    draw_text_lines(20.0f, 190.0f, 10.0f, 0.34f, 0.34f, UI_TEXT, reply_lines, reply_line_count, reply_start, HOME_REPLY_LINES_PER_PAGE > 3 ? 3 : HOME_REPLY_LINES_PER_PAGE);
+    app_gfx_panel_inset(12.0f, 132.0f, 376.0f, 96.0f, UI_REPLY_CARD, UI_BORDER_STRONG, UI_SIGNAL);
+    draw_chip(20.0f, 138.0f, 88.0f, "HERMES REPLY", UI_SIGNAL, UI_BG_TOP);
+    app_gfx_text_right(380.0f, 140.0f, 0.36f, 0.36f, UI_SIGNAL_HI, page_label);
+    draw_note_lines(20.0f, 184.0f, 360.0f, 4);
+    app_gfx_text(20.0f, 160.0f, 0.32f, 0.32f, UI_META, "Last message:");
+    draw_text_lines(20.0f, 166.0f, 10.0f, 356.0f, 0.32f, 0.32f, UI_TEXT, message_lines, message_line_count, 0, 2);
+    draw_text_lines(20.0f, 190.0f, 10.0f, 356.0f, 0.34f, 0.34f, UI_TEXT, reply_lines, reply_line_count, reply_start, HOME_REPLY_LINES_PER_PAGE);
 
     app_gfx_begin_bottom(UI_BG_BOTTOM);
     draw_bottom_header("COMMAND MENU");
     app_gfx_panel_inset(8.0f, 46.0f, 184.0f, 138.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
-    draw_menu_row(16.0f, 56.0f, 168.0f, "B Ask Hermes", true);
+    draw_menu_row(16.0f, 56.0f, 168.0f, "B Ask Hermes", false);
     draw_menu_row(16.0f, 74.0f, 168.0f, "A Check Link", false);
     draw_menu_row(16.0f, 92.0f, 168.0f, "SELECT Threads", false);
     draw_menu_row(16.0f, 110.0f, 168.0f, "X Config", false);
@@ -357,15 +432,15 @@ static void render_home_graphical(
     draw_menu_row(16.0f, 164.0f, 168.0f, "START Exit", false);
 
     app_gfx_panel_inset(202.0f, 46.0f, 110.0f, 66.0f, UI_PANEL_ALT, UI_BORDER, UI_ACCENT);
-    app_gfx_text(210.0f, 56.0f, 0.34f, 0.34f, UI_HILITE, "GATEWAY");
-    app_gfx_text(210.0f, 70.0f, 0.32f, 0.32f, UI_TEXT, bridge_summary);
-    app_gfx_text(210.0f, 88.0f, 0.34f, 0.34f, UI_HILITE, "TOKEN");
-    app_gfx_text(210.0f, 102.0f, 0.30f, 0.30f, UI_TEXT, token_summary);
+    app_gfx_text(210.0f, 56.0f, 0.34f, 0.34f, UI_SIGNAL_HI, "GATEWAY");
+    app_gfx_text_fit(210.0f, 70.0f, 94.0f, 0.32f, 0.32f, UI_TEXT, bridge_summary);
+    app_gfx_text(210.0f, 88.0f, 0.34f, 0.34f, UI_SIGNAL_HI, "TOKEN");
+    app_gfx_text_fit(210.0f, 102.0f, 94.0f, 0.30f, 0.30f, UI_TEXT, token_summary);
 
     app_gfx_panel_inset(202.0f, 120.0f, 110.0f, 64.0f, UI_PANEL_ALT, UI_BORDER, UI_ACCENT);
-    app_gfx_text(210.0f, 130.0f, 0.33f, 0.33f, UI_HILITE, "HINT");
-    app_gfx_text(210.0f, 144.0f, 0.30f, 0.30f, UI_TEXT, "L/R page reply");
-    app_gfx_text(210.0f, 156.0f, 0.30f, 0.30f, UI_TEXT, "Old 3DS safe");
+    app_gfx_text(210.0f, 130.0f, 0.33f, 0.33f, UI_SIGNAL_HI, "HINT");
+    app_gfx_text_fit(210.0f, 144.0f, 94.0f, 0.30f, 0.30f, UI_TEXT, "L/R page reply");
+    app_gfx_text_fit(210.0f, 156.0f, 94.0f, 0.30f, 0.30f, UI_TEXT, "Old 3DS safe");
 }
 
 static void render_settings_graphical(
@@ -390,30 +465,30 @@ static void render_settings_graphical(
     app_gfx_begin_top(UI_BG_TOP);
     draw_header("HERMES AGENT", "SYSTEM CONFIG");
     app_gfx_panel_inset(12.0f, 48.0f, 376.0f, 176.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
-    app_gfx_text(20.0f, 58.0f, 0.42f, 0.42f, UI_TEXT, settings_dirty ? "LINK SETTINGS*" : "LINK SETTINGS");
+    app_gfx_text_fit(20.0f, 58.0f, 320.0f, 0.42f, 0.42f, UI_TEXT, settings_dirty ? "LINK SETTINGS*" : "LINK SETTINGS");
     app_gfx_text_right(380.0f, 58.0f, 0.30f, 0.30f, UI_MUTED, rc_line);
 
     app_gfx_highlight_bar(18.0f, row_y - 2.0f + (float)selected_field * 34.0f, 170.0f, 28.0f, UI_ACCENT);
-    app_gfx_text(24.0f, row_y + 2.0f, 0.38f, 0.38f, selected_field == SETTINGS_FIELD_HOST ? UI_BG_TOP : UI_TEXT, host_cursor);
-    app_gfx_text(24.0f, row_y + 36.0f, 0.38f, 0.38f, selected_field == SETTINGS_FIELD_PORT ? UI_BG_TOP : UI_TEXT, port_cursor);
-    app_gfx_text(24.0f, row_y + 70.0f, 0.38f, 0.38f, selected_field == SETTINGS_FIELD_TOKEN ? UI_BG_TOP : UI_TEXT, token_cursor);
-    app_gfx_text(24.0f, row_y + 104.0f, 0.38f, 0.38f, selected_field == SETTINGS_FIELD_DEVICE_ID ? UI_BG_TOP : UI_TEXT, device_id_cursor);
+    app_gfx_text_fit(24.0f, row_y + 2.0f, 154.0f, 0.38f, 0.38f, selected_field == SETTINGS_FIELD_HOST ? UI_BG_TOP : UI_TEXT, host_cursor);
+    app_gfx_text_fit(24.0f, row_y + 36.0f, 154.0f, 0.38f, 0.38f, selected_field == SETTINGS_FIELD_PORT ? UI_BG_TOP : UI_TEXT, port_cursor);
+    app_gfx_text_fit(24.0f, row_y + 70.0f, 154.0f, 0.38f, 0.38f, selected_field == SETTINGS_FIELD_TOKEN ? UI_BG_TOP : UI_TEXT, token_cursor);
+    app_gfx_text_fit(24.0f, row_y + 104.0f, 154.0f, 0.38f, 0.38f, selected_field == SETTINGS_FIELD_DEVICE_ID ? UI_BG_TOP : UI_TEXT, device_id_cursor);
 
     app_gfx_panel(198.0f, 72.0f, 178.0f, 28.0f, UI_PANEL_ALT, UI_BORDER);
-    app_gfx_text(206.0f, 80.0f, 0.34f, 0.34f, UI_TEXT, config->host);
+    app_gfx_text_fit(206.0f, 80.0f, 162.0f, 0.34f, 0.34f, UI_TEXT, config->host);
     app_gfx_panel(198.0f, 106.0f, 178.0f, 28.0f, UI_PANEL_ALT, UI_BORDER);
     snprintf(rc_line, sizeof(rc_line), "%u", (unsigned int)config->port);
-    app_gfx_text(206.0f, 114.0f, 0.34f, 0.34f, UI_TEXT, rc_line);
+    app_gfx_text_fit(206.0f, 114.0f, 162.0f, 0.34f, 0.34f, UI_TEXT, rc_line);
     app_gfx_panel(198.0f, 140.0f, 178.0f, 28.0f, UI_PANEL_ALT, UI_BORDER);
-    app_gfx_text(206.0f, 148.0f, 0.32f, 0.32f, UI_TEXT, token_summary);
+    app_gfx_text_fit(206.0f, 148.0f, 162.0f, 0.32f, 0.32f, UI_TEXT, token_summary);
     app_gfx_panel(198.0f, 174.0f, 178.0f, 28.0f, UI_PANEL_ALT, UI_BORDER);
-    app_gfx_text(206.0f, 182.0f, 0.32f, 0.32f, UI_TEXT, config->device_id[0] != '\0' ? config->device_id : "<empty>");
-    app_gfx_text(20.0f, 208.0f, 0.30f, 0.30f, UI_MUTED, status_line);
+    app_gfx_text_fit(206.0f, 182.0f, 162.0f, 0.32f, 0.32f, UI_TEXT, config->device_id[0] != '\0' ? config->device_id : "<empty>");
+    app_gfx_text_fit(20.0f, 208.0f, 356.0f, 0.30f, 0.30f, UI_MUTED, status_line);
 
     app_gfx_begin_bottom(UI_BG_BOTTOM);
     draw_bottom_header("OPTIONS MENU");
     app_gfx_panel_inset(8.0f, 46.0f, 304.0f, 138.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
-    draw_menu_row(16.0f, 58.0f, 288.0f, "A Edit value", true);
+    draw_menu_row(16.0f, 58.0f, 288.0f, "A Edit value", false);
     draw_menu_row(16.0f, 78.0f, 288.0f, "X Save settings", false);
     draw_menu_row(16.0f, 98.0f, 288.0f, "Y Restore defaults", false);
     draw_menu_row(16.0f, 118.0f, 288.0f, "B Home", false);
@@ -434,13 +509,13 @@ static void render_conversations_graphical(
     size_t index;
     char rc_line[32];
 
+    snprintf(rc_line, sizeof(rc_line), "rc 0x%08lX", (unsigned long)last_rc);
     app_gfx_begin_top(UI_BG_TOP);
     draw_header("HERMES AGENT", "THREAD LOG");
     app_gfx_panel_inset(12.0f, 48.0f, 376.0f, 176.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
-    app_gfx_text(20.0f, 58.0f, 0.42f, 0.42f, UI_TEXT, "THREAD ARCHIVE");
-    snprintf(rc_line, sizeof(rc_line), "rc 0x%08lX", (unsigned long)last_rc);
+    draw_chip(20.0f, 54.0f, 92.0f, "THREAD ARCHIVE", UI_ACCENT, UI_TEXT);
     app_gfx_text_right(380.0f, 58.0f, 0.30f, 0.30f, UI_MUTED, rc_line);
-    app_gfx_text(20.0f, 72.0f, 0.30f, 0.30f, UI_MUTED, status_line);
+    app_gfx_text_fit(20.0f, 76.0f, 356.0f, 0.30f, 0.30f, UI_MUTED, status_line);
 
     if (config == NULL || config->recent_conversation_count == 0) {
         app_gfx_text(20.0f, 98.0f, 0.38f, 0.38f, UI_TEXT, "No saved conversations.");
@@ -460,8 +535,8 @@ static void render_conversations_graphical(
 
             if (selected)
                 app_gfx_highlight_bar(18.0f, row_y - 2.0f, 364.0f, 26.0f, UI_ACCENT);
-            app_gfx_text(24.0f, row_y + 2.0f, 0.36f, 0.36f, selected ? UI_BG_TOP : UI_TEXT, title);
-            app_gfx_text(24.0f, row_y + 14.0f, 0.28f, 0.28f, selected ? UI_BG_TOP : UI_MUTED,
+            app_gfx_text_fit(24.0f, row_y + 2.0f, 350.0f, 0.36f, 0.36f, selected ? UI_BG_TOP : UI_TEXT, title);
+            app_gfx_text_fit(24.0f, row_y + 14.0f, 350.0f, 0.28f, 0.28f, selected ? UI_BG_TOP : UI_MUTED,
                 info != NULL && info->preview[0] != '\0' ? info->preview : config->recent_conversations[index]);
         }
     }
@@ -469,7 +544,7 @@ static void render_conversations_graphical(
     app_gfx_begin_bottom(UI_BG_BOTTOM);
     draw_bottom_header("THREAD MENU");
     app_gfx_panel_inset(8.0f, 46.0f, 304.0f, 138.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
-    draw_menu_row(16.0f, 58.0f, 288.0f, "A Use thread", true);
+    draw_menu_row(16.0f, 58.0f, 288.0f, "A Use thread", false);
     draw_menu_row(16.0f, 78.0f, 288.0f, "X New thread", false);
     draw_menu_row(16.0f, 98.0f, 288.0f, "Y Sync Hermes", false);
     draw_menu_row(16.0f, 118.0f, 288.0f, "B Home", false);
@@ -492,7 +567,7 @@ void hermes_app_ui_render_approval_prompt(const char* request_id)
     app_gfx_panel_inset(24.0f, 56.0f, 352.0f, 156.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
     app_gfx_text(36.0f, 72.0f, 0.46f, 0.46f, UI_TEXT, "Approval required");
     app_gfx_text_fit(36.0f, 92.0f, 328.0f, 0.32f, 0.32f, UI_MUTED, request_line);
-    app_gfx_text_fit(36.0f, 120.0f, 328.0f, 0.34f, 0.34f, UI_HILITE, "Hermes needs a response before it can continue.");
+    app_gfx_text_fit(36.0f, 120.0f, 328.0f, 0.34f, 0.34f, UI_SIGNAL_HI, "Hermes needs a response before it can continue.");
     app_gfx_text_fit(36.0f, 144.0f, 328.0f, 0.32f, 0.32f, UI_TEXT, "Choose how long to allow the action, or deny it.");
 
     app_gfx_begin_bottom(UI_BG_BOTTOM);
@@ -523,10 +598,10 @@ void hermes_app_ui_render_voice_recording(unsigned long tenths, size_t pcm_size,
     app_gfx_panel_inset(20.0f, 54.0f, 360.0f, 160.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
     app_gfx_text(32.0f, 70.0f, 0.46f, 0.46f, UI_TEXT, "Recording microphone");
     app_gfx_text_fit(32.0f, 92.0f, 316.0f, 0.32f, 0.32f, UI_MUTED, status_line != NULL && status_line[0] != '\0' ? status_line : "Mic is recording now.");
-    app_gfx_text(32.0f, 122.0f, 0.34f, 0.34f, UI_HILITE, "TIME");
+    app_gfx_text(32.0f, 122.0f, 0.34f, 0.34f, UI_SIGNAL_HI, "TIME");
     app_gfx_panel(96.0f, 118.0f, 100.0f, 24.0f, UI_PANEL_ALT, UI_BORDER);
     app_gfx_text(106.0f, 124.0f, 0.34f, 0.34f, UI_TEXT, time_line);
-    app_gfx_text(220.0f, 122.0f, 0.34f, 0.34f, UI_HILITE, "AUDIO");
+    app_gfx_text(220.0f, 122.0f, 0.34f, 0.34f, UI_SIGNAL_HI, "AUDIO");
     app_gfx_panel(286.0f, 118.0f, 74.0f, 24.0f, UI_PANEL_ALT, UI_BORDER);
     app_gfx_text_fit(292.0f, 124.0f, 62.0f, 0.30f, 0.30f, UI_TEXT, audio_line);
     app_gfx_text(32.0f, 162.0f, 0.34f, 0.34f, UI_TEXT, capture_state);
