@@ -75,6 +75,5 @@ Latest built artifact:
 ## Recommended next steps
 
 1. add saved sessions / conversation selection
-2. replace the placeholder app art/icon with the provided portrait asset
-3. add microphone input on 3DS with host-side speech-to-text
-4. keep tightening UI polish for Old 3DS readability and speed
+2. add microphone input on 3DS with host-side speech-to-text
+3. keep tightening UI polish for Old 3DS readability and speed

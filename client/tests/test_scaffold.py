@@ -27,6 +27,6 @@ def test_main_c_bootstraps_a_basic_old_3ds_friendly_loop():
     assert "Old 3DS" in content
 
 
-def test_icon_placeholder_and_include_dir_exist():
+def test_icon_and_include_dir_exist():
     assert (CLIENT_DIR / "icon.png").exists(), "client/icon.png should exist"
     assert (CLIENT_DIR / "include").exists(), "client/include should exist"
