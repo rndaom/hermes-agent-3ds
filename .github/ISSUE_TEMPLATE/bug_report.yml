@@ -32,4 +32,4 @@ body:
     id: environment
     attributes:
       label: Setup details
-      placeholder: 3DS model, firmware/homebrew setup, app version, bridge version
+      placeholder: 3DS model, firmware/homebrew setup, app version, Hermes gateway commit/version

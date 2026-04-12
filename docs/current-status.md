@@ -1,6 +1,6 @@
 # Current status
 
-Last major verified milestone: **the client is now V2-only and targets the native 3DS gateway architecture in `hermes-agent`.**
+Last major verified milestone: **the V2-only 3DS client is validated end-to-end against the native 3DS gateway in `hermes-agent`, including real Old 3DS hardware.**
 
 ## What is done
 
@@ -27,43 +27,54 @@ Last major verified milestone: **the client is now V2-only and targets the nativ
   - matching `reply_to`
   - longer wait window for final replies
 
+### Host-side integration
+- native 3DS gateway support now exists in `hermes-agent`
+- the gateway exposes the expected V2 surface:
+  - `GET /api/v2/health`
+  - `GET /api/v2/capabilities`
+  - `POST /api/v2/messages`
+  - `GET /api/v2/events`
+  - `POST /api/v2/interactions/{request_id}/respond`
+- live local integration has been validated against the Hermes-side gateway
+- the latest app build has been deployed over FTPD and verified on real hardware
+
 ### Repo cleanup
-- legacy bundled Python bridge has been removed from this repo
-- legacy v1 chat transport code has been removed from the client build path
-- docs are being aligned around the V2-only architecture
+- this repo is now client-only
+- bundled bridge code is gone
+- old V1 chat transport code is gone from the client path
+- docs are aligned around the V2-only split:
+  - `hermes-agent-3ds` = handheld client
+  - `hermes-agent` = host-side 3DS gateway platform
 
 ## Current target architecture
 
-This repo is now the handheld client only.
+This repo is the handheld client only.
 
-Host-side gateway ownership belongs in `hermes-agent`, where 3DS should behave like any other Hermes gateway platform.
+Host-side gateway ownership belongs in `hermes-agent`, where 3DS behaves like any other Hermes gateway platform.
 
-Expected host-side API surface:
-- `GET /api/v2/health`
-- `GET /api/v2/capabilities`
-- `POST /api/v2/messages`
-- `GET /api/v2/events`
-- `POST /api/v2/interactions/{request_id}/respond`
-
-## Current known-good local validation
+## Current known-good validation
 
 - `python3 -m pytest client/tests -q`
 - `make -C client clean && make -C client`
+- live V2 gateway checks for:
+  - `/api/v2/health`
+  - `/api/v2/capabilities`
+  - `/api/v2/messages`
+  - `/api/v2/events`
+- real-hardware deployment over FTPD to the Old 3DS
 
 Latest built artifact:
 - `client/hermes-agent-3ds.3dsx`
 
 ## What is intentionally gone
 
-- standalone repo-local v1 bridge flow
+- the old standalone repo-local bridge flow
 - `/api/v1/chat` as the client chat path
-- v1-first docs and setup guidance
+- V1-first setup and architecture assumptions
 
 ## Recommended next steps
 
-1. finish or restore the Hermes-side native 3DS gateway branch in `hermes-agent`
-2. validate the V2-only client against that gateway on real hardware
-3. add the next user-facing improvements:
-   - microphone input option with bridge-side STT
-   - portrait artwork/app icon
-   - session UX polish
+1. add saved sessions / conversation selection
+2. replace the placeholder app art/icon with the provided portrait asset
+3. add microphone input on 3DS with host-side speech-to-text
+4. keep tightening UI polish for Old 3DS readability and speed

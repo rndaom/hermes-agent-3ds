@@ -19,7 +19,7 @@ This repo is now the **3DS client only**.
 - `hermes-agent-3ds` = handheld app, settings, UI, input, transport client
 - `hermes-agent` = Hermes-side 3DS gateway platform, sessions, approvals, message flow
 
-Legacy v1 bridge code is gone from this repo.
+This repo is V2-only now. The old bundled bridge path is gone.
 
 ## Quick start
 
@@ -102,8 +102,8 @@ No. The 3DS is the client. Hermes runs on stronger hardware.
 ### Do I need a modded 3DS?
 Yes.
 
-### Is v1 still supported?
-No. This repo is V2-only now.
+### Is V1 still supported?
+No. V1 is gone. This repo is V2-only.
 
 ### Where is the host-side gateway code?
 In `hermes-agent`, where 3DS should behave like a normal Hermes gateway platform.
