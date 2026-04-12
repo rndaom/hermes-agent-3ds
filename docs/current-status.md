@@ -23,7 +23,8 @@ Last major verified milestone: **the V2-only 3DS client is validated end-to-end 
   - `POST /api/v2/voice`
   - `GET /api/v2/events`
   - approval handling through `POST /api/v2/interactions/{request_id}/respond`
-- microphone input is implemented on-device and routed through host-side speech-to-text with `SELECT`
+- microphone input is implemented on-device and routed through host-side speech-to-text with `UP`
+- the mic recording screen now uses reduced in-place redraws to stay stable on real Old 3DS hardware during capture
 - stale-event filtering is in place using:
   - ack cursor handoff
   - matching `reply_to`
