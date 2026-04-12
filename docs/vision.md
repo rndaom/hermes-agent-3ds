@@ -12,19 +12,20 @@ The job of the app is simple:
 
 ## What we are building
 
-A Nintendo 3DS homebrew app that talks to a bridge service, which then talks to Hermes.
+A Nintendo 3DS homebrew app that talks to the native 3DS gateway in `hermes-agent`.
 
 The 3DS handles the experience.
-The bridge handles the modern web complexity.
+Hermes handles the backend work.
 
 ## What we are not building
 
-At least for v1, we are not trying to:
+We are not trying to:
 - run Hermes directly on the 3DS
+- keep a separate legacy bridge model alive
 - build a giant feature-complete messenger
 - stuff the UI with power-user settings
 - make setup harder than it needs to be
 
 ## North star
 
-If someone with a modded 3DS can install the app, point it at their Hermes bridge, and start chatting without reading a novel, we're on the right track.
+If someone with a modded 3DS can install the app, point it at their Hermes 3DS gateway, and start chatting without reading a novel, we're on the right track.

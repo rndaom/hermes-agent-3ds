@@ -5,7 +5,7 @@
 #include <stddef.h>
 
 #ifndef DEFAULT_BRIDGE_HEALTH_URL
-#define DEFAULT_BRIDGE_HEALTH_URL "http://10.75.76.156:8787/api/v1/health"
+#define DEFAULT_BRIDGE_HEALTH_URL "http://10.75.76.156:8787/api/v2/health"
 #endif
 
 #define BRIDGE_HEALTH_TEXT_MAX 96

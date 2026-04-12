@@ -10,70 +10,77 @@
 
 A Nintendo 3DS client for Hermes Agent.
 
-The app runs on a modded 3DS. Hermes runs on your PC or server. The 3DS talks to Hermes through a small bridge service.
+The app runs on a modded 3DS. Hermes runs on your PC. The 3DS talks to the **native 3DS gateway in `hermes-agent`** over HTTP.
+
+## Current architecture
+
+This repo is now the **3DS client only**.
+
+- `hermes-agent-3ds` = handheld app, settings, UI, input, transport client
+- `hermes-agent` = Hermes-side 3DS gateway platform, sessions, approvals, message flow
+
+Legacy v1 bridge code is gone from this repo.
 
 ## Quick start
 
-This project is for a **modded Nintendo 3DS**. If your system is not already modded, start with:
+### 1) Build the 3DS app
 
-- https://3ds.hacks.guide/
+From `client/`:
 
-### 1) Install the 3DS app
+```bash
+make clean && make
+make release RELEASE_VERSION=local
+```
 
-Current release shape is a Homebrew Launcher build.
+### 2) Copy it to your SD card
 
-Copy the app to:
+Install to:
 
 ```text
 sdmc:/3ds/hermes-agent-3ds/
 ```
 
-The folder should contain at least:
+Expected files:
 
 ```text
 sdmc:/3ds/hermes-agent-3ds/hermes-agent-3ds.3dsx
+sdmc:/3ds/hermes-agent-3ds/hermes-agent-3ds.smdh
 ```
 
-Then launch **Hermes Agent 3DS** from the Homebrew Launcher.
+### 3) Run Hermes with the native 3DS gateway enabled
 
-### 2) Run the bridge on your PC
+The target host is the Hermes-side 3DS platform in the main `hermes-agent` repo.
 
-From this repo:
+The 3DS client expects the gateway to expose:
 
-```bash
-python -m venv bridge/.venv
-. bridge/.venv/bin/activate
-pip install -e './bridge[dev]'
-export HERMES_3DS_BRIDGE_AUTH_TOKEN='change-me'
-hermes-3ds-bridge
-```
+- `GET /api/v2/health`
+- `GET /api/v2/capabilities`
+- `POST /api/v2/messages`
+- `GET /api/v2/events`
+- `POST /api/v2/interactions/{request_id}/respond`
 
-If you prefer the module entrypoint directly, this also works:
+### 4) Configure the app on the 3DS
 
-```bash
-python -m hermes_3ds_bridge.main
-```
-
-The bridge should be reachable from the same LAN as the 3DS.
-
-### 3) Connect for the first time
-
-Open the app on your 3DS.
+Open **Hermes Agent 3DS** in Homebrew Launcher.
 
 - `X` — open settings
-- set the bridge host
-- set the bridge port
-- set the auth token to match `HERMES_3DS_BRIDGE_AUTH_TOKEN`
-- press `X` again to save settings
+- set `Host`
+- set `Port`
+- set `Token`
+- set `Device ID`
+- press `X` again to save
 - press `B` to return home
-- press `A` — run bridge health check
 
-If the health check succeeds, press `B` on the home screen and send a test message to Hermes.
+### 5) Test it
+
+- `A` — check Hermes gateway health
+- `B` — ask Hermes
+- `L/R` — page long replies
 
 ## Controls
 
 ### Home
-- A — run bridge health check
+- A — check Hermes gateway health
 - B — ask Hermes
 - X — open settings
 - Y — clear status
@@ -95,21 +102,19 @@ No. The 3DS is the client. Hermes runs on stronger hardware.
 ### Do I need a modded 3DS?
 Yes.
 
-### Will this be easy to set up?
-That's the goal. The app is being built around a simple LAN bridge flow and short install steps.
+### Is v1 still supported?
+No. This repo is V2-only now.
 
-### Is this only for one specific Hermes setup?
-No. The long-term goal is to support a simple bridge model that can work with normal Hermes usage.
-
-### Is the app released yet?
-The core v1 flow is now implemented and hardware-validated on a real modded 3DS. The repo includes working build, bridge, and setup instructions for local testing and first-release prep.
+### Where is the host-side gateway code?
+In `hermes-agent`, where 3DS should behave like a normal Hermes gateway platform.
 
 ## Links
 
 - [`docs/install.md`](docs/install.md)
+- [`docs/current-status.md`](docs/current-status.md)
+- [`docs/architecture.md`](docs/architecture.md)
 - [`docs/roadmap.md`](docs/roadmap.md)
 - [`docs/design-language.md`](docs/design-language.md)
-- [`bridge/README.md`](bridge/README.md)
 - [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
 ## License

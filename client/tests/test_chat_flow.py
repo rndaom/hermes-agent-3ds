@@ -2,50 +2,38 @@ from pathlib import Path
 
 
 CLIENT_DIR = Path(__file__).resolve().parents[1]
+REPO_ROOT = CLIENT_DIR.parent
 
 
-def test_app_config_supports_chat_endpoint_urls():
+def test_app_config_only_supports_native_v2_endpoint_urls():
     header = (CLIENT_DIR / "include" / "app_config.h").read_text()
     source = (CLIENT_DIR / "source" / "app_config.c").read_text()
 
-    assert "HERMES_APP_CHAT_URL_MAX" in header
-    assert "hermes_app_config_build_chat_url" in header
-    assert '"/api/v1/chat"' in source
+    assert "HERMES_APP_CHAT_URL_MAX" not in header
+    assert "hermes_app_config_build_chat_url" not in header
+    assert '"/api/v1/chat"' not in source
+    assert '"/api/v2/messages"' in source
+    assert '"/api/v2/events"' in source
+    assert '"/api/v2/interactions/"' in source
 
 
-
-def test_bridge_chat_module_exists_and_posts_json_to_chat_endpoint():
+def test_legacy_v1_chat_transport_module_is_removed():
     header_path = CLIENT_DIR / "include" / "bridge_chat.h"
     source_path = CLIENT_DIR / "source" / "bridge_chat.c"
 
-    assert header_path.exists(), "client/include/bridge_chat.h should exist"
-    assert source_path.exists(), "client/source/bridge_chat.c should exist"
+    assert header_path.exists(), "client/include/bridge_chat.h should remain as shared chat result types"
+    assert not source_path.exists(), "client/source/bridge_chat.c should be removed"
 
     header = header_path.read_text()
-    source = source_path.read_text()
-
     assert "BridgeChatResult" in header
-    assert "BRIDGE_CHAT_REPLY_MAX" in header
-    assert "bridge_chat_run" in header
-
-    assert '"POST %s HTTP/1.1\\r\\n"' in source
-    assert '"Content-Type: application/json\\r\\n"' in source
-    assert 'message' in source
-    assert 'token' in source
-    assert 'context' in source
-    assert 'platform' in source
-    assert 'app_version' in source
-    assert "recv(" in source
-    assert "BRIDGE_CHAT_IO_TIMEOUT_SECONDS" in source
-    assert "#define BRIDGE_CHAT_IO_TIMEOUT_SECONDS 180" in source
-    assert "Timed out waiting for a Hermes reply." in source
-    assert "extract_json_string(response_body, \"reply\"" in source
-    assert "extract_json_string(response_body, \"error\"" in source
-    assert '"\\\"truncated\\\":true"' in source
+    assert "bridge_chat_run" not in header
 
 
+def test_legacy_python_bridge_repo_folder_is_removed():
+    assert not (REPO_ROOT / "bridge").exists()
 
-def test_main_c_offers_message_prompt_and_reply_rendering():
+
+def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
 
     assert '"bridge_chat.h"' in main_c
@@ -68,7 +56,8 @@ def test_main_c_offers_message_prompt_and_reply_rendering():
     assert "Last message" in main_c
     assert "Last reply" in main_c
     assert "swkbdInputText" in main_c
-    assert "Checking bridge..." in main_c
+    assert "Asking Hermes over v2..." in main_c
+    assert '"/api/v1/chat"' not in main_c
 
 
 def test_main_c_wraps_and_pages_long_reply_text_for_small_screens():

@@ -11,7 +11,6 @@
 #define HERMES_APP_CONFIG_HOST_MAX 64
 #define HERMES_APP_CONFIG_TOKEN_MAX 128
 #define HERMES_APP_HEALTH_URL_MAX 160
-#define HERMES_APP_CHAT_URL_MAX 160
 #define HERMES_APP_CAPABILITIES_URL_MAX 160
 #define HERMES_APP_MESSAGES_URL_MAX 160
 #define HERMES_APP_EVENTS_URL_MAX 160
@@ -35,7 +34,6 @@ void hermes_app_config_set_defaults(HermesAppConfig* config);
 HermesAppConfigLoadStatus hermes_app_config_load(HermesAppConfig* config);
 bool hermes_app_config_save(const HermesAppConfig* config);
 bool hermes_app_config_build_health_url(const HermesAppConfig* config, char* out_url, size_t out_size);
-bool hermes_app_config_build_chat_url(const HermesAppConfig* config, char* out_url, size_t out_size);
 bool hermes_app_config_build_capabilities_url(const HermesAppConfig* config, char* out_url, size_t out_size);
 bool hermes_app_config_build_messages_url(const HermesAppConfig* config, char* out_url, size_t out_size);
 bool hermes_app_config_build_events_url(const HermesAppConfig* config, char* out_url, size_t out_size);

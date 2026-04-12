@@ -471,17 +471,17 @@ static void render_home_top_screen(
         if (chat_result->http_status != 0)
             printf("http: %lu\n", (unsigned long)chat_result->http_status);
     } else if (health_result->success) {
-        printf("Bridge OK\n");
+        printf("Hermes gateway OK\n");
         printf("service: %s\n", health_result->service);
         printf("version: %s\n", health_result->version);
         printf("http: %lu\n", (unsigned long)health_result->http_status);
     } else if (health_result->error[0] != '\0') {
-        printf("Bridge check failed\n");
+        printf("Gateway check failed\n");
         printf("%s\n", health_result->error);
         if (health_result->http_status != 0)
             printf("http: %lu\n", (unsigned long)health_result->http_status);
     } else {
-        printf("Press A to check bridge health.\n");
+        printf("Press A to check Hermes gateway.\n");
         printf("Press B to Ask Hermes.\n");
     }
 }
@@ -504,7 +504,7 @@ static void render_home_bottom_screen(
     if (chat_result != NULL && chat_result->success)
         page_count = wrapped_page_count(chat_result->reply, HOME_REPLY_LINES_PER_PAGE);
 
-    printf("Bridge:\n%s\n", bridge_summary);
+    printf("Gateway:\n%s\n", bridge_summary);
     printf("Token: %s\n", token_summary);
     printf("\n");
     printf("A check   B ask   X settings\n");
@@ -676,23 +676,18 @@ int main(int argc, char* argv[])
 
             if ((kDown & KEY_A) != 0) {
                 char health_url[HERMES_APP_HEALTH_URL_MAX];
-                char capabilities_url[HERMES_APP_CAPABILITIES_URL_MAX];
-                BridgeV2CapabilitiesResult capabilities_result;
-                Result capabilities_rc = 0;
 
                 bridge_health_result_reset(&health_result);
-                bridge_v2_capabilities_result_reset(&capabilities_result);
                 request_rc = 0;
                 reply_page = 0;
 
-                if (!hermes_app_config_build_health_url(&config, health_url, sizeof(health_url)) ||
-                    !hermes_app_config_build_capabilities_url(&config, capabilities_url, sizeof(capabilities_url))) {
+                if (!hermes_app_config_build_health_url(&config, health_url, sizeof(health_url))) {
                     snprintf(status_line, sizeof(status_line), "Local config is incomplete.");
                     render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
                     continue;
                 }
 
-                snprintf(status_line, sizeof(status_line), "Checking bridge...");
+                snprintf(status_line, sizeof(status_line), "Checking Hermes gateway...");
                 render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
                 gfxFlushBuffers();
                 gfxSwapBuffers();
@@ -700,22 +695,11 @@ int main(int argc, char* argv[])
 
                 if (network_ready) {
                     request_rc = bridge_health_check_run(health_url, &health_result);
-                    capabilities_rc = bridge_v2_get_capabilities(capabilities_url, config.token, &capabilities_result);
 
-                    if (R_SUCCEEDED(request_rc) && health_result.success) {
-                        if (R_SUCCEEDED(capabilities_rc) && capabilities_result.success)
-                            snprintf(status_line, sizeof(status_line), "Bridge OK. Native v2: %s.", capabilities_result.transport[0] != '\0' ? capabilities_result.transport : "ready");
-                        else if (capabilities_result.error[0] != '\0')
-                            snprintf(status_line, sizeof(status_line), "Bridge OK. V2 probe failed.");
-                        else
-                            snprintf(status_line, sizeof(status_line), "Bridge OK, but v2 probe failed.");
-                    } else if (R_SUCCEEDED(capabilities_rc) && capabilities_result.success) {
-                        health_result.success = true;
-                        snprintf(health_result.service, sizeof(health_result.service), "%s", capabilities_result.platform[0] != '\0' ? capabilities_result.platform : "3ds");
-                        snprintf(health_result.version, sizeof(health_result.version), "%s", capabilities_result.transport[0] != '\0' ? capabilities_result.transport : "native-v2");
-                        snprintf(status_line, sizeof(status_line), "Native v2 responded even though v1 health failed.");
-                    } else if (health_result.error[0] == '\0')
-                        snprintf(status_line, sizeof(status_line), "Bridge check failed: 0x%08lX", (unsigned long)request_rc);
+                    if (R_SUCCEEDED(request_rc) && health_result.success)
+                        snprintf(status_line, sizeof(status_line), "Hermes gateway OK.");
+                    else if (health_result.error[0] == '\0')
+                        snprintf(status_line, sizeof(status_line), "Gateway check failed: 0x%08lX", (unsigned long)request_rc);
                     else
                         snprintf(status_line, sizeof(status_line), "%s", health_result.error);
                 } else {

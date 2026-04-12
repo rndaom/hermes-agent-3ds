@@ -19,13 +19,13 @@ def test_app_config_supports_native_v2_urls_and_device_identity():
     assert "hermes_app_config_build_events_url" in header
     assert "hermes_app_config_build_interaction_url" in header
 
-    assert '"/api/v1/health"' in source
+    assert '"/api/v2/health"' in source
+    assert '"/api/v1/health"' not in source
     assert '"/api/v2/capabilities"' in source
     assert '"/api/v2/messages"' in source
     assert '"/api/v2/events"' in source
     assert '"/api/v2/interactions/"' in source
     assert "device_id=" in source
-
 
 
 def test_bridge_v2_module_exists_for_native_gateway_protocol():
@@ -60,7 +60,6 @@ def test_bridge_v2_module_exists_for_native_gateway_protocol():
     assert "message.created" in source
     assert "message.updated" in source
     assert "reply_to" in source
-
 
 
 def test_makefile_picks_up_bridge_v2_sources_automatically():

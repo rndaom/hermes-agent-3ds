@@ -144,12 +144,7 @@ static bool build_url(const HermesAppConfig* config, const char* endpoint_path, 
 
 bool hermes_app_config_build_health_url(const HermesAppConfig* config, char* out_url, size_t out_size)
 {
-    return build_url(config, "/api/v1/health", out_url, out_size);
-}
-
-bool hermes_app_config_build_chat_url(const HermesAppConfig* config, char* out_url, size_t out_size)
-{
-    return build_url(config, "/api/v1/chat", out_url, out_size);
+    return build_url(config, "/api/v2/health", out_url, out_size);
 }
 
 bool hermes_app_config_build_capabilities_url(const HermesAppConfig* config, char* out_url, size_t out_size)

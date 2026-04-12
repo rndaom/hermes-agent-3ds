@@ -3,6 +3,7 @@
 #include <3ds.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <string.h>
 
 #define BRIDGE_CHAT_MESSAGE_MAX 256
 #define BRIDGE_CHAT_REPLY_MAX 1200
@@ -18,5 +19,10 @@ typedef struct BridgeChatResult {
     char error[BRIDGE_CHAT_ERROR_MAX];
 } BridgeChatResult;
 
-void bridge_chat_result_reset(BridgeChatResult* result);
-Result bridge_chat_run(const char* url, const char* token, const char* message, BridgeChatResult* result);
+static inline void bridge_chat_result_reset(BridgeChatResult* result)
+{
+    if (result == NULL)
+        return;
+
+    memset(result, 0, sizeof(*result));
+}
