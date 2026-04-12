@@ -1,5 +1,7 @@
 # Actual 3DS GUI Implementation Plan
 
+> Historical note: this document reflects the earlier transition plan away from the console-only UI. It is now superseded by `docs/hermes-pictochat-dark-mode-spec.md` and `docs/plans/2026-04-12-hermes-pictochat-dark-mode-ui.md`.
+
 > For Hermes: replace the current console-only presentation with a real graphical GUI, Old-3DS-safe, while keeping the existing app behavior and navigation logic.
 
 Goal: move Hermes Agent 3DS off the current black-background PrintConsole UI and into a real pixel-art handheld GUI.
@@ -15,7 +17,7 @@ Tech stack:
 - raw framebuffer drawing via gfxGetFramebuffer / screen buffers
 - optional future Citro2D backend once the dependency is available
 
-Current repo facts:
+Current repo facts at the time this historical plan was written:
 - `client/source/main.c` currently initializes `consoleInit(GFX_TOP, &top_console);` and `consoleInit(GFX_BOTTOM, &bottom_console);`
 - `client/source/app_ui.c` is entirely `PrintConsole*` based
 - `client/Makefile` links only `-lctru -lm`

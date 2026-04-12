@@ -81,6 +81,6 @@ Latest built artifact:
 
 ## Recommended next steps
 
-1. do real-hardware acceptance testing on the freshly polished build and capture any actual UX bugs before adding more features
-2. if the handheld needs richer labels/previews later, expand conversation metadata polish without changing the thin-client architecture
-3. otherwise, treat the 3DS client as feature-complete for this phase and shift new work to genuinely new capabilities rather than more cleanup
+1. use `docs/hermes-pictochat-dark-mode-spec.md` as the current UI source of truth and complete the visual rewrite toward dark-mode Hermes + PictoChat
+2. remove the remaining mixed console/graphical transient flows so approval and mic recording use the same render language as the main screens
+3. do real-hardware acceptance testing on the refreshed build and capture any actual UX bugs before adding unrelated feature work

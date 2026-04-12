@@ -86,8 +86,17 @@ Open **Hermes Agent 3DS** in Homebrew Launcher.
 - B — ask Hermes
 - UP — start mic input
 - X — open settings
+- SELECT — open the conversation picker
 - Y — clear status
 - L/R — page long replies
+- START — exit
+
+### Conversations
+- UP/DOWN — select a conversation slot
+- A — activate the highlighted conversation
+- X — create a new conversation ID
+- Y — sync recent conversation slots from Hermes
+- B — return home
 - START — exit
 
 ### Settings
@@ -118,6 +127,8 @@ In `hermes-agent`, where 3DS should behave like a normal Hermes gateway platform
 - [`docs/architecture.md`](docs/architecture.md)
 - [`docs/roadmap.md`](docs/roadmap.md)
 - [`docs/design-language.md`](docs/design-language.md)
+- [`docs/hermes-pictochat-dark-mode-spec.md`](docs/hermes-pictochat-dark-mode-spec.md)
+- [`docs/plans/2026-04-12-hermes-pictochat-dark-mode-ui.md`](docs/plans/2026-04-12-hermes-pictochat-dark-mode-ui.md)
 - [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
 ## License

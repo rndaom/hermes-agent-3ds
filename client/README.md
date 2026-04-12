@@ -8,7 +8,7 @@ The client now has:
 - devkitPro-style project layout
 - build Makefile
 - packaged `.3dsx` release zip target
-- simple Old 3DS-friendly console UI
+- graphical Citro2D/Citro3D UI on the main home, settings, and conversation screens
 - SD-backed config load/save
 - settings screen for host, port, token, and device ID
 - SD-backed active conversation + recent conversation cache
@@ -18,6 +18,12 @@ The client now has:
 - on-device approval handling
 - in-app rendering for the last message and last reply
 - reply paging for long output
+
+Current design work is now driven by:
+- `docs/hermes-pictochat-dark-mode-spec.md`
+- `docs/plans/2026-04-12-hermes-pictochat-dark-mode-ui.md`
+
+The remaining UI job is to finish the dark-mode Hermes + PictoChat visual pass and remove the last mixed console/graphical transient flows.
 
 Current controls:
 
