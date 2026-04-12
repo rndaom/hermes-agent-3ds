@@ -963,6 +963,168 @@ static void render_ui(
     }
 }
 
+static void handle_home_health_check(
+    const HermesAppConfig* config,
+    bool network_ready,
+    SettingsField selected_field,
+    bool settings_dirty,
+    BridgeHealthResult* health_result,
+    const BridgeChatResult* chat_result,
+    const char* last_message,
+    size_t* reply_page,
+    char* status_line,
+    Result* request_rc
+)
+{
+    char health_url[HERMES_APP_HEALTH_URL_MAX];
+
+    if (health_result == NULL || status_line == NULL || request_rc == NULL || reply_page == NULL)
+        return;
+
+    bridge_health_result_reset(health_result);
+    *request_rc = 0;
+    *reply_page = 0;
+
+    if (!network_ready) {
+        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Networking services failed to start.");
+        render_ui(APP_SCREEN_HOME, config, selected_field, settings_dirty, health_result, chat_result, last_message, *reply_page, status_line, *request_rc);
+        return;
+    }
+
+    if (!hermes_app_config_build_health_url(config, health_url, sizeof(health_url))) {
+        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Local config is incomplete.");
+        render_ui(APP_SCREEN_HOME, config, selected_field, settings_dirty, health_result, chat_result, last_message, *reply_page, status_line, *request_rc);
+        return;
+    }
+
+    snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Checking Hermes gateway...");
+    render_ui(APP_SCREEN_HOME, config, selected_field, settings_dirty, health_result, chat_result, last_message, *reply_page, status_line, *request_rc);
+    gfxFlushBuffers();
+    gfxSwapBuffers();
+    gspWaitForVBlank();
+
+    *request_rc = bridge_health_check_run(health_url, health_result);
+    if (R_SUCCEEDED(*request_rc) && health_result->success)
+        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Hermes gateway OK.");
+    else if (health_result->error[0] == '\0')
+        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Gateway check failed: 0x%08lX", (unsigned long)*request_rc);
+    else
+        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "%s", health_result->error);
+
+    render_ui(APP_SCREEN_HOME, config, selected_field, settings_dirty, health_result, chat_result, last_message, *reply_page, status_line, *request_rc);
+}
+
+static void handle_activate_conversation(
+    HermesAppConfig* config,
+    AppScreen* screen,
+    BridgeChatResult* chat_result,
+    char* last_message,
+    size_t* reply_page,
+    char* status_line
+)
+{
+    if (config == NULL || screen == NULL || chat_result == NULL || last_message == NULL || reply_page == NULL || status_line == NULL)
+        return;
+
+    if (config->recent_conversation_count == 0) {
+        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "No saved conversations yet.");
+        return;
+    }
+    if (!hermes_app_config_set_active_conversation(config, config->recent_conversations[g_conversation_selection])) {
+        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Conversation selection was invalid.");
+        return;
+    }
+    if (!hermes_app_config_save(config)) {
+        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Could not save conversation selection.");
+        return;
+    }
+
+    bridge_chat_result_reset(chat_result);
+    last_message[0] = '\0';
+    *reply_page = 0;
+    *screen = APP_SCREEN_HOME;
+    snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Conversation %s selected.", config->active_conversation_id);
+}
+
+static void handle_create_conversation(
+    HermesAppConfig* config,
+    AppScreen* screen,
+    BridgeChatResult* chat_result,
+    char* last_message,
+    size_t* reply_page,
+    char* status_line
+)
+{
+    char conversation_id[HERMES_APP_CONVERSATION_ID_MAX];
+
+    if (config == NULL || screen == NULL || chat_result == NULL || last_message == NULL || reply_page == NULL || status_line == NULL)
+        return;
+
+    if (!prompt_conversation_input("", conversation_id, sizeof(conversation_id))) {
+        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "New conversation canceled.");
+        return;
+    }
+    if (!hermes_app_config_is_valid_conversation_id(conversation_id)) {
+        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Conversation IDs only allow letters, numbers, - _ .");
+        return;
+    }
+    if (!hermes_app_config_set_active_conversation(config, conversation_id)) {
+        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Could not activate that conversation.");
+        return;
+    }
+    if (!hermes_app_config_save(config)) {
+        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Could not save new conversation.");
+        return;
+    }
+
+    bridge_chat_result_reset(chat_result);
+    last_message[0] = '\0';
+    *reply_page = 0;
+    g_conversation_selection = find_recent_conversation_index(config, config->active_conversation_id);
+    *screen = APP_SCREEN_HOME;
+    snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Conversation %s created.", config->active_conversation_id);
+}
+
+static void handle_conversation_sync(
+    HermesAppConfig* config,
+    bool network_ready,
+    char* status_line,
+    Result* request_rc
+)
+{
+    char conversations_url[HERMES_APP_CONVERSATIONS_URL_MAX];
+    BridgeV2ConversationListResult fetched_conversations;
+
+    if (config == NULL || status_line == NULL || request_rc == NULL)
+        return;
+
+    bridge_v2_conversation_list_result_reset(&fetched_conversations);
+    *request_rc = 0;
+    if (!network_ready) {
+        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Networking services failed to start.");
+        return;
+    }
+    if (!hermes_app_config_build_conversations_url(config, conversations_url, sizeof(conversations_url)) ||
+        config->device_id[0] == '\0') {
+        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "V2 config is incomplete. Set device_id.");
+        return;
+    }
+
+    *request_rc = bridge_v2_list_conversations(conversations_url, config->token, config->device_id, &fetched_conversations);
+    if (R_SUCCEEDED(*request_rc) && fetched_conversations.success) {
+        g_conversation_list = fetched_conversations;
+        merge_synced_conversations_into_config(config);
+        if (!hermes_app_config_save(config))
+            snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Synced, but could not save conversations.");
+        else
+            snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Synced %lu conversations.", (unsigned long)g_conversation_list.count);
+    } else if (fetched_conversations.error[0] != '\0') {
+        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "%s", fetched_conversations.error);
+    } else {
+        snprintf(status_line, BRIDGE_CHAT_ERROR_MAX, "Conversation sync failed: 0x%08lX", (unsigned long)*request_rc);
+    }
+}
+
 int main(int argc, char* argv[])
 {
     Result init_rc = 0;
@@ -1069,40 +1231,8 @@ int main(int argc, char* argv[])
                 render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
 
-            if ((kDown & KEY_A) != 0) {
-                char health_url[HERMES_APP_HEALTH_URL_MAX];
-
-                bridge_health_result_reset(&health_result);
-                request_rc = 0;
-                reply_page = 0;
-
-                if (!hermes_app_config_build_health_url(&config, health_url, sizeof(health_url))) {
-                    snprintf(status_line, sizeof(status_line), "Local config is incomplete.");
-                    render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
-                    continue;
-                }
-
-                snprintf(status_line, sizeof(status_line), "Checking Hermes gateway...");
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
-                gfxFlushBuffers();
-                gfxSwapBuffers();
-                gspWaitForVBlank();
-
-                if (network_ready) {
-                    request_rc = bridge_health_check_run(health_url, &health_result);
-
-                    if (R_SUCCEEDED(request_rc) && health_result.success)
-                        snprintf(status_line, sizeof(status_line), "Hermes gateway OK.");
-                    else if (health_result.error[0] == '\0')
-                        snprintf(status_line, sizeof(status_line), "Gateway check failed: 0x%08lX", (unsigned long)request_rc);
-                    else
-                        snprintf(status_line, sizeof(status_line), "%s", health_result.error);
-                } else {
-                    snprintf(status_line, sizeof(status_line), "Networking services failed to start.");
-                }
-
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
-            }
+            if ((kDown & KEY_A) != 0)
+                handle_home_health_check(&config, network_ready, selected_field, settings_dirty, &health_result, &chat_result, last_message, &reply_page, status_line, &request_rc);
 
             if ((kDown & KEY_B) != 0) {
                 char message_buffer[BRIDGE_CHAT_MESSAGE_MAX];
@@ -1235,70 +1365,17 @@ int main(int argc, char* argv[])
             }
 
             if ((kDown & KEY_A) != 0) {
-                if (config.recent_conversation_count == 0) {
-                    snprintf(status_line, sizeof(status_line), "No saved conversations yet.");
-                } else if (!hermes_app_config_set_active_conversation(&config, config.recent_conversations[g_conversation_selection])) {
-                    snprintf(status_line, sizeof(status_line), "Conversation selection was invalid.");
-                } else if (!hermes_app_config_save(&config)) {
-                    snprintf(status_line, sizeof(status_line), "Could not save conversation selection.");
-                } else {
-                    bridge_chat_result_reset(&chat_result);
-                    last_message[0] = '\0';
-                    reply_page = 0;
-                    screen = APP_SCREEN_HOME;
-                    snprintf(status_line, sizeof(status_line), "Conversation %s selected.", config.active_conversation_id);
-                }
+                handle_activate_conversation(&config, &screen, &chat_result, last_message, &reply_page, status_line);
                 render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
 
             if ((kDown & KEY_X) != 0) {
-                char conversation_id[HERMES_APP_CONVERSATION_ID_MAX];
-
-                if (!prompt_conversation_input("", conversation_id, sizeof(conversation_id))) {
-                    snprintf(status_line, sizeof(status_line), "New conversation canceled.");
-                } else if (!hermes_app_config_is_valid_conversation_id(conversation_id)) {
-                    snprintf(status_line, sizeof(status_line), "Conversation IDs only allow letters, numbers, - _ .");
-                } else if (!hermes_app_config_set_active_conversation(&config, conversation_id)) {
-                    snprintf(status_line, sizeof(status_line), "Could not activate that conversation.");
-                } else if (!hermes_app_config_save(&config)) {
-                    snprintf(status_line, sizeof(status_line), "Could not save new conversation.");
-                } else {
-                    bridge_chat_result_reset(&chat_result);
-                    last_message[0] = '\0';
-                    reply_page = 0;
-                    g_conversation_selection = find_recent_conversation_index(&config, config.active_conversation_id);
-                    screen = APP_SCREEN_HOME;
-                    snprintf(status_line, sizeof(status_line), "Conversation %s created.", config.active_conversation_id);
-                }
+                handle_create_conversation(&config, &screen, &chat_result, last_message, &reply_page, status_line);
                 render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
 
             if ((kDown & KEY_Y) != 0) {
-                char conversations_url[HERMES_APP_CONVERSATIONS_URL_MAX];
-                BridgeV2ConversationListResult fetched_conversations;
-
-                bridge_v2_conversation_list_result_reset(&fetched_conversations);
-                request_rc = 0;
-                if (!network_ready) {
-                    snprintf(status_line, sizeof(status_line), "Networking services failed to start.");
-                } else if (!hermes_app_config_build_conversations_url(&config, conversations_url, sizeof(conversations_url)) ||
-                           config.device_id[0] == '\0') {
-                    snprintf(status_line, sizeof(status_line), "V2 config is incomplete. Set device_id.");
-                } else {
-                    request_rc = bridge_v2_list_conversations(conversations_url, config.token, config.device_id, &fetched_conversations);
-                    if (R_SUCCEEDED(request_rc) && fetched_conversations.success) {
-                        g_conversation_list = fetched_conversations;
-                        merge_synced_conversations_into_config(&config);
-                        if (!hermes_app_config_save(&config))
-                            snprintf(status_line, sizeof(status_line), "Synced, but could not save conversations.");
-                        else
-                            snprintf(status_line, sizeof(status_line), "Synced %lu conversations.", (unsigned long)g_conversation_list.count);
-                    } else if (fetched_conversations.error[0] != '\0') {
-                        snprintf(status_line, sizeof(status_line), "%s", fetched_conversations.error);
-                    } else {
-                        snprintf(status_line, sizeof(status_line), "Conversation sync failed: 0x%08lX", (unsigned long)request_rc);
-                    }
-                }
+                handle_conversation_sync(&config, network_ready, status_line, &request_rc);
                 render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
         } else {
