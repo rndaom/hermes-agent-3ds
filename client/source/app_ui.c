@@ -184,6 +184,27 @@ static void render_relay_crest(void)
     printf("o==[ HERMES RELAY ]==o\n");
 }
 
+static const char* render_pixel_crest_line(size_t index)
+{
+    static const char* crest_lines[] = {
+        "      /\\      ",
+        "   .-====-.   ",
+        "  /  HRMS  \\",
+        "  | RELAY |  ",
+        "  \\__--__/   ",
+        "    /__\\     ",
+    };
+    size_t count = sizeof(crest_lines) / sizeof(crest_lines[0]);
+    if (index >= count)
+        return "              ";
+    return crest_lines[index];
+}
+
+static void render_split_line(const char* left, size_t crest_index)
+{
+    printf("%-24.24s %s\n", left != NULL ? left : "", render_pixel_crest_line(crest_index));
+}
+
 static void render_panel_title(const char* label)
 {
     printf("[ %s ]\n", label != NULL ? label : "");
@@ -280,26 +301,32 @@ static void render_home_top_screen(
     size_t message_line_count = 0;
     size_t reply_line_count = 0;
 
+    char link_errno_line[32];
+    char link_stage_line[40];
+
     consoleSelect(top_console);
     consoleClear();
 
     render_brand_header("MESSENGER DECK");
     render_relay_crest();
-    printf("%s\n", status_line);
-    printf("last rc: 0x%08lX\n", (unsigned long)last_rc);
+    render_split_line(status_line, 0);
+    snprintf(link_errno_line, sizeof(link_errno_line), "last rc: 0x%08lX", (unsigned long)last_rc);
+    render_split_line(link_errno_line, 1);
     print_rule();
     format_active_conversation_label(config, conversation_list, conversation_label, sizeof(conversation_label));
     render_panel_title("MESSENGER LINK");
-    printf("LINK STATE\n");
+    render_split_line("LINK STATE", 2);
     if (chat_result != NULL && (chat_result->success || chat_result->error[0] != '\0')) {
-        printf("socket errno: %d\n", chat_result->socket_errno);
-        printf("stage: %s\n", chat_result->socket_stage[0] != '\0' ? chat_result->socket_stage : "n/a");
+        snprintf(link_errno_line, sizeof(link_errno_line), "socket errno: %d", chat_result->socket_errno);
+        snprintf(link_stage_line, sizeof(link_stage_line), "stage: %s", chat_result->socket_stage[0] != '\0' ? chat_result->socket_stage : "n/a");
     } else {
-        printf("socket errno: %d\n", health_result->socket_errno);
-        printf("stage: %s\n", health_result->socket_stage[0] != '\0' ? health_result->socket_stage : "n/a");
+        snprintf(link_errno_line, sizeof(link_errno_line), "socket errno: %d", health_result->socket_errno);
+        snprintf(link_stage_line, sizeof(link_stage_line), "stage: %s", health_result->socket_stage[0] != '\0' ? health_result->socket_stage : "n/a");
     }
+    render_split_line(link_errno_line, 3);
+    render_split_line(link_stage_line, 4);
     render_panel_title("ACTIVE THREAD");
-    printf("%s\n", conversation_label);
+    render_split_line(conversation_label, 5);
     print_rule();
 
     if (chat_result != NULL && chat_result->success) {
@@ -392,6 +419,10 @@ static void render_settings_top_screen(
     const char* token_cursor = selected_field == SETTINGS_FIELD_TOKEN ? ">" : " ";
     const char* device_id_cursor = selected_field == SETTINGS_FIELD_DEVICE_ID ? ">" : " ";
 
+    char dirty_line[24];
+    char status_summary[40];
+    char rc_line[32];
+
     consoleSelect(top_console);
     consoleClear();
 
@@ -399,9 +430,12 @@ static void render_settings_top_screen(
 
     render_brand_header("SYSTEM CONFIG");
     render_relay_crest();
-    printf("Dirty: %s\n", settings_dirty ? "yes" : "no");
-    printf("Status: %s\n", status_line);
-    printf("rc: 0x%08lX\n", (unsigned long)last_rc);
+    snprintf(dirty_line, sizeof(dirty_line), "Dirty: %s", settings_dirty ? "yes" : "no");
+    snprintf(status_summary, sizeof(status_summary), "Status: %s", status_line);
+    snprintf(rc_line, sizeof(rc_line), "rc: 0x%08lX", (unsigned long)last_rc);
+    render_split_line(dirty_line, 0);
+    render_split_line(status_summary, 1);
+    render_split_line(rc_line, 2);
     print_rule();
     render_panel_title("LINK SETTINGS");
     printf("%s Host\n", host_cursor);
@@ -443,13 +477,16 @@ static void render_conversations_top_screen(
     size_t end;
     size_t index;
 
+    char rc_line[32];
+
     consoleSelect(top_console);
     consoleClear();
 
     render_brand_header("THREADS / Conversations");
     render_relay_crest();
-    printf("%s\n", status_line);
-    printf("rc: 0x%08lX\n", (unsigned long)last_rc);
+    render_split_line(status_line, 0);
+    snprintf(rc_line, sizeof(rc_line), "rc: 0x%08lX", (unsigned long)last_rc);
+    render_split_line(rc_line, 1);
     print_rule();
     render_panel_title("THREAD ARCHIVE");
 
