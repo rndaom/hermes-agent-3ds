@@ -37,3 +37,14 @@ The app should feel like Hermes translated onto 3DS hardware.
 ## Brand note
 
 This project is inspired by the Hermes / Nous vibe, but it should still stand on its own as a clean community project.
+
+## Current visual direction
+
+The next visual pass should lean into a classic handheld pixel RPG feel:
+- game-like menu framing
+- dialogue-box reply presentation
+- tiny Hermes-native pixel motifs
+- warm limited palette
+- no Pokemon-specific symbols, creatures, or copied UI patterns
+
+See `docs/pixel-rpg-visual-direction.md` for the working spec.
