@@ -22,6 +22,7 @@ Current controls:
 ### Home
 - `A` — check Hermes gateway health
 - `B` — Ask Hermes / open the message keyboard
+- `SELECT` — record mic input and send it for host-side speech-to-text
 - `X` — open settings
 - `Y` — clear the current status
 - `L/R` — page long replies

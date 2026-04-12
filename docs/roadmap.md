@@ -19,7 +19,7 @@
 
 - [ ] saved sessions / conversation selection
 - [ ] UI polish pass for readability and flow
-- [ ] microphone input option on 3DS with host-side speech-to-text
+- [x] microphone input option on 3DS with host-side speech-to-text
 - [x] replace placeholder app art/icon with the provided portrait image asset
 
 ## maybe later

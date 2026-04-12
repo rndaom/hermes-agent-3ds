@@ -344,12 +344,13 @@ static Result connect_with_timeout(int socket_fd, const struct sockaddr_in* addr
     return 0;
 }
 
-static Result send_all(int socket_fd, const char* buffer, size_t length)
+static Result send_all(int socket_fd, const void* buffer, size_t length)
 {
+    const u8* bytes = (const u8*)buffer;
     size_t sent_total = 0;
 
     while (sent_total < length) {
-        ssize_t sent = send(socket_fd, buffer + sent_total, length - sent_total, 0);
+        ssize_t sent = send(socket_fd, bytes + sent_total, length - sent_total, 0);
         if (sent < 0) {
             if (errno == EINTR)
                 continue;
@@ -365,7 +366,9 @@ static Result perform_request(
     const char* method,
     const char* url,
     const char* token,
-    const char* body,
+    const void* body,
+    size_t body_length,
+    const char* content_type,
     char* response,
     size_t response_size,
     u32* http_status,
@@ -380,11 +383,11 @@ static Result perform_request(
     u16 port = 0;
     struct sockaddr_in address;
     int socket_fd = -1;
-    char request[2048];
+    char request[1024];
     size_t response_used = 0;
     Result rc;
     int request_length;
-    size_t body_length = body != NULL ? strlen(body) : 0;
+    bool has_body = body != NULL && body_length > 0;
     const char* auth_header = "";
 
     if (response == NULL || response_size == 0)
@@ -436,7 +439,7 @@ static Result perform_request(
     if (token != NULL && token[0] != '\0')
         auth_header = token;
 
-    if (body != NULL) {
+    if (has_body) {
         request_length = snprintf(
             request,
             sizeof(request),
@@ -446,10 +449,9 @@ static Result perform_request(
             "Connection: close\r\n"
             "Accept: application/json\r\n"
             "%s%s%s"
-            "Content-Type: application/json\r\n"
+            "Content-Type: %s\r\n"
             "Content-Length: %u\r\n"
-            "\r\n"
-            "%s",
+            "\r\n",
             method,
             path,
             host,
@@ -457,8 +459,8 @@ static Result perform_request(
             auth_header[0] != '\0' ? "Authorization: Bearer " : "",
             auth_header,
             auth_header[0] != '\0' ? "\r\n" : "",
-            (unsigned int)body_length,
-            body
+            content_type != NULL ? content_type : "application/octet-stream",
+            (unsigned int)body_length
         );
     } else {
         request_length = snprintf(
@@ -487,11 +489,20 @@ static Result perform_request(
         return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
     }
 
-    rc = send_all(socket_fd, request, strlen(request));
+    rc = send_all(socket_fd, request, (size_t)request_length);
     if (R_FAILED(rc)) {
         set_error(error_out, error_out_size, "Could not send the request.");
         close(socket_fd);
         return rc;
+    }
+
+    if (has_body) {
+        rc = send_all(socket_fd, body, body_length);
+        if (R_FAILED(rc)) {
+            set_error(error_out, error_out_size, "Could not send the request body.");
+            close(socket_fd);
+            return rc;
+        }
     }
 
     while (response_used < response_size - 1) {
@@ -570,6 +581,40 @@ void bridge_v2_interaction_result_reset(BridgeV2InteractionResult* result)
     memset(result, 0, sizeof(*result));
 }
 
+static Result parse_message_ack_response(const char* response, u32 status_code, BridgeV2MessageResult* result, const char* failure_label)
+{
+    const char* response_body;
+
+    response_body = response_body_start(response);
+    if (response_body == NULL) {
+        set_error(result->error, sizeof(result->error), "Bridge response body was missing.");
+        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
+    }
+    if (status_code != 200) {
+        if (!extract_json_string_v2(response_body, "error", result->error, sizeof(result->error)))
+            snprintf(result->error, sizeof(result->error), "Bridge returned HTTP %lu.", (unsigned long)status_code);
+        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
+    }
+    if (!response_ok(response_body)) {
+        if (!extract_json_string_v2(response_body, "error", result->error, sizeof(result->error)))
+            snprintf(result->error, sizeof(result->error), "%s response was not OK.", failure_label != NULL ? failure_label : "Request");
+        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
+    }
+
+    if (!extract_json_string_v2(response_body, "chat_id", result->chat_id, sizeof(result->chat_id)) ||
+        !extract_json_string_v2(response_body, "conversation_id", result->conversation_id, sizeof(result->conversation_id)) ||
+        !extract_json_string_v2(response_body, "message_id", result->message_id, sizeof(result->message_id))) {
+        snprintf(result->error, sizeof(result->error), "%s acknowledgement was incomplete.", failure_label != NULL ? failure_label : "Request");
+        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
+    }
+    if (extract_json_u32(response_body, "cursor", &result->cursor) == false)
+        result->cursor = 0;
+
+    result->success = true;
+    result->error[0] = '\0';
+    return 0;
+}
+
 Result bridge_v2_get_capabilities(const char* url, const char* token, BridgeV2CapabilitiesResult* result)
 {
     char response[BRIDGE_V2_RESPONSE_MAX];
@@ -581,7 +626,7 @@ Result bridge_v2_get_capabilities(const char* url, const char* token, BridgeV2Ca
     if (result == NULL)
         return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_POINTER);
 
-    rc = perform_request("GET", url, token, NULL, response, sizeof(response), &status_code, result->error, sizeof(result->error));
+    rc = perform_request("GET", url, token, NULL, 0, NULL, response, sizeof(response), &status_code, result->error, sizeof(result->error));
     if (R_FAILED(rc))
         return rc;
 
@@ -616,7 +661,6 @@ Result bridge_v2_send_message(const char* url, const char* token, const char* de
     char escaped_conversation_id[(BRIDGE_V2_CONVERSATION_ID_MAX * 2) + 32];
     char body[1024];
     char response[BRIDGE_V2_RESPONSE_MAX];
-    const char* response_body;
     u32 status_code = 0;
     Result rc;
     int body_length;
@@ -654,38 +698,57 @@ Result bridge_v2_send_message(const char* url, const char* token, const char* de
         return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
     }
 
-    rc = perform_request("POST", url, token, body, response, sizeof(response), &status_code, result->error, sizeof(result->error));
+    rc = perform_request("POST", url, token, body, strlen(body), "application/json", response, sizeof(response), &status_code, result->error, sizeof(result->error));
     if (R_FAILED(rc))
         return rc;
 
-    response_body = response_body_start(response);
-    if (response_body == NULL) {
-        set_error(result->error, sizeof(result->error), "Bridge response body was missing.");
-        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
+    return parse_message_ack_response(response, status_code, result, "Message");
+}
+
+Result bridge_v2_send_voice_message(const char* url, const char* token, const char* device_id, const char* conversation_id, const void* wav_data, size_t wav_size, BridgeV2MessageResult* result)
+{
+    char host[64];
+    char path[192];
+    char path_with_query[320];
+    char full_url[512];
+    char response[BRIDGE_V2_RESPONSE_MAX];
+    u16 port = 0;
+    u32 status_code = 0;
+    Result rc;
+
+    bridge_v2_message_result_reset(result);
+    if (result == NULL)
+        return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_POINTER);
+
+    if (url == NULL || device_id == NULL || device_id[0] == '\0' || wav_data == NULL || wav_size == 0) {
+        set_error(result->error, sizeof(result->error), "device_id and wav_data are required.");
+        return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
     }
-    if (status_code != 200) {
-        if (!extract_json_string_v2(response_body, "error", result->error, sizeof(result->error)))
-            snprintf(result->error, sizeof(result->error), "Bridge returned HTTP %lu.", (unsigned long)status_code);
-        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
-    }
-    if (!response_ok(response_body)) {
-        if (!extract_json_string_v2(response_body, "error", result->error, sizeof(result->error)))
-            set_error(result->error, sizeof(result->error), "Message response was not OK.");
-        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
+    if (!is_safe_query_value(device_id) || !is_safe_query_value(conversation_id != NULL ? conversation_id : "main")) {
+        set_error(result->error, sizeof(result->error), "device_id or conversation_id contains unsupported characters.");
+        return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
     }
 
-    if (!extract_json_string_v2(response_body, "chat_id", result->chat_id, sizeof(result->chat_id)) ||
-        !extract_json_string_v2(response_body, "conversation_id", result->conversation_id, sizeof(result->conversation_id)) ||
-        !extract_json_string_v2(response_body, "message_id", result->message_id, sizeof(result->message_id))) {
-        set_error(result->error, sizeof(result->error), "Message acknowledgement was incomplete.");
-        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
+    if (!parse_http_url(url, host, sizeof(host), &port, path, sizeof(path))) {
+        set_error(result->error, sizeof(result->error), "Bridge URL is invalid.");
+        return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
     }
-    if (extract_json_u32(response_body, "cursor", &result->cursor) == false)
-        result->cursor = 0;
 
-    result->success = true;
-    result->error[0] = '\0';
-    return 0;
+    snprintf(
+        path_with_query,
+        sizeof(path_with_query),
+        "%s?device_id=%s&conversation_id=%s",
+        path,
+        device_id,
+        conversation_id != NULL ? conversation_id : "main"
+    );
+    snprintf(full_url, sizeof(full_url), "http://%s:%u%s", host, (unsigned int)port, path_with_query);
+
+    rc = perform_request("POST", full_url, token, wav_data, wav_size, "audio/wav", response, sizeof(response), &status_code, result->error, sizeof(result->error));
+    if (R_FAILED(rc))
+        return rc;
+
+    return parse_message_ack_response(response, status_code, result, "Voice upload");
 }
 
 Result bridge_v2_poll_events(const char* url, const char* token, const char* device_id, const char* conversation_id, u32 cursor, u32 wait_ms, BridgeV2EventPollResult* result)
@@ -732,7 +795,7 @@ Result bridge_v2_poll_events(const char* url, const char* token, const char* dev
     );
     snprintf(full_url, sizeof(full_url), "http://%s:%u%s", host, (unsigned int)port, path_with_query);
 
-    rc = perform_request("GET", full_url, token, NULL, response, sizeof(response), &status_code, result->error, sizeof(result->error));
+    rc = perform_request("GET", full_url, token, NULL, 0, NULL, response, sizeof(response), &status_code, result->error, sizeof(result->error));
     if (R_FAILED(rc))
         return rc;
 
@@ -810,7 +873,7 @@ Result bridge_v2_submit_interaction(const char* url, const char* token, const ch
 
     snprintf(body, sizeof(body), "{\"choice\":\"%s\"}", escaped_choice);
 
-    rc = perform_request("POST", url, token, body, response, sizeof(response), &status_code, result->error, sizeof(result->error));
+    rc = perform_request("POST", url, token, body, strlen(body), "application/json", response, sizeof(response), &status_code, result->error, sizeof(result->error));
     if (R_FAILED(rc))
         return rc;
 

@@ -162,6 +162,11 @@ bool hermes_app_config_build_events_url(const HermesAppConfig* config, char* out
     return build_url(config, "/api/v2/events", out_url, out_size);
 }
 
+bool hermes_app_config_build_voice_url(const HermesAppConfig* config, char* out_url, size_t out_size)
+{
+    return build_url(config, "/api/v2/voice", out_url, out_size);
+}
+
 bool hermes_app_config_build_interaction_url(const HermesAppConfig* config, const char* request_id, char* out_url, size_t out_size)
 {
     int written;

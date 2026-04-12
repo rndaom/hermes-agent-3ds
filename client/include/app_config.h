@@ -14,6 +14,7 @@
 #define HERMES_APP_CAPABILITIES_URL_MAX 160
 #define HERMES_APP_MESSAGES_URL_MAX 160
 #define HERMES_APP_EVENTS_URL_MAX 160
+#define HERMES_APP_VOICE_URL_MAX 160
 #define HERMES_APP_INTERACTION_URL_MAX 192
 #define HERMES_APP_DEVICE_ID_MAX 64
 
@@ -37,4 +38,5 @@ bool hermes_app_config_build_health_url(const HermesAppConfig* config, char* out
 bool hermes_app_config_build_capabilities_url(const HermesAppConfig* config, char* out_url, size_t out_size);
 bool hermes_app_config_build_messages_url(const HermesAppConfig* config, char* out_url, size_t out_size);
 bool hermes_app_config_build_events_url(const HermesAppConfig* config, char* out_url, size_t out_size);
+bool hermes_app_config_build_voice_url(const HermesAppConfig* config, char* out_url, size_t out_size);
 bool hermes_app_config_build_interaction_url(const HermesAppConfig* config, const char* request_id, char* out_url, size_t out_size);

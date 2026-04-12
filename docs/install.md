@@ -71,6 +71,7 @@ On the home screen:
 On the home screen:
 - press `A` to run a health check
 - if that succeeds, press `B` and send a test message
+- or press `SELECT` to record mic input and send it through host-side speech-to-text
 - use `L/R` if the reply spans multiple pages
 
 ## Common issues

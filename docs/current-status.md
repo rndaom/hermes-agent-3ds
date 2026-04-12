@@ -20,8 +20,10 @@ Last major verified milestone: **the V2-only 3DS client is validated end-to-end 
 - long replies page cleanly with `L/R`
 - native V2 chat flow is implemented with:
   - `POST /api/v2/messages`
+  - `POST /api/v2/voice`
   - `GET /api/v2/events`
   - approval handling through `POST /api/v2/interactions/{request_id}/respond`
+- microphone input is implemented on-device and routed through host-side speech-to-text with `SELECT`
 - stale-event filtering is in place using:
   - ack cursor handoff
   - matching `reply_to`
@@ -33,6 +35,7 @@ Last major verified milestone: **the V2-only 3DS client is validated end-to-end 
   - `GET /api/v2/health`
   - `GET /api/v2/capabilities`
   - `POST /api/v2/messages`
+  - `POST /api/v2/voice`
   - `GET /api/v2/events`
   - `POST /api/v2/interactions/{request_id}/respond`
 - live local integration has been validated against the Hermes-side gateway
@@ -75,5 +78,4 @@ Latest built artifact:
 ## Recommended next steps
 
 1. add saved sessions / conversation selection
-2. add microphone input on 3DS with host-side speech-to-text
-3. keep tightening UI polish for Old 3DS readability and speed
+2. keep tightening UI polish for Old 3DS readability and speed

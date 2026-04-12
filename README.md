@@ -75,6 +75,7 @@ Open **Hermes Agent 3DS** in Homebrew Launcher.
 
 - `A` — check Hermes gateway health
 - `B` — ask Hermes
+- `SELECT` — record mic input and send it through host-side speech-to-text
 - `L/R` — page long replies
 
 ## Controls
@@ -82,6 +83,7 @@ Open **Hermes Agent 3DS** in Homebrew Launcher.
 ### Home
 - A — check Hermes gateway health
 - B — ask Hermes
+- SELECT — record mic input
 - X — open settings
 - Y — clear status
 - L/R — page long replies

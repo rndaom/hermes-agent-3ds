@@ -53,5 +53,6 @@ void bridge_v2_interaction_result_reset(BridgeV2InteractionResult* result);
 
 Result bridge_v2_get_capabilities(const char* url, const char* token, BridgeV2CapabilitiesResult* result);
 Result bridge_v2_send_message(const char* url, const char* token, const char* device_id, const char* conversation_id, const char* message, BridgeV2MessageResult* result);
+Result bridge_v2_send_voice_message(const char* url, const char* token, const char* device_id, const char* conversation_id, const void* wav_data, size_t wav_size, BridgeV2MessageResult* result);
 Result bridge_v2_poll_events(const char* url, const char* token, const char* device_id, const char* conversation_id, u32 cursor, u32 wait_ms, BridgeV2EventPollResult* result);
 Result bridge_v2_submit_interaction(const char* url, const char* token, const char* choice, BridgeV2InteractionResult* result);

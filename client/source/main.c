@@ -7,6 +7,7 @@
 #include "bridge_chat.h"
 #include "bridge_health.h"
 #include "bridge_v2.h"
+#include "voice_input.h"
 
 #define HOME_WRAP_WIDTH 38
 #define HOME_WRAP_MAX_LINES 128
@@ -483,6 +484,7 @@ static void render_home_top_screen(
     } else {
         printf("Press A to check Hermes gateway.\n");
         printf("Press B to Ask Hermes.\n");
+        printf("Press SELECT to Record mic.\n");
     }
 }
 
@@ -507,7 +509,8 @@ static void render_home_bottom_screen(
     printf("Gateway:\n%s\n", bridge_summary);
     printf("Token: %s\n", token_summary);
     printf("\n");
-    printf("A check   B ask   X settings\n");
+    printf("A check   B ask\n");
+    printf("SELECT mic   X settings\n");
     printf("Y clear   START exit\n");
     if (chat_result != NULL && chat_result->success && page_count > 1)
         printf("L/R page reply\n");
@@ -840,6 +843,147 @@ int main(int argc, char* argv[])
                         snprintf(status_line, sizeof(status_line), "Chat failed: 0x%08lX", (unsigned long)request_rc);
                 } else {
                     snprintf(status_line, sizeof(status_line), "Networking services failed to start.");
+                }
+
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
+            }
+
+            if ((kDown & KEY_SELECT) != 0) {
+                char voice_url[HERMES_APP_VOICE_URL_MAX];
+                char events_url[HERMES_APP_EVENTS_URL_MAX];
+                char interaction_url[HERMES_APP_INTERACTION_URL_MAX];
+                char approval_choice[16];
+                u8* wav_data = NULL;
+                size_t wav_size = 0;
+                BridgeV2MessageResult message_result;
+                BridgeV2EventPollResult event_result;
+                BridgeV2EventPollResult matched_event_result;
+                BridgeV2InteractionResult interaction_result;
+                bool matched_reply = false;
+                u32 event_cursor = 0;
+                int poll_attempt;
+
+                if (!network_ready) {
+                    snprintf(status_line, sizeof(status_line), "Networking services failed to start.");
+                    render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
+                    continue;
+                }
+
+                if (!hermes_app_config_build_voice_url(&config, voice_url, sizeof(voice_url)) ||
+                    !hermes_app_config_build_events_url(&config, events_url, sizeof(events_url)) ||
+                    config.device_id[0] == '\0') {
+                    snprintf(status_line, sizeof(status_line), "V2 config is incomplete. Set device_id.");
+                    render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
+                    continue;
+                }
+
+                if (!voice_input_record_prompt(&top_console, &bottom_console, &wav_data, &wav_size, status_line, sizeof(status_line))) {
+                    render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
+                    continue;
+                }
+
+                copy_bounded_string(last_message, sizeof(last_message), "[mic] voice input");
+                bridge_chat_result_reset(&chat_result);
+                bridge_v2_message_result_reset(&message_result);
+                bridge_v2_event_poll_result_reset(&event_result);
+                bridge_v2_event_poll_result_reset(&matched_event_result);
+                bridge_v2_interaction_result_reset(&interaction_result);
+                matched_reply = false;
+                approval_choice[0] = '\0';
+                request_rc = 0;
+                reply_page = 0;
+
+                snprintf(status_line, sizeof(status_line), "Sending mic input to Hermes...");
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
+                gfxFlushBuffers();
+                gfxSwapBuffers();
+                gspWaitForVBlank();
+
+                request_rc = bridge_v2_send_voice_message(voice_url, config.token, config.device_id, "main", wav_data, wav_size, &message_result);
+                free(wav_data);
+                wav_data = NULL;
+
+                if (R_SUCCEEDED(request_rc) && message_result.success) {
+                    event_cursor = message_result.cursor;
+                    for (poll_attempt = 0; poll_attempt < 6; poll_attempt++) {
+                        request_rc = bridge_v2_poll_events(events_url, config.token, config.device_id, message_result.conversation_id[0] != '\0' ? message_result.conversation_id : "main", event_cursor, 5000, &event_result);
+                        if (R_FAILED(request_rc))
+                            break;
+
+                        if (event_result.cursor > event_cursor)
+                            event_cursor = event_result.cursor;
+
+                        if (event_result.approval_required)
+                            break;
+
+                        if (event_result.reply_text[0] != '\0' &&
+                            strcmp(event_result.reply_to_message_id, message_result.message_id) == 0) {
+                            matched_event_result = event_result;
+                            matched_reply = true;
+                            break;
+                        }
+                    }
+
+                    if (R_SUCCEEDED(request_rc) && event_result.approval_required) {
+                        if (!hermes_app_config_build_interaction_url(&config, event_result.request_id, interaction_url, sizeof(interaction_url))) {
+                            bridge_chat_result_reset(&chat_result);
+                            snprintf(chat_result.error, sizeof(chat_result.error), "Approval URL could not be built.");
+                        } else if (!prompt_v2_approval_choice(approval_choice, sizeof(approval_choice))) {
+                            bridge_chat_result_reset(&chat_result);
+                            snprintf(chat_result.error, sizeof(chat_result.error), "Approval canceled.");
+                        } else {
+                            request_rc = bridge_v2_submit_interaction(interaction_url, config.token, approval_choice, &interaction_result);
+                            if (R_SUCCEEDED(request_rc) && interaction_result.success) {
+                                if (strcmp(approval_choice, "deny") == 0) {
+                                    bridge_chat_result_reset(&chat_result);
+                                    snprintf(chat_result.error, sizeof(chat_result.error), "Command denied.");
+                                } else {
+                                    bridge_v2_event_poll_result_reset(&event_result);
+                                    bridge_v2_event_poll_result_reset(&matched_event_result);
+                                    matched_reply = false;
+                                    for (poll_attempt = 0; poll_attempt < 6; poll_attempt++) {
+                                        request_rc = bridge_v2_poll_events(events_url, config.token, config.device_id, message_result.conversation_id[0] != '\0' ? message_result.conversation_id : "main", event_cursor, 5000, &event_result);
+                                        if (R_FAILED(request_rc))
+                                            break;
+
+                                        if (event_result.cursor > event_cursor)
+                                            event_cursor = event_result.cursor;
+
+                                        if (event_result.approval_required)
+                                            break;
+
+                                        if (event_result.reply_text[0] != '\0' &&
+                                            strcmp(event_result.reply_to_message_id, message_result.message_id) == 0) {
+                                            matched_event_result = event_result;
+                                            matched_reply = true;
+                                            break;
+                                        }
+                                    }
+                                    apply_v2_event_to_chat_result(matched_reply ? &matched_event_result : &event_result, &chat_result);
+                                }
+                            } else {
+                                bridge_chat_result_reset(&chat_result);
+                                snprintf(chat_result.error, sizeof(chat_result.error), "%s", interaction_result.error[0] != '\0' ? interaction_result.error : "Approval response failed.");
+                            }
+                        }
+                    } else {
+                        apply_v2_event_to_chat_result(matched_reply ? &matched_event_result : &event_result, &chat_result);
+                    }
+
+                    if (chat_result.success) {
+                        if (event_result.missed_events)
+                            snprintf(status_line, sizeof(status_line), "Voice reply received. Some events were missed.");
+                        else
+                            snprintf(status_line, sizeof(status_line), "Voice reply received over native v2.");
+                    } else if (chat_result.error[0] != '\0') {
+                        snprintf(status_line, sizeof(status_line), "%s", chat_result.error);
+                    } else {
+                        snprintf(status_line, sizeof(status_line), "No assistant reply arrived yet.");
+                    }
+                } else if (message_result.error[0] != '\0') {
+                    snprintf(status_line, sizeof(status_line), "%s", message_result.error);
+                } else {
+                    snprintf(status_line, sizeof(status_line), "Voice upload failed: 0x%08lX", (unsigned long)request_rc);
                 }
 
                 render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);

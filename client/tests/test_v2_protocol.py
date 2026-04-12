@@ -11,12 +11,14 @@ def test_app_config_supports_native_v2_urls_and_device_identity():
     assert "HERMES_APP_CAPABILITIES_URL_MAX" in header
     assert "HERMES_APP_MESSAGES_URL_MAX" in header
     assert "HERMES_APP_EVENTS_URL_MAX" in header
+    assert "HERMES_APP_VOICE_URL_MAX" in header
     assert "HERMES_APP_INTERACTION_URL_MAX" in header
     assert "HERMES_APP_DEVICE_ID_MAX" in header
     assert "device_id" in header
     assert "hermes_app_config_build_capabilities_url" in header
     assert "hermes_app_config_build_messages_url" in header
     assert "hermes_app_config_build_events_url" in header
+    assert "hermes_app_config_build_voice_url" in header
     assert "hermes_app_config_build_interaction_url" in header
 
     assert '"/api/v2/health"' in source
@@ -24,6 +26,7 @@ def test_app_config_supports_native_v2_urls_and_device_identity():
     assert '"/api/v2/capabilities"' in source
     assert '"/api/v2/messages"' in source
     assert '"/api/v2/events"' in source
+    assert '"/api/v2/voice"' in source
     assert '"/api/v2/interactions/"' in source
     assert "device_id=" in source
 
@@ -46,13 +49,16 @@ def test_bridge_v2_module_exists_for_native_gateway_protocol():
     assert "reply_to_message_id" in header
     assert "bridge_v2_get_capabilities" in header
     assert "bridge_v2_send_message" in header
+    assert "bridge_v2_send_voice_message" in header
     assert "bridge_v2_poll_events" in header
     assert "bridge_v2_submit_interaction" in header
 
     assert "Authorization: Bearer " in source
     assert "bridge_v2_send_message" in source or '"/api/v2/messages"' in source
+    assert "bridge_v2_send_voice_message" in source or '"/api/v2/voice"' in source
     assert "device_id" in source
     assert "conversation_id" in source
+    assert "audio/wav" in source
     assert "extract_json_u32(response_body, \"cursor\"" in source
     assert "cursor" in source
     assert "wait" in source
