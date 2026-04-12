@@ -60,6 +60,7 @@ def test_main_c_offers_message_prompt_and_reply_rendering():
     assert "bridge_v2_poll_events" in main_c
     assert "bridge_v2_submit_interaction" in main_c
     assert "hermes_app_config_build_interaction_url" in main_c
+    assert "reply_to_message_id" in main_c
     assert "Approval required" in main_c
     assert "Command denied." in main_c
     assert "KEY_B" in main_c

@@ -34,6 +34,7 @@ typedef struct BridgeV2EventPollResult {
     u32 cursor;
     char event_type[BRIDGE_V2_EVENT_TYPE_MAX];
     char request_id[BRIDGE_V2_REQUEST_ID_MAX];
+    char reply_to_message_id[BRIDGE_V2_REQUEST_ID_MAX];
     char reply_text[BRIDGE_V2_TEXT_MAX];
     char error[BRIDGE_V2_ERROR_MAX];
 } BridgeV2EventPollResult;

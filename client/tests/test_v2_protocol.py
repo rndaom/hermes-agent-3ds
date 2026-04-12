@@ -43,6 +43,7 @@ def test_bridge_v2_module_exists_for_native_gateway_protocol():
     assert "BridgeV2EventPollResult" in header
     assert "BridgeV2InteractionResult" in header
     assert "u32 cursor;" in header
+    assert "reply_to_message_id" in header
     assert "bridge_v2_get_capabilities" in header
     assert "bridge_v2_send_message" in header
     assert "bridge_v2_poll_events" in header
@@ -58,6 +59,7 @@ def test_bridge_v2_module_exists_for_native_gateway_protocol():
     assert "approval.request" in source
     assert "message.created" in source
     assert "message.updated" in source
+    assert "reply_to" in source
 
 
 

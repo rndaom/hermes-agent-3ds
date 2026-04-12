@@ -411,7 +411,7 @@ Result bridge_health_check_run(const char* url, BridgeHealthResult* result)
     }
 
     body += 4;
-    if (strstr(body, "\"ok\":true") == NULL) {
+    if (strstr(body, "\"ok\":true") == NULL && strstr(body, "\"ok\": true") == NULL) {
         set_error(result, "Bridge response was not OK.");
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }

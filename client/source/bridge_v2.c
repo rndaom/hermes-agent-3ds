@@ -768,6 +768,7 @@ Result bridge_v2_poll_events(const char* url, const char* token, const char* dev
     if (strstr(body, "\"message.updated\"") != NULL) {
         snprintf(result->event_type, sizeof(result->event_type), "%s", "message.updated");
         extract_json_string_after(body, "\"message.updated\"", "text", result->reply_text, sizeof(result->reply_text));
+        extract_json_string_after(body, "\"message.updated\"", "reply_to", result->reply_to_message_id, sizeof(result->reply_to_message_id));
         result->success = true;
         return 0;
     }
@@ -775,6 +776,7 @@ Result bridge_v2_poll_events(const char* url, const char* token, const char* dev
     if (strstr(body, "\"message.created\"") != NULL) {
         snprintf(result->event_type, sizeof(result->event_type), "%s", "message.created");
         extract_json_string_after(body, "\"message.created\"", "text", result->reply_text, sizeof(result->reply_text));
+        extract_json_string_after(body, "\"message.created\"", "reply_to", result->reply_to_message_id, sizeof(result->reply_to_message_id));
         result->success = true;
         return 0;
     }

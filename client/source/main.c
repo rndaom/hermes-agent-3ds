@@ -779,7 +779,11 @@ int main(int argc, char* argv[])
                             if (event_result.cursor > event_cursor)
                                 event_cursor = event_result.cursor;
 
-                            if (event_result.approval_required || event_result.reply_text[0] != '\0')
+                            if (event_result.approval_required)
+                                break;
+
+                            if (event_result.reply_text[0] != '\0' &&
+                                strcmp(event_result.reply_to_message_id, message_result.message_id) == 0)
                                 break;
                         }
 
@@ -806,7 +810,11 @@ int main(int argc, char* argv[])
                                             if (event_result.cursor > event_cursor)
                                                 event_cursor = event_result.cursor;
 
-                                            if (event_result.reply_text[0] != '\0' || event_result.approval_required)
+                                            if (event_result.approval_required)
+                                                break;
+
+                                            if (event_result.reply_text[0] != '\0' &&
+                                                strcmp(event_result.reply_to_message_id, message_result.message_id) == 0)
                                                 break;
                                         }
                                         apply_v2_event_to_chat_result(&event_result, &chat_result);
