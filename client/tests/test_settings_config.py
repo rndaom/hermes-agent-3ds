@@ -43,10 +43,11 @@ def test_app_config_source_reads_and_writes_host_port_token_device_id_and_conver
 
 def test_main_c_loads_saved_config_and_uses_it_for_health_checks():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
+    settings_c = (CLIENT_DIR / "source" / "app_settings.c").read_text()
     assert '"app_config.h"' in main_c
     assert "HermesAppConfig" in main_c
     assert "hermes_app_config_load" in main_c
-    assert "hermes_app_config_save" in main_c
+    assert "hermes_app_config_save" in settings_c
     assert "hermes_app_config_build_health_url" in main_c
     assert "bridge_health_check_run(DEFAULT_BRIDGE_HEALTH_URL" not in main_c
 
@@ -57,10 +58,13 @@ def test_main_c_has_settings_and_conversation_picker_navigation():
     conv_c = (CLIENT_DIR / "source" / "app_conversations.c").read_text()
     input_header = (CLIENT_DIR / "include" / "app_input.h").read_text()
     input_c = (CLIENT_DIR / "source" / "app_input.c").read_text()
+    settings_header = (CLIENT_DIR / "include" / "app_settings.h").read_text()
+    settings_c = (CLIENT_DIR / "source" / "app_settings.c").read_text()
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
     assert "APP_SCREEN_SETTINGS" in main_c
     assert "APP_SCREEN_CONVERSATIONS" in main_c
     assert '"app_conversations.h"' in main_c
+    assert '"app_settings.h"' in main_c
     assert "KEY_X" in main_c
     assert "KEY_UP" in main_c
     assert "KEY_SELECT" in main_c
@@ -70,6 +74,8 @@ def test_main_c_has_settings_and_conversation_picker_navigation():
     assert "SettingsField" in input_header
     assert "settings_field_label" in input_header
     assert "AppConversationState" in conv_header
+    assert "AppSettingsContext" in settings_header
+    assert "hermes_app_settings_handle_input" in settings_header
     assert "Host" in input_c
     assert "Port" in input_c
     assert "Token" in input_c
@@ -77,5 +83,10 @@ def test_main_c_has_settings_and_conversation_picker_navigation():
     assert "Conversation picker opened" in conv_c
     assert "bridge_v2_list_conversations" in conv_c
     assert "active_conversation_id" in conv_c
+    assert "Settings closed with unsaved changes." in settings_c
+    assert "Defaults restored. Save settings to keep them." in settings_c
+    assert "Settings saved to SD card." in settings_c
+    assert "edit_selected_setting" in settings_c
+    assert "settings_field_label" in settings_c
     assert "SELECT conv" in ui_c or "Conversations" in ui_c
-    assert "Save settings" in main_c or "X: save" in main_c
+    assert "Save settings" in ui_c or "X: save" in ui_c

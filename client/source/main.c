@@ -7,6 +7,7 @@
 #include "app_conversations.h"
 #include "app_input.h"
 #include "app_requests.h"
+#include "app_settings.h"
 #include "app_ui.h"
 #include "bridge_chat.h"
 #include "bridge_health.h"
@@ -235,48 +236,18 @@ int main(int argc, char* argv[])
                 render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
         } else {
-            if ((kDown & KEY_B) != 0) {
-                screen = APP_SCREEN_HOME;
-                snprintf(status_line, sizeof(status_line), settings_dirty ? "Settings closed with unsaved changes." : "Returned home.");
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
-            }
+            AppSettingsContext settings_context = {&g_conversation_state};
 
-            if ((kDown & KEY_UP) != 0) {
-                if (selected_field == 0)
-                    selected_field = SETTINGS_FIELD_COUNT - 1;
-                else
-                    selected_field = (SettingsField)(selected_field - 1);
-                snprintf(status_line, sizeof(status_line), "Selected %s.", settings_field_label(selected_field));
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
-            }
-
-            if ((kDown & KEY_DOWN) != 0) {
-                selected_field = (SettingsField)((selected_field + 1) % SETTINGS_FIELD_COUNT);
-                snprintf(status_line, sizeof(status_line), "Selected %s.", settings_field_label(selected_field));
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
-            }
-
-            if ((kDown & KEY_Y) != 0) {
-                hermes_app_config_set_defaults(&config);
-                hermes_app_conversations_refresh_selection_from_active(&g_conversation_state, &config);
-                settings_dirty = true;
-                snprintf(status_line, sizeof(status_line), "Defaults restored. Save settings to keep them.");
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
-            }
-
-            if ((kDown & KEY_A) != 0) {
-                if (edit_selected_setting(&config, selected_field, status_line, sizeof(status_line)))
-                    settings_dirty = true;
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
-            }
-
-            if ((kDown & KEY_X) != 0) {
-                if (hermes_app_config_save(&config)) {
-                    settings_dirty = false;
-                    snprintf(status_line, sizeof(status_line), "Settings saved to SD card.");
-                } else {
-                    snprintf(status_line, sizeof(status_line), "Could not save settings to SD card.");
-                }
+            if (hermes_app_settings_handle_input(
+                    kDown,
+                    &config,
+                    &settings_context,
+                    &screen,
+                    &selected_field,
+                    &settings_dirty,
+                    status_line,
+                    sizeof(status_line)
+                )) {
                 render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
         }
