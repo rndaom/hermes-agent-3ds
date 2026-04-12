@@ -168,15 +168,15 @@ static size_t page_count_for_lines(size_t total_lines, size_t lines_per_page)
 
 static void print_rule(void)
 {
-    printf("--------------------------------\n");
+    printf("--------------------------------------\n");
 }
 
 static void render_brand_header(const char* screen_title)
 {
-    printf("+------------------------------+\n");
-    printf("| HERMES AGENT                 |\n");
-    printf("| %-28.28s |\n", screen_title != NULL ? screen_title : "");
-    printf("+------------------------------+\n");
+    printf("+--------------------------------------+\n");
+    printf("| HERMES AGENT                         |\n");
+    printf("| %-36.36s |\n", screen_title != NULL ? screen_title : "");
+    printf("+--------------------------------------+\n");
 }
 
 static void render_relay_crest(void)
@@ -333,9 +333,9 @@ static void render_home_top_screen(
         if (health_result->http_status != 0)
             printf("http: %lu\n", (unsigned long)health_result->http_status);
     } else {
-        printf("Press A to check Hermes gateway.\n");
-        printf("Press B to Ask Hermes.\n");
-        printf("Press UP to Record mic.\n");
+        printf("Ready for a request.\n");
+        printf("Use COMMAND DECK below.\n");
+        printf("Hermes relay is standing by.\n");
     }
 }
 
@@ -348,22 +348,22 @@ static void render_home_bottom_screen(
 {
     char bridge_summary[80];
     char token_summary[48];
-    char conversation_label[HERMES_APP_CONVERSATION_ID_MAX];
     size_t page_count = 1;
+
+    (void)conversation_list;
 
     consoleSelect(bottom_console);
     consoleClear();
 
     format_token_summary(config, token_summary, sizeof(token_summary));
-    format_active_conversation_label(config, conversation_list, conversation_label, sizeof(conversation_label));
     snprintf(bridge_summary, sizeof(bridge_summary), "%s:%u", config->host, (unsigned int)config->port);
 
     if (chat_result != NULL && chat_result->success)
         page_count = hermes_app_ui_reply_page_count(chat_result->reply);
 
-    printf("+------------------------------+\n");
-    printf("|        COMMAND DECK          |\n");
-    printf("+------------------------------+\n");
+    printf("+--------------------------------------+\n");
+    printf("|             COMMAND DECK             |\n");
+    printf("+--------------------------------------+\n");
     printf("A Check     B Ask\n");
     printf("UP Mic      X Config\n");
     printf("SELECT Conv Y Clear\n");
@@ -374,7 +374,6 @@ static void render_home_bottom_screen(
         printf("L/R when reply is long\n");
     print_rule();
     printf("Gateway:\n%s\n", bridge_summary);
-    printf("ACTIVE THREAD\n%s\n", conversation_label);
     printf("Token: %s\n", token_summary);
 }
 
@@ -420,9 +419,9 @@ static void render_settings_bottom_screen(PrintConsole* bottom_console)
     consoleSelect(bottom_console);
     consoleClear();
 
-    printf("+------------------------------+\n");
-    printf("|         CONFIG DECK          |\n");
-    printf("+------------------------------+\n");
+    printf("+--------------------------------------+\n");
+    printf("|             CONFIG DECK              |\n");
+    printf("+--------------------------------------+\n");
     printf("UP/DOWN field\n");
     printf("A edit value\n");
     printf("X Save settings\n");
@@ -497,9 +496,9 @@ static void render_conversations_bottom_screen(
     if (config != NULL && config->recent_conversation_count > 0)
         info = find_synced_conversation(conversation_list, config->recent_conversations[conversation_selection]);
 
-    printf("+------------------------------+\n");
-    printf("|         THREAD DECK          |\n");
-    printf("+------------------------------+\n");
+    printf("+--------------------------------------+\n");
+    printf("|             THREAD DECK              |\n");
+    printf("+--------------------------------------+\n");
     printf("UP/DOWN select\n");
     printf("A use thread\n");
     printf("X new thread\n");

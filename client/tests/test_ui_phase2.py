@@ -27,3 +27,11 @@ def test_app_ui_uses_phase2_framed_sections_and_relay_language():
     assert "THREAD ARCHIVE" in ui_c
     assert "LINK SETTINGS" in ui_c
     assert "HERMES REPLY" in ui_c
+
+
+def test_phase2_followup_uses_wider_frames_and_less_duplicate_home_info():
+    ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
+
+    assert "+--------------------------------------+" in ui_c
+    assert "Use COMMAND DECK below." in ui_c
+    assert 'printf("ACTIVE THREAD\\n%s\\n", conversation_label);' not in ui_c
