@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define VOICE_INPUT_MAX_SECONDS 6
+#define VOICE_INPUT_MAX_SECONDS 300
 #define VOICE_INPUT_SAMPLE_RATE_HZ 16360
 #define VOICE_INPUT_BITS_PER_SAMPLE 16
 #define VOICE_INPUT_CHANNELS 1

@@ -83,7 +83,7 @@ static void render_recording_ui(PrintConsole* top_console, PrintConsole* bottom_
     printf("Record mic\n");
     printf("==========\n");
     printf("Mic is recording now.\n");
-    printf("Time: %lu.%lus / %ds\n", seconds, tenth_digit, VOICE_INPUT_MAX_SECONDS);
+    printf("Time: %lu.%lus\n", seconds, tenth_digit);
     printf("Audio: %lu bytes\n", (unsigned long)pcm_size);
     printf("\n");
     printf("Press UP to stop and send.\n");
@@ -95,6 +95,7 @@ static void render_recording_ui(PrintConsole* top_console, PrintConsole* bottom_
     printf("============\n");
     printf("UP: stop + send\n");
     printf("B: cancel\n");
+    printf("5 min safety timeout\n");
     printf("START: exit app\n");
 }
 
@@ -178,7 +179,7 @@ bool voice_input_record_prompt(
             break;
         }
         if ((osGetTime() - start_ms) >= (VOICE_INPUT_MAX_SECONDS * 1000ULL) || pcm_size >= VOICE_INPUT_MAX_PCM_BYTES) {
-            set_status(status_line, status_line_size, "Mic reached max length. Sending to Hermes...");
+            set_status(status_line, status_line_size, "Mic safety timeout reached. Sending to Hermes...");
             break;
         }
     }
