@@ -57,8 +57,6 @@ static void handle_home_health_check(const HermesAppConfig* config, bool network
 
     snprintf(context->status_line, context->status_line_size, "Checking Hermes gateway...");
     render_home_screen(config, context);
-    gfxFlushBuffers();
-    gfxSwapBuffers();
     gspWaitForVBlank();
 
     *context->request_rc = bridge_health_check_run(health_url, context->health_result);

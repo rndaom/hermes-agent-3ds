@@ -18,9 +18,10 @@ typedef enum AppScreen {
 
 size_t hermes_app_ui_reply_page_count(const char* reply_text);
 
+bool hermes_app_ui_init(void);
+void hermes_app_ui_exit(void);
+
 void hermes_app_ui_render(
-    PrintConsole* top_console,
-    PrintConsole* bottom_console,
     AppScreen screen,
     const HermesAppConfig* config,
     SettingsField selected_field,

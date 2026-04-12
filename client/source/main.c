@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "app_config.h"
+#include "app_gfx.h"
 #include "app_home.h"
 #include "app_conversations.h"
 #include "app_input.h"
@@ -30,8 +31,6 @@ static void render_ui(
 )
 {
     hermes_app_ui_render(
-        &top_console,
-        &bottom_console,
         screen,
         config,
         selected_field,
@@ -82,9 +81,13 @@ int main(int argc, char* argv[])
 
     hermes_app_conversations_refresh_selection_from_active(&g_conversation_state, &config);
 
-    // Old 3DS-friendly UI: text-first rendering split across top and bottom screens.
-    gfxInitDefault();
-    gfxSet3D(false);
+    /*
+     * Graphical UI bootstrap moved behind hermes_app_ui_init() / app_gfx_init().
+     * That path now owns gfxInitDefault() and gfxSet3D(false) for the Old 3DS GUI.
+     */
+    if (!hermes_app_ui_init()) {
+        return 1;
+    }
     consoleInit(GFX_TOP, &top_console);
     consoleInit(GFX_BOTTOM, &bottom_console);
 
@@ -167,8 +170,7 @@ int main(int argc, char* argv[])
             }
         }
 
-        gfxFlushBuffers();
-        gfxSwapBuffers();
+        render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
     }
 
     if (network_ready)
@@ -177,6 +179,6 @@ int main(int argc, char* argv[])
     if (ac_ready)
         acExit();
 
-    gfxExit();
+    hermes_app_ui_exit();
     return 0;
 }
