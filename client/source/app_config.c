@@ -318,11 +318,6 @@ bool hermes_app_config_build_health_url(const HermesAppConfig* config, char* out
     return build_url(config, "/api/v2/health", out_url, out_size);
 }
 
-bool hermes_app_config_build_capabilities_url(const HermesAppConfig* config, char* out_url, size_t out_size)
-{
-    return build_url(config, "/api/v2/capabilities", out_url, out_size);
-}
-
 bool hermes_app_config_build_conversations_url(const HermesAppConfig* config, char* out_url, size_t out_size)
 {
     return build_url(config, "/api/v2/conversations", out_url, out_size);

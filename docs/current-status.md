@@ -19,7 +19,7 @@ Last major verified milestone: **the V2-only 3DS client is validated end-to-end 
 - active conversation + recent conversation list are persisted on SD
 - top/bottom-screen UI split is implemented
 - long replies page cleanly with `L/R`
-- conversation picker exists on `SELECT` for switching/syncing saved conversation slots
+- conversation picker exists on `SELECT` for switching/syncing conversation slots
 - native V2 chat flow is implemented with:
   - `POST /api/v2/messages`
   - `POST /api/v2/voice`
@@ -34,9 +34,8 @@ Last major verified milestone: **the V2-only 3DS client is validated end-to-end 
 
 ### Host-side integration
 - native 3DS gateway support now exists in `hermes-agent`
-- the gateway exposes the expected V2 surface:
+- the gateway exposes the expected V2 surface used by the handheld client:
   - `GET /api/v2/health`
-  - `GET /api/v2/capabilities`
   - `GET /api/v2/conversations`
   - `POST /api/v2/messages`
   - `POST /api/v2/voice`
@@ -65,8 +64,9 @@ Host-side gateway ownership belongs in `hermes-agent`, where 3DS behaves like an
 - `make -C client clean && make -C client`
 - live V2 gateway checks for:
   - `/api/v2/health`
-  - `/api/v2/capabilities`
+  - `/api/v2/conversations`
   - `/api/v2/messages`
+  - `/api/v2/voice`
   - `/api/v2/events`
 - real-hardware deployment over FTPD to the Old 3DS
 

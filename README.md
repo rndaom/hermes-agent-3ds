@@ -51,11 +51,12 @@ sdmc:/3ds/hermes-agent-3ds/hermes-agent-3ds.smdh
 
 The target host is the Hermes-side 3DS platform in the main `hermes-agent` repo.
 
-The 3DS client expects the gateway to expose:
+The 3DS client expects the gateway to support the active handheld flow:
 
 - `GET /api/v2/health`
-- `GET /api/v2/capabilities`
+- `GET /api/v2/conversations`
 - `POST /api/v2/messages`
+- `POST /api/v2/voice`
 - `GET /api/v2/events`
 - `POST /api/v2/interactions/{request_id}/respond`
 

@@ -32,7 +32,7 @@ Current controls:
 - `START` — exit back to Homebrew Launcher
 
 ### Conversations
-- `UP/DOWN` — select a saved conversation slot
+- `UP/DOWN` — select a conversation slot
 - `A` — activate the highlighted conversation
 - `X` — create a new conversation ID
 - `Y` — sync recent conversation slots from Hermes
@@ -91,9 +91,10 @@ Those defaults live in `include/app_config.h` and are only used until the user s
 
 This client is V2-only.
 
-It expects the Hermes-side 3DS gateway to implement:
+It expects the Hermes-side 3DS gateway to implement the active client flow:
 - `/api/v2/health`
-- `/api/v2/capabilities`
+- `/api/v2/conversations`
 - `/api/v2/messages`
+- `/api/v2/voice`
 - `/api/v2/events`
 - `/api/v2/interactions/{request_id}/respond`

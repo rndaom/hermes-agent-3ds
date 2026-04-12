@@ -43,12 +43,12 @@ sdmc:/3ds/hermes-agent-3ds/hermes-agent-3ds.smdh
 
 This repo no longer ships a standalone bridge.
 
-Run Hermes from the main `hermes-agent` repo with the 3DS gateway enabled on your PC. The 3DS client expects these endpoints:
+Run Hermes from the main `hermes-agent` repo with the 3DS gateway enabled on your PC. The 3DS client expects this active handheld flow:
 
 - `GET /api/v2/health`
-- `GET /api/v2/capabilities`
 - `GET /api/v2/conversations`
 - `POST /api/v2/messages`
+- `POST /api/v2/voice`
 - `GET /api/v2/events`
 - `POST /api/v2/interactions/{request_id}/respond`
 

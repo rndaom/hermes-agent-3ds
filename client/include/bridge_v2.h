@@ -13,14 +13,6 @@
 #define BRIDGE_V2_CONVERSATION_PREVIEW_MAX 96
 #define BRIDGE_V2_CONVERSATION_COUNT_MAX 8
 
-typedef struct BridgeV2CapabilitiesResult {
-    bool success;
-    char service[64];
-    char platform[16];
-    char transport[32];
-    char error[BRIDGE_V2_ERROR_MAX];
-} BridgeV2CapabilitiesResult;
-
 typedef struct BridgeV2ConversationInfo {
     char conversation_id[BRIDGE_V2_CONVERSATION_ID_MAX];
     char session_id[BRIDGE_V2_REQUEST_ID_MAX];
@@ -64,13 +56,11 @@ typedef struct BridgeV2InteractionResult {
     char error[BRIDGE_V2_ERROR_MAX];
 } BridgeV2InteractionResult;
 
-void bridge_v2_capabilities_result_reset(BridgeV2CapabilitiesResult* result);
 void bridge_v2_conversation_list_result_reset(BridgeV2ConversationListResult* result);
 void bridge_v2_message_result_reset(BridgeV2MessageResult* result);
 void bridge_v2_event_poll_result_reset(BridgeV2EventPollResult* result);
 void bridge_v2_interaction_result_reset(BridgeV2InteractionResult* result);
 
-Result bridge_v2_get_capabilities(const char* url, const char* token, BridgeV2CapabilitiesResult* result);
 Result bridge_v2_list_conversations(const char* url, const char* token, const char* device_id, BridgeV2ConversationListResult* result);
 Result bridge_v2_send_message(const char* url, const char* token, const char* device_id, const char* conversation_id, const char* message, BridgeV2MessageResult* result);
 Result bridge_v2_send_voice_message(const char* url, const char* token, const char* device_id, const char* conversation_id, const void* wav_data, size_t wav_size, BridgeV2MessageResult* result);

@@ -19,6 +19,8 @@ static PrintConsole bottom_console;
 static BridgeV2ConversationListResult g_conversation_list;
 static size_t g_conversation_selection = 0;
 
+static bool prompt_v2_approval_choice(char* out_choice, size_t out_size);
+
 typedef enum AppScreen {
     APP_SCREEN_HOME = 0,
     APP_SCREEN_SETTINGS = 1,
@@ -458,6 +460,210 @@ static void apply_v2_event_to_chat_result(const BridgeV2EventPollResult* event_r
 
     chat_result->success = true;
     snprintf(chat_result->reply, sizeof(chat_result->reply), "%s", event_result->reply_text);
+}
+
+static void set_chat_result_error(BridgeChatResult* chat_result, const char* error_message)
+{
+    if (chat_result == NULL)
+        return;
+
+    bridge_chat_result_reset(chat_result);
+    snprintf(chat_result->error, sizeof(chat_result->error), "%s", error_message != NULL ? error_message : "Unknown error.");
+}
+
+static void reset_chat_request_state(BridgeChatResult* chat_result, BridgeV2MessageResult* message_result, Result* request_rc, size_t* reply_page)
+{
+    if (chat_result != NULL)
+        bridge_chat_result_reset(chat_result);
+    if (message_result != NULL)
+        bridge_v2_message_result_reset(message_result);
+    if (request_rc != NULL)
+        *request_rc = 0;
+    if (reply_page != NULL)
+        *reply_page = 0;
+}
+
+static const char* conversation_id_for_message(const HermesAppConfig* config, const BridgeV2MessageResult* message_result)
+{
+    if (message_result != NULL && message_result->conversation_id[0] != '\0')
+        return message_result->conversation_id;
+    if (config != NULL && config->active_conversation_id[0] != '\0')
+        return config->active_conversation_id;
+    return DEFAULT_CONVERSATION_ID;
+}
+
+static Result poll_for_v2_reply(
+    const HermesAppConfig* config,
+    const char* events_url,
+    const BridgeV2MessageResult* message_result,
+    u32* event_cursor,
+    BridgeV2EventPollResult* event_result,
+    BridgeV2EventPollResult* matched_event_result,
+    bool* matched_reply
+)
+{
+    const char* conversation_id;
+    int poll_attempt;
+    Result request_rc = 0;
+
+    if (config == NULL || events_url == NULL || message_result == NULL || event_cursor == NULL ||
+        event_result == NULL || matched_event_result == NULL || matched_reply == NULL) {
+        return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_POINTER);
+    }
+
+    conversation_id = conversation_id_for_message(config, message_result);
+    bridge_v2_event_poll_result_reset(event_result);
+    bridge_v2_event_poll_result_reset(matched_event_result);
+    *matched_reply = false;
+
+    for (poll_attempt = 0; poll_attempt < 6; poll_attempt++) {
+        request_rc = bridge_v2_poll_events(
+            events_url,
+            config->token,
+            config->device_id,
+            conversation_id,
+            *event_cursor,
+            5000,
+            event_result
+        );
+        if (R_FAILED(request_rc))
+            break;
+
+        if (event_result->cursor > *event_cursor)
+            *event_cursor = event_result->cursor;
+
+        if (event_result->approval_required)
+            break;
+
+        if (event_result->reply_text[0] != '\0' &&
+            strcmp(event_result->reply_to_message_id, message_result->message_id) == 0) {
+            *matched_event_result = *event_result;
+            *matched_reply = true;
+            break;
+        }
+    }
+
+    return request_rc;
+}
+
+static Result complete_v2_roundtrip(
+    const HermesAppConfig* config,
+    const char* events_url,
+    const BridgeV2MessageResult* message_result,
+    BridgeChatResult* chat_result,
+    bool* missed_events_out
+)
+{
+    char interaction_url[HERMES_APP_INTERACTION_URL_MAX];
+    char approval_choice[16];
+    BridgeV2EventPollResult event_result;
+    BridgeV2EventPollResult matched_event_result;
+    BridgeV2InteractionResult interaction_result;
+    bool matched_reply = false;
+    bool missed_events = false;
+    u32 event_cursor;
+    Result request_rc;
+
+    if (missed_events_out != NULL)
+        *missed_events_out = false;
+
+    if (config == NULL || events_url == NULL || message_result == NULL || chat_result == NULL)
+        return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_POINTER);
+
+    event_cursor = message_result->cursor;
+    request_rc = poll_for_v2_reply(
+        config,
+        events_url,
+        message_result,
+        &event_cursor,
+        &event_result,
+        &matched_event_result,
+        &matched_reply
+    );
+    if (R_FAILED(request_rc)) {
+        if (event_result.error[0] != '\0')
+            set_chat_result_error(chat_result, event_result.error);
+        return request_rc;
+    }
+
+    if (event_result.missed_events)
+        missed_events = true;
+
+    if (event_result.approval_required) {
+        approval_choice[0] = '\0';
+        bridge_v2_interaction_result_reset(&interaction_result);
+
+        if (!hermes_app_config_build_interaction_url(config, event_result.request_id, interaction_url, sizeof(interaction_url))) {
+            set_chat_result_error(chat_result, "Approval URL could not be built.");
+            goto done;
+        }
+        if (!prompt_v2_approval_choice(approval_choice, sizeof(approval_choice))) {
+            set_chat_result_error(chat_result, "Approval canceled.");
+            goto done;
+        }
+
+        request_rc = bridge_v2_submit_interaction(interaction_url, config->token, approval_choice, &interaction_result);
+        if (R_FAILED(request_rc) || !interaction_result.success) {
+            set_chat_result_error(
+                chat_result,
+                interaction_result.error[0] != '\0' ? interaction_result.error : "Approval response failed."
+            );
+            goto done;
+        }
+        if (strcmp(approval_choice, "deny") == 0) {
+            set_chat_result_error(chat_result, "Command denied.");
+            request_rc = 0;
+            goto done;
+        }
+
+        request_rc = poll_for_v2_reply(
+            config,
+            events_url,
+            message_result,
+            &event_cursor,
+            &event_result,
+            &matched_event_result,
+            &matched_reply
+        );
+        if (R_FAILED(request_rc)) {
+            if (event_result.error[0] != '\0')
+                set_chat_result_error(chat_result, event_result.error);
+            return request_rc;
+        }
+
+        if (event_result.missed_events)
+            missed_events = true;
+    }
+
+    apply_v2_event_to_chat_result(matched_reply ? &matched_event_result : &event_result, chat_result);
+
+done:
+    if (missed_events_out != NULL)
+        *missed_events_out = missed_events;
+    return request_rc;
+}
+
+static void format_roundtrip_status(
+    const BridgeChatResult* chat_result,
+    bool missed_events,
+    const char* success_message,
+    char* status_line,
+    size_t status_line_size
+)
+{
+    if (status_line == NULL || status_line_size == 0)
+        return;
+
+    if (chat_result != NULL && chat_result->success) {
+        if (missed_events)
+            snprintf(status_line, status_line_size, "%s Some events were missed.", success_message);
+        else
+            snprintf(status_line, status_line_size, "%s", success_message);
+    } else if (chat_result != NULL && chat_result->error[0] != '\0') {
+        snprintf(status_line, status_line_size, "%s", chat_result->error);
+    } else {
+        snprintf(status_line, status_line_size, "No assistant reply arrived yet.");
+    }
 }
 
 static bool prompt_v2_approval_choice(char* out_choice, size_t out_size)
@@ -902,15 +1108,8 @@ int main(int argc, char* argv[])
                 char message_buffer[BRIDGE_CHAT_MESSAGE_MAX];
                 char messages_url[HERMES_APP_MESSAGES_URL_MAX];
                 char events_url[HERMES_APP_EVENTS_URL_MAX];
-                char interaction_url[HERMES_APP_INTERACTION_URL_MAX];
-                char approval_choice[16];
                 BridgeV2MessageResult message_result;
-                BridgeV2EventPollResult event_result;
-                BridgeV2EventPollResult matched_event_result;
-                BridgeV2InteractionResult interaction_result;
-                bool matched_reply = false;
-                u32 event_cursor = 0;
-                int poll_attempt;
+                bool missed_events = false;
 
                 message_buffer[0] = '\0';
                 if (!prompt_message_input(message_buffer, sizeof(message_buffer))) {
@@ -920,15 +1119,7 @@ int main(int argc, char* argv[])
                 }
 
                 copy_bounded_string(last_message, sizeof(last_message), message_buffer);
-                bridge_chat_result_reset(&chat_result);
-                bridge_v2_message_result_reset(&message_result);
-                bridge_v2_event_poll_result_reset(&event_result);
-                bridge_v2_event_poll_result_reset(&matched_event_result);
-                bridge_v2_interaction_result_reset(&interaction_result);
-                matched_reply = false;
-                approval_choice[0] = '\0';
-                request_rc = 0;
-                reply_page = 0;
+                reset_chat_request_state(&chat_result, &message_result, &request_rc, &reply_page);
 
                 if (!hermes_app_config_build_messages_url(&config, messages_url, sizeof(messages_url)) ||
                     !hermes_app_config_build_events_url(&config, events_url, sizeof(events_url)) ||
@@ -947,82 +1138,13 @@ int main(int argc, char* argv[])
                 if (network_ready) {
                     request_rc = bridge_v2_send_message(messages_url, config.token, config.device_id, config.active_conversation_id, message_buffer, &message_result);
                     if (R_SUCCEEDED(request_rc) && message_result.success) {
-                        event_cursor = message_result.cursor;
-                        for (poll_attempt = 0; poll_attempt < 6; poll_attempt++) {
-                            request_rc = bridge_v2_poll_events(events_url, config.token, config.device_id, message_result.conversation_id[0] != '\0' ? message_result.conversation_id : config.active_conversation_id, event_cursor, 5000, &event_result);
-                            if (R_FAILED(request_rc))
-                                break;
-
-                            if (event_result.cursor > event_cursor)
-                                event_cursor = event_result.cursor;
-
-                            if (event_result.approval_required)
-                                break;
-
-                            if (event_result.reply_text[0] != '\0' &&
-                                strcmp(event_result.reply_to_message_id, message_result.message_id) == 0) {
-                                matched_event_result = event_result;
-                                matched_reply = true;
-                                break;
-                            }
-                        }
-
-                        if (R_SUCCEEDED(request_rc) && event_result.approval_required) {
-                            if (!hermes_app_config_build_interaction_url(&config, event_result.request_id, interaction_url, sizeof(interaction_url))) {
-                                bridge_chat_result_reset(&chat_result);
-                                snprintf(chat_result.error, sizeof(chat_result.error), "Approval URL could not be built.");
-                            } else if (!prompt_v2_approval_choice(approval_choice, sizeof(approval_choice))) {
-                                bridge_chat_result_reset(&chat_result);
-                                snprintf(chat_result.error, sizeof(chat_result.error), "Approval canceled.");
-                            } else {
-                                request_rc = bridge_v2_submit_interaction(interaction_url, config.token, approval_choice, &interaction_result);
-                                if (R_SUCCEEDED(request_rc) && interaction_result.success) {
-                                    if (strcmp(approval_choice, "deny") == 0) {
-                                        bridge_chat_result_reset(&chat_result);
-                                        snprintf(chat_result.error, sizeof(chat_result.error), "Command denied.");
-                                    } else {
-                                        bridge_v2_event_poll_result_reset(&event_result);
-                                        bridge_v2_event_poll_result_reset(&matched_event_result);
-                                        matched_reply = false;
-                                        for (poll_attempt = 0; poll_attempt < 6; poll_attempt++) {
-                                            request_rc = bridge_v2_poll_events(events_url, config.token, config.device_id, message_result.conversation_id[0] != '\0' ? message_result.conversation_id : config.active_conversation_id, event_cursor, 5000, &event_result);
-                                            if (R_FAILED(request_rc))
-                                                break;
-
-                                            if (event_result.cursor > event_cursor)
-                                                event_cursor = event_result.cursor;
-
-                                            if (event_result.approval_required)
-                                                break;
-
-                                            if (event_result.reply_text[0] != '\0' &&
-                                                strcmp(event_result.reply_to_message_id, message_result.message_id) == 0) {
-                                                matched_event_result = event_result;
-                                                matched_reply = true;
-                                                break;
-                                            }
-                                        }
-                                        apply_v2_event_to_chat_result(matched_reply ? &matched_event_result : &event_result, &chat_result);
-                                    }
-                                } else {
-                                    bridge_chat_result_reset(&chat_result);
-                                    snprintf(chat_result.error, sizeof(chat_result.error), "%s", interaction_result.error[0] != '\0' ? interaction_result.error : "Approval response failed.");
-                                }
-                            }
-                        } else {
-                            apply_v2_event_to_chat_result(matched_reply ? &matched_event_result : &event_result, &chat_result);
-                        }
-
-                        if (chat_result.success) {
-                            if (event_result.missed_events)
-                                snprintf(status_line, sizeof(status_line), "Reply received. Some events were missed.");
-                            else
-                                snprintf(status_line, sizeof(status_line), "Reply received over native v2.");
-                        } else if (chat_result.error[0] != '\0') {
+                        request_rc = complete_v2_roundtrip(&config, events_url, &message_result, &chat_result, &missed_events);
+                        if (R_SUCCEEDED(request_rc))
+                            format_roundtrip_status(&chat_result, missed_events, "Reply received over native v2.", status_line, sizeof(status_line));
+                        else if (chat_result.error[0] != '\0')
                             snprintf(status_line, sizeof(status_line), "%s", chat_result.error);
-                        } else {
-                            snprintf(status_line, sizeof(status_line), "No assistant reply arrived yet.");
-                        }
+                        else
+                            snprintf(status_line, sizeof(status_line), "Chat failed: 0x%08lX", (unsigned long)request_rc);
                     } else if (message_result.error[0] != '\0')
                         snprintf(status_line, sizeof(status_line), "%s", message_result.error);
                     else
@@ -1037,17 +1159,10 @@ int main(int argc, char* argv[])
             if ((kDown & KEY_UP) != 0) {
                 char voice_url[HERMES_APP_VOICE_URL_MAX];
                 char events_url[HERMES_APP_EVENTS_URL_MAX];
-                char interaction_url[HERMES_APP_INTERACTION_URL_MAX];
-                char approval_choice[16];
                 u8* wav_data = NULL;
                 size_t wav_size = 0;
                 BridgeV2MessageResult message_result;
-                BridgeV2EventPollResult event_result;
-                BridgeV2EventPollResult matched_event_result;
-                BridgeV2InteractionResult interaction_result;
-                bool matched_reply = false;
-                u32 event_cursor = 0;
-                int poll_attempt;
+                bool missed_events = false;
 
                 if (!network_ready) {
                     snprintf(status_line, sizeof(status_line), "Networking services failed to start.");
@@ -1069,15 +1184,7 @@ int main(int argc, char* argv[])
                 }
 
                 copy_bounded_string(last_message, sizeof(last_message), "[mic] voice input");
-                bridge_chat_result_reset(&chat_result);
-                bridge_v2_message_result_reset(&message_result);
-                bridge_v2_event_poll_result_reset(&event_result);
-                bridge_v2_event_poll_result_reset(&matched_event_result);
-                bridge_v2_interaction_result_reset(&interaction_result);
-                matched_reply = false;
-                approval_choice[0] = '\0';
-                request_rc = 0;
-                reply_page = 0;
+                reset_chat_request_state(&chat_result, &message_result, &request_rc, &reply_page);
 
                 snprintf(status_line, sizeof(status_line), "Sending mic input to Hermes...");
                 render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
@@ -1090,82 +1197,13 @@ int main(int argc, char* argv[])
                 wav_data = NULL;
 
                 if (R_SUCCEEDED(request_rc) && message_result.success) {
-                    event_cursor = message_result.cursor;
-                    for (poll_attempt = 0; poll_attempt < 6; poll_attempt++) {
-                        request_rc = bridge_v2_poll_events(events_url, config.token, config.device_id, message_result.conversation_id[0] != '\0' ? message_result.conversation_id : config.active_conversation_id, event_cursor, 5000, &event_result);
-                        if (R_FAILED(request_rc))
-                            break;
-
-                        if (event_result.cursor > event_cursor)
-                            event_cursor = event_result.cursor;
-
-                        if (event_result.approval_required)
-                            break;
-
-                        if (event_result.reply_text[0] != '\0' &&
-                            strcmp(event_result.reply_to_message_id, message_result.message_id) == 0) {
-                            matched_event_result = event_result;
-                            matched_reply = true;
-                            break;
-                        }
-                    }
-
-                    if (R_SUCCEEDED(request_rc) && event_result.approval_required) {
-                        if (!hermes_app_config_build_interaction_url(&config, event_result.request_id, interaction_url, sizeof(interaction_url))) {
-                            bridge_chat_result_reset(&chat_result);
-                            snprintf(chat_result.error, sizeof(chat_result.error), "Approval URL could not be built.");
-                        } else if (!prompt_v2_approval_choice(approval_choice, sizeof(approval_choice))) {
-                            bridge_chat_result_reset(&chat_result);
-                            snprintf(chat_result.error, sizeof(chat_result.error), "Approval canceled.");
-                        } else {
-                            request_rc = bridge_v2_submit_interaction(interaction_url, config.token, approval_choice, &interaction_result);
-                            if (R_SUCCEEDED(request_rc) && interaction_result.success) {
-                                if (strcmp(approval_choice, "deny") == 0) {
-                                    bridge_chat_result_reset(&chat_result);
-                                    snprintf(chat_result.error, sizeof(chat_result.error), "Command denied.");
-                                } else {
-                                    bridge_v2_event_poll_result_reset(&event_result);
-                                    bridge_v2_event_poll_result_reset(&matched_event_result);
-                                    matched_reply = false;
-                                    for (poll_attempt = 0; poll_attempt < 6; poll_attempt++) {
-                                        request_rc = bridge_v2_poll_events(events_url, config.token, config.device_id, message_result.conversation_id[0] != '\0' ? message_result.conversation_id : config.active_conversation_id, event_cursor, 5000, &event_result);
-                                        if (R_FAILED(request_rc))
-                                            break;
-
-                                        if (event_result.cursor > event_cursor)
-                                            event_cursor = event_result.cursor;
-
-                                        if (event_result.approval_required)
-                                            break;
-
-                                        if (event_result.reply_text[0] != '\0' &&
-                                            strcmp(event_result.reply_to_message_id, message_result.message_id) == 0) {
-                                            matched_event_result = event_result;
-                                            matched_reply = true;
-                                            break;
-                                        }
-                                    }
-                                    apply_v2_event_to_chat_result(matched_reply ? &matched_event_result : &event_result, &chat_result);
-                                }
-                            } else {
-                                bridge_chat_result_reset(&chat_result);
-                                snprintf(chat_result.error, sizeof(chat_result.error), "%s", interaction_result.error[0] != '\0' ? interaction_result.error : "Approval response failed.");
-                            }
-                        }
-                    } else {
-                        apply_v2_event_to_chat_result(matched_reply ? &matched_event_result : &event_result, &chat_result);
-                    }
-
-                    if (chat_result.success) {
-                        if (event_result.missed_events)
-                            snprintf(status_line, sizeof(status_line), "Voice reply received. Some events were missed.");
-                        else
-                            snprintf(status_line, sizeof(status_line), "Voice reply received over native v2.");
-                    } else if (chat_result.error[0] != '\0') {
+                    request_rc = complete_v2_roundtrip(&config, events_url, &message_result, &chat_result, &missed_events);
+                    if (R_SUCCEEDED(request_rc))
+                        format_roundtrip_status(&chat_result, missed_events, "Voice reply received over native v2.", status_line, sizeof(status_line));
+                    else if (chat_result.error[0] != '\0')
                         snprintf(status_line, sizeof(status_line), "%s", chat_result.error);
-                    } else {
-                        snprintf(status_line, sizeof(status_line), "No assistant reply arrived yet.");
-                    }
+                    else
+                        snprintf(status_line, sizeof(status_line), "Voice roundtrip failed: 0x%08lX", (unsigned long)request_rc);
                 } else if (message_result.error[0] != '\0') {
                     snprintf(status_line, sizeof(status_line), "%s", message_result.error);
                 } else {

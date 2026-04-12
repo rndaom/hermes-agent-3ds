@@ -42,7 +42,8 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "BridgeV2MessageResult" in main_c
     assert "BridgeV2EventPollResult" in main_c
     assert "BridgeV2ConversationListResult" in main_c
-    assert "message_result.cursor" in main_c
+    assert "complete_v2_roundtrip" in main_c
+    assert "poll_for_v2_reply" in main_c
     assert "hermes_app_config_build_messages_url" in main_c
     assert "hermes_app_config_build_events_url" in main_c
     assert "hermes_app_config_build_conversations_url" in main_c

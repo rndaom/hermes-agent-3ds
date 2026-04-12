@@ -8,14 +8,12 @@ def test_app_config_supports_native_v2_urls_and_device_identity():
     header = (CLIENT_DIR / "include" / "app_config.h").read_text()
     source = (CLIENT_DIR / "source" / "app_config.c").read_text()
 
-    assert "HERMES_APP_CAPABILITIES_URL_MAX" in header
     assert "HERMES_APP_MESSAGES_URL_MAX" in header
     assert "HERMES_APP_EVENTS_URL_MAX" in header
     assert "HERMES_APP_VOICE_URL_MAX" in header
     assert "HERMES_APP_INTERACTION_URL_MAX" in header
     assert "HERMES_APP_DEVICE_ID_MAX" in header
     assert "device_id" in header
-    assert "hermes_app_config_build_capabilities_url" in header
     assert "hermes_app_config_build_messages_url" in header
     assert "hermes_app_config_build_events_url" in header
     assert "hermes_app_config_build_voice_url" in header
@@ -23,7 +21,6 @@ def test_app_config_supports_native_v2_urls_and_device_identity():
 
     assert '"/api/v2/health"' in source
     assert '"/api/v1/health"' not in source
-    assert '"/api/v2/capabilities"' in source
     assert '"/api/v2/messages"' in source
     assert '"/api/v2/events"' in source
     assert '"/api/v2/voice"' in source
@@ -42,13 +39,11 @@ def test_bridge_v2_module_exists_for_native_gateway_protocol():
     header = header_path.read_text()
     source = source_path.read_text()
 
-    assert "BridgeV2CapabilitiesResult" in header
     assert "BridgeV2MessageResult" in header
     assert "BridgeV2EventPollResult" in header
     assert "BridgeV2InteractionResult" in header
     assert "u32 cursor;" in header
     assert "reply_to_message_id" in header
-    assert "bridge_v2_get_capabilities" in header
     assert "bridge_v2_send_message" in header
     assert "bridge_v2_send_voice_message" in header
     assert "bridge_v2_poll_events" in header

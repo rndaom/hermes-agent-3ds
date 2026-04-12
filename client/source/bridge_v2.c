@@ -634,13 +634,6 @@ static const char* response_body_start(const char* response)
     return body + 4;
 }
 
-void bridge_v2_capabilities_result_reset(BridgeV2CapabilitiesResult* result)
-{
-    if (result == NULL)
-        return;
-    memset(result, 0, sizeof(*result));
-}
-
 void bridge_v2_conversation_list_result_reset(BridgeV2ConversationListResult* result)
 {
     if (result == NULL)
@@ -698,45 +691,6 @@ static Result parse_message_ack_response(const char* response, u32 status_code, 
     if (extract_json_u32(response_body, "cursor", &result->cursor) == false)
         result->cursor = 0;
 
-    result->success = true;
-    result->error[0] = '\0';
-    return 0;
-}
-
-Result bridge_v2_get_capabilities(const char* url, const char* token, BridgeV2CapabilitiesResult* result)
-{
-    char response[BRIDGE_V2_RESPONSE_MAX];
-    const char* body;
-    u32 status_code = 0;
-    Result rc;
-
-    bridge_v2_capabilities_result_reset(result);
-    if (result == NULL)
-        return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_POINTER);
-
-    rc = perform_request("GET", url, token, NULL, 0, NULL, response, sizeof(response), &status_code, result->error, sizeof(result->error));
-    if (R_FAILED(rc))
-        return rc;
-
-    body = response_body_start(response);
-    if (body == NULL) {
-        set_error(result->error, sizeof(result->error), "Bridge response body was missing.");
-        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
-    }
-    if (status_code != 200) {
-        if (!extract_json_string_v2(body, "error", result->error, sizeof(result->error)))
-            snprintf(result->error, sizeof(result->error), "Bridge returned HTTP %lu.", (unsigned long)status_code);
-        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
-    }
-    if (!response_ok(body)) {
-        if (!extract_json_string_v2(body, "error", result->error, sizeof(result->error)))
-            set_error(result->error, sizeof(result->error), "Capabilities response was not OK.");
-        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
-    }
-
-    extract_json_string_v2(body, "service", result->service, sizeof(result->service));
-    extract_json_string_v2(body, "platform", result->platform, sizeof(result->platform));
-    extract_json_string_v2(body, "transport", result->transport, sizeof(result->transport));
     result->success = true;
     result->error[0] = '\0';
     return 0;
