@@ -226,6 +226,57 @@ This spec exists partly to replace ambiguity.
 
 This spec treats those as defects, not as precedent.
 
+## Current implemented milestone and live hardware feedback
+
+### What is now finished
+The following are now implemented and were validated in the repo and deployed to the real Old 3DS build:
+- Citro2D/Citro3D graphical UI is the active main-screen path
+- `main.c` no longer boots the main UI through `consoleInit(...)`
+- renderer ownership cleanup for normal GUI screens is complete
+- approval prompt now renders graphically
+- mic recording prompt now renders graphically
+- the app is deployed over FTPD to `sdmc:/3ds/hermes-agent-3ds/`
+- the user gave strong positive first-impression feedback on the deployed graphical build
+
+### What the latest live hardware feedback says
+This feedback is now part of the source of truth and should directly guide the next visual pass.
+
+1. The current build is a strong baseline
+- The user described the current build as "super cool already" and "astounding work"
+- This means the current graphical direction is approved as a foundation, not to be discarded
+
+2. Top rail content needs to become more useful
+- The current subtitle / secondary top-screen label (`RELAY DECK`) should be replaced
+- Preferred replacement content:
+  - current model name, for example `gpt-5.4`
+  - context bar / context usage indicator
+  - session length or similar session/runtime status
+
+3. Active-thread utility panel needs containment and better composition
+- text currently spills outside the active-thread box in some cases
+- there is too much unused empty space on the right side of that box
+- the next pass should rebalance the panel so the available width is actually used
+
+4. Crest panel placeholder is acceptable for now
+- The current rough placeholder shape in the relay/crest panel is acceptable temporarily
+- The user expects this area to hold a real future custom crest / image / icon treatment later
+- This is a future art pass item, not an immediate blocker
+
+5. Reply card containment is still not good enough
+- long reply text can visually cross the note lines / exceed the intended box boundaries
+- reply text still wraps too early and leaves too much unused width on the right side of the reply card
+- the next pass must use more of the real horizontal width of the card
+
+6. Command menu should support true D-pad navigation in addition to hotkeys
+- hotkeys stay
+- D-pad navigation should be added for the command list itself
+- pressing the selected command via confirm/select action should work
+- this should make the command deck feel like a real handheld menu, not just a list of labeled shortcuts
+
+7. Command/gateway text still needs containment work
+- command menu and gateway box content can still render outside their containing boxes in edge cases
+- bounded text rules must continue to be applied until no user-facing overflow remains
+
 ## Dark-mode-only visual language
 
 ## Base surfaces

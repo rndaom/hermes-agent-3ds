@@ -26,11 +26,14 @@ Last major verified milestone: **the V2-only 3DS client is validated end-to-end 
   - `GET /api/v2/events`
   - approval handling through `POST /api/v2/interactions/{request_id}/respond`
 - microphone input is implemented on-device and routed through host-side speech-to-text with `UP`
-- the mic recording screen now uses reduced in-place redraws to stay stable on real Old 3DS hardware during capture
+- the mic recording screen now uses graphical in-app rendering instead of the old console shell
+- approval prompts now use graphical in-app rendering instead of the old console shell
+- renderer ownership cleanup is complete for normal GUI screens
 - stale-event filtering is in place using:
   - ack cursor handoff
   - matching `reply_to`
   - longer wait window for final replies
+- a refined dark-mode Hermes + PictoChat baseline build has been deployed to the real Old 3DS and received strong positive first-impression feedback from the user
 
 ### Host-side integration
 - native 3DS gateway support now exists in `hermes-agent`
@@ -81,6 +84,7 @@ Latest built artifact:
 
 ## Recommended next steps
 
-1. use `docs/hermes-pictochat-dark-mode-spec.md` as the current UI source of truth and complete the visual rewrite toward dark-mode Hermes + PictoChat
-2. remove the remaining mixed console/graphical transient flows so approval and mic recording use the same render language as the main screens
-3. do real-hardware acceptance testing on the refreshed build and capture any actual UX bugs before adding unrelated feature work
+1. update the top rail to show model / context bar / session-length information instead of `RELAY DECK`
+2. add true D-pad navigation for the command menu while keeping the existing hotkeys
+3. tighten text containment and width usage in the active-thread, reply, command-menu, and gateway boxes based on the latest live hardware feedback
+4. after that, replace the temporary relay/crest placeholder with a real Hermes handheld crest / icon asset pass
