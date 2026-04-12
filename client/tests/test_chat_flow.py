@@ -52,7 +52,7 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "Approval required" in main_c
     assert "Command denied." in main_c
     assert "KEY_B" in main_c
-    assert "KEY_SELECT" in main_c
+    assert "KEY_UP" in main_c
     assert "Write a message" in main_c or "Ask Hermes" in main_c
     assert "Record mic" in main_c or "mic" in main_c.lower()
     assert "bridge_v2_send_voice_message" in main_c

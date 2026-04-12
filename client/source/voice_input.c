@@ -86,14 +86,14 @@ static void render_recording_ui(PrintConsole* top_console, PrintConsole* bottom_
     printf("Time: %lu.%lus / %ds\n", seconds, tenth_digit, VOICE_INPUT_MAX_SECONDS);
     printf("Audio: %lu bytes\n", (unsigned long)pcm_size);
     printf("\n");
-    printf("Press SELECT to stop and send.\n");
+    printf("Press UP to stop and send.\n");
     printf("Press B to cancel.\n");
 
     consoleSelect(bottom_console);
     consoleClear();
     printf("Mic controls\n");
     printf("============\n");
-    printf("SELECT: stop + send\n");
+    printf("UP: stop + send\n");
     printf("B: cancel\n");
     printf("START: exit app\n");
 }
@@ -173,7 +173,7 @@ bool voice_input_record_prompt(
             set_status(status_line, status_line_size, "Mic input canceled.");
             break;
         }
-        if ((kDown & KEY_SELECT) != 0) {
+        if ((kDown & KEY_UP) != 0) {
             set_status(status_line, status_line_size, "Mic captured. Sending to Hermes...");
             break;
         }

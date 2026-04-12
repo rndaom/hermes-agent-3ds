@@ -484,7 +484,7 @@ static void render_home_top_screen(
     } else {
         printf("Press A to check Hermes gateway.\n");
         printf("Press B to Ask Hermes.\n");
-        printf("Press SELECT to Record mic.\n");
+        printf("Press UP to Record mic.\n");
     }
 }
 
@@ -510,7 +510,7 @@ static void render_home_bottom_screen(
     printf("Token: %s\n", token_summary);
     printf("\n");
     printf("A check   B ask\n");
-    printf("SELECT mic   X settings\n");
+    printf("UP mic   X settings\n");
     printf("Y clear   START exit\n");
     if (chat_result != NULL && chat_result->success && page_count > 1)
         printf("L/R page reply\n");
@@ -848,7 +848,7 @@ int main(int argc, char* argv[])
                 render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
             }
 
-            if ((kDown & KEY_SELECT) != 0) {
+            if ((kDown & KEY_UP) != 0) {
                 char voice_url[HERMES_APP_VOICE_URL_MAX];
                 char events_url[HERMES_APP_EVENTS_URL_MAX];
                 char interaction_url[HERMES_APP_INTERACTION_URL_MAX];
