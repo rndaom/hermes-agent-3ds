@@ -81,5 +81,6 @@ Latest built artifact:
 
 ## Recommended next steps
 
-1. keep tightening UI polish for Old 3DS readability and speed
-2. expand conversation metadata polish if the handheld needs richer labels/previews later
+1. do real-hardware acceptance testing on the freshly polished build and capture any actual UX bugs before adding more features
+2. if the handheld needs richer labels/previews later, expand conversation metadata polish without changing the thin-client architecture
+3. otherwise, treat the 3DS client as feature-complete for this phase and shift new work to genuinely new capabilities rather than more cleanup
