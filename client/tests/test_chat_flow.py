@@ -75,6 +75,13 @@ def test_main_c_wraps_and_pages_long_reply_text_for_small_screens():
     assert "Page %lu/%lu" in main_c
 
 
+def test_voice_input_waits_for_up_release_before_allowing_stop():
+    voice_input_c = (CLIENT_DIR / "source" / "voice_input.c").read_text()
+
+    assert "hidKeysHeld() & KEY_UP" in voice_input_c
+    assert "waiting_for_up_release" in voice_input_c
+
+
 def test_main_c_uses_both_top_and_bottom_screens_for_ui():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
 

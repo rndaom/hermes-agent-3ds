@@ -117,6 +117,7 @@ bool voice_input_record_prompt(
     bool sampling_started = false;
     bool canceled = false;
     bool success = false;
+    bool waiting_for_up_release = true;
     u64 start_ms = 0;
 
     if (out_wav_data == NULL || out_wav_size == NULL || top_console == NULL || bottom_console == NULL) {
@@ -163,6 +164,12 @@ bool voice_input_record_prompt(
         render_recording_ui(top_console, bottom_console, pcm_size, start_ms);
         gfxFlushBuffers();
         gfxSwapBuffers();
+
+        if (waiting_for_up_release) {
+            if ((hidKeysHeld() & KEY_UP) == 0)
+                waiting_for_up_release = false;
+            continue;
+        }
 
         if ((kDown & KEY_START) != 0) {
             canceled = true;
