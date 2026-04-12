@@ -37,42 +37,50 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
     conv_h = (CLIENT_DIR / "include" / "app_conversations.h").read_text()
     conv_c = (CLIENT_DIR / "source" / "app_conversations.c").read_text()
+    request_h = (CLIENT_DIR / "include" / "app_requests.h").read_text()
+    request_c = (CLIENT_DIR / "source" / "app_requests.c").read_text()
     input_c = (CLIENT_DIR / "source" / "app_input.c").read_text()
 
     assert '"bridge_chat.h"' in main_c
     assert '"app_conversations.h"' in main_c
+    assert '"app_requests.h"' in main_c
     assert '"bridge_v2.h"' in main_c
     assert "BridgeChatResult" in main_c
-    assert "BridgeV2MessageResult" in main_c
-    assert "BridgeV2EventPollResult" in main_c
+    assert "BridgeV2MessageResult" in request_h
+    assert "BridgeV2EventPollResult" in request_h
     assert "BridgeV2ConversationListResult" in conv_h
-    assert "complete_v2_roundtrip" in main_c
-    assert "poll_for_v2_reply" in main_c
-    assert "hermes_app_config_build_messages_url" in main_c
-    assert "hermes_app_config_build_events_url" in main_c
+    assert "complete_v2_roundtrip" in request_c
+    assert "poll_for_v2_reply" in request_c
+    assert "hermes_app_config_build_messages_url" in request_c
+    assert "hermes_app_config_build_events_url" in request_c
     assert "hermes_app_config_build_conversations_url" in conv_c
-    assert "bridge_v2_send_message" in main_c
-    assert "bridge_v2_send_message(messages_url, config.token, config.device_id, config.active_conversation_id" in main_c
+    assert "bridge_v2_send_message" in request_c
+    assert "config->active_conversation_id" in request_c
+    assert "message_buffer" in request_c
     assert "bridge_v2_list_conversations" in conv_c
-    assert "bridge_v2_poll_events" in main_c
-    assert "bridge_v2_submit_interaction" in main_c
-    assert "hermes_app_config_build_interaction_url" in main_c
-    assert "reply_to_message_id" in main_c
-    assert "Approval required" in main_c
-    assert "Command denied." in main_c
+    assert "bridge_v2_poll_events" in request_c
+    assert "bridge_v2_submit_interaction" in request_c
+    assert "hermes_app_config_build_interaction_url" in request_c
+    assert "reply_to_message_id" in request_c
+    assert "Approval required" in request_c
+    assert "Command denied." in request_c
     assert "KEY_B" in main_c
     assert "KEY_UP" in main_c
     assert "KEY_SELECT" in main_c
     assert "KEY_DOWN" in conv_c
     assert "Write a message" in input_c
-    assert "Record mic" in main_c or "mic" in main_c.lower()
-    assert "bridge_v2_send_voice_message" in main_c
-    assert "bridge_v2_send_voice_message(voice_url, config.token, config.device_id, config.active_conversation_id" in main_c
-    assert "MICU_StartSampling" in main_c or "voice_input_record_prompt" in main_c
+    assert "Record mic" in request_c or "mic" in request_c.lower()
+    assert "bridge_v2_send_voice_message" in request_c
+    assert "config->active_conversation_id" in request_c
+    assert "wav_data" in request_c
+    assert "MICU_StartSampling" in main_c or "voice_input_record_prompt" in request_c
     assert "Last message" in main_c or "Last message" in (CLIENT_DIR / "source" / "app_ui.c").read_text()
     assert "Last reply" in main_c or "Last reply" in (CLIENT_DIR / "source" / "app_ui.c").read_text()
     assert "swkbdInputText" in input_c
-    assert "Asking Hermes over v2..." in main_c
+    assert "hermes_app_requests_handle_text" in main_c
+    assert "hermes_app_requests_handle_voice" in main_c
+    assert "Asking Hermes over v2..." in request_c
+    assert "Sending mic input to Hermes..." in request_c
     assert '"/api/v1/chat"' not in main_c
 
 

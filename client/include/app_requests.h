@@ -1,0 +1,61 @@
+#pragma once
+
+#include <3ds.h>
+#include <stdbool.h>
+#include <stddef.h>
+
+#include "app_config.h"
+#include "app_input.h"
+#include "app_ui.h"
+#include "bridge_chat.h"
+#include "bridge_health.h"
+#include "bridge_v2.h"
+
+/* Uses BridgeV2MessageResult and BridgeV2EventPollResult for native V2 roundtrips. */
+typedef void (*AppRequestRenderFn)(
+    AppScreen screen,
+    const HermesAppConfig* config,
+    SettingsField selected_field,
+    bool settings_dirty,
+    const BridgeHealthResult* health_result,
+    const BridgeChatResult* chat_result,
+    const char* last_message,
+    size_t reply_page,
+    const char* status_line,
+    Result last_rc
+);
+
+typedef struct AppRequestUiContext {
+    PrintConsole* top_console;
+    PrintConsole* bottom_console;
+    SettingsField selected_field;
+    bool settings_dirty;
+    const BridgeHealthResult* health_result;
+    AppRequestRenderFn render;
+} AppRequestUiContext;
+
+void hermes_app_requests_handle_text(
+    const HermesAppConfig* config,
+    bool network_ready,
+    const AppRequestUiContext* ui,
+    BridgeChatResult* chat_result,
+    char* last_message,
+    size_t last_message_size,
+    size_t* reply_page,
+    char* status_line,
+    size_t status_line_size,
+    Result* request_rc
+);
+
+void hermes_app_requests_handle_voice(
+    const HermesAppConfig* config,
+    bool network_ready,
+    const AppRequestUiContext* ui,
+    BridgeChatResult* chat_result,
+    char* last_message,
+    size_t last_message_size,
+    size_t* reply_page,
+    char* status_line,
+    size_t status_line_size,
+    Result* request_rc
+);
