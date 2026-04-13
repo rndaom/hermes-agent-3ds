@@ -32,7 +32,7 @@ def test_health_check_implementation_uses_wifi_and_timeout_based_socket_networki
     assert "select(" in source
     assert "send(" in source
     assert "recv(" in source
-    assert "Bridge timed out." in source
+    assert "Hermes gateway timed out." in source
     assert "socket_errno" in source
     assert "socket_stage" in source
     assert "parse_content_length_header" in source

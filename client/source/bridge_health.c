@@ -439,7 +439,7 @@ Result bridge_health_check_run(const char* url, BridgeHealthResult* result)
 
     if (!resolve_ipv4_address(host, &address.sin_addr)) {
         set_socket_debug(result, "resolve", h_errno);
-        set_error(result, "Could not resolve bridge host.");
+        set_error(result, "Could not resolve Hermes gateway host.");
         return MAKERESULT(RL_STATUS, RS_NOTFOUND, RM_APPLICATION, RD_NOT_FOUND);
     }
 
@@ -453,8 +453,8 @@ Result bridge_health_check_run(const char* url, BridgeHealthResult* result)
     rc = connect_with_timeout(socket_fd, &address, result);
     if (R_FAILED(rc)) {
         set_error(result, rc == MAKERESULT(RL_STATUS, RS_INTERNAL, RM_APPLICATION, RD_TIMEOUT)
-                              ? "Bridge timed out."
-                              : "Could not reach the bridge.");
+                              ? "Hermes gateway timed out."
+                              : "Could not reach the Hermes gateway.");
         close(socket_fd);
         return rc;
     }
@@ -476,7 +476,7 @@ Result bridge_health_check_run(const char* url, BridgeHealthResult* result)
     rc = send_all(socket_fd, request, strlen(request));
     if (R_FAILED(rc)) {
         set_socket_debug(result, "send", errno);
-        set_error(result, "Could not send the bridge request.");
+        set_error(result, "Could not send the Hermes gateway request.");
         close(socket_fd);
         return rc;
     }
@@ -488,7 +488,7 @@ Result bridge_health_check_run(const char* url, BridgeHealthResult* result)
 
         if (R_FAILED(wait_rc)) {
             set_socket_debug(result, "recv-wait", errno);
-            set_error(result, "Bridge timed out.");
+            set_error(result, "Hermes gateway timed out.");
             close(socket_fd);
             return wait_rc;
         }
@@ -498,7 +498,7 @@ Result bridge_health_check_run(const char* url, BridgeHealthResult* result)
             if (errno == EINTR)
                 continue;
             set_socket_debug(result, "recv", errno);
-            set_error(result, "Bridge response read failed.");
+            set_error(result, "Hermes gateway response read failed.");
             close(socket_fd);
             return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
         }
@@ -522,19 +522,19 @@ Result bridge_health_check_run(const char* url, BridgeHealthResult* result)
 
     result->http_status = status_code;
     if (status_code != 200) {
-        snprintf(result->error, sizeof(result->error), "Bridge returned HTTP %u.", status_code);
+        snprintf(result->error, sizeof(result->error), "Hermes gateway returned HTTP %u.", status_code);
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
 
     body = strstr(response, "\r\n\r\n");
     if (body == NULL) {
-        set_error(result, "Bridge response body was missing.");
+        set_error(result, "Hermes gateway response body was missing.");
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
 
     body += 4;
     if (strstr(body, "\"ok\":true") == NULL && strstr(body, "\"ok\": true") == NULL) {
-        set_error(result, "Bridge response was not OK.");
+        set_error(result, "Hermes gateway response was not OK.");
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
 

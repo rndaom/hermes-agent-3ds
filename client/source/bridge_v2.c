@@ -575,7 +575,7 @@ static Result perform_request(
     address.sin_port = htons(port);
 
     if (!resolve_ipv4_address(host, &address.sin_addr)) {
-        set_error(error_out, error_out_size, "Could not resolve bridge host.");
+        set_error(error_out, error_out_size, "Could not resolve Hermes gateway host.");
         return MAKERESULT(RL_STATUS, RS_NOTFOUND, RM_APPLICATION, RD_NOT_FOUND);
     }
 
@@ -588,8 +588,8 @@ static Result perform_request(
     rc = connect_with_timeout(socket_fd, &address);
     if (R_FAILED(rc)) {
         set_error(error_out, error_out_size, rc == MAKERESULT(RL_STATUS, RS_INTERNAL, RM_APPLICATION, RD_TIMEOUT)
-            ? "Bridge timed out."
-            : "Could not reach the bridge.");
+            ? "Hermes gateway timed out."
+            : "Could not reach the Hermes gateway.");
         close(socket_fd);
         return rc;
     }
@@ -677,7 +677,7 @@ static Result perform_request(
         if (received < 0) {
             if (errno == EINTR)
                 continue;
-            set_error(error_out, error_out_size, "Bridge response read failed.");
+            set_error(error_out, error_out_size, "Hermes gateway response read failed.");
             close(socket_fd);
             return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
         }
@@ -748,12 +748,12 @@ static Result parse_message_ack_response(const char* response, u32 status_code, 
 
     response_body = response_body_start(response);
     if (response_body == NULL) {
-        set_error(result->error, sizeof(result->error), "Bridge response body was missing.");
+        set_error(result->error, sizeof(result->error), "Hermes gateway response body was missing.");
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
     if (status_code != 200) {
         if (!extract_json_string_v2(response_body, "error", result->error, sizeof(result->error)))
-            snprintf(result->error, sizeof(result->error), "Bridge returned HTTP %lu.", (unsigned long)status_code);
+            snprintf(result->error, sizeof(result->error), "Hermes gateway returned HTTP %lu.", (unsigned long)status_code);
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
     if (!response_ok(response_body)) {
@@ -816,12 +816,12 @@ Result bridge_v2_list_conversations(const char* url, const char* token, const ch
 
     body = response_body_start(response);
     if (body == NULL) {
-        set_error(result->error, sizeof(result->error), "Bridge response body was missing.");
+        set_error(result->error, sizeof(result->error), "Hermes gateway response body was missing.");
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
     if (status_code != 200) {
         if (!extract_json_string_v2(body, "error", result->error, sizeof(result->error)))
-            snprintf(result->error, sizeof(result->error), "Bridge returned HTTP %lu.", (unsigned long)status_code);
+            snprintf(result->error, sizeof(result->error), "Hermes gateway returned HTTP %lu.", (unsigned long)status_code);
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
     if (!response_ok(body)) {
@@ -997,12 +997,12 @@ Result bridge_v2_poll_events(const char* url, const char* token, const char* dev
 
     body = response_body_start(response);
     if (body == NULL) {
-        set_error(result->error, sizeof(result->error), "Bridge response body was missing.");
+        set_error(result->error, sizeof(result->error), "Hermes gateway response body was missing.");
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
     if (status_code != 200) {
         if (!extract_json_string_v2(body, "error", result->error, sizeof(result->error)))
-            snprintf(result->error, sizeof(result->error), "Bridge returned HTTP %lu.", (unsigned long)status_code);
+            snprintf(result->error, sizeof(result->error), "Hermes gateway returned HTTP %lu.", (unsigned long)status_code);
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
     if (!response_ok(body)) {
@@ -1075,12 +1075,12 @@ Result bridge_v2_submit_interaction(const char* url, const char* token, const ch
 
     response_body = response_body_start(response);
     if (response_body == NULL) {
-        set_error(result->error, sizeof(result->error), "Bridge response body was missing.");
+        set_error(result->error, sizeof(result->error), "Hermes gateway response body was missing.");
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
     if (status_code != 200) {
         if (!extract_json_string_v2(response_body, "error", result->error, sizeof(result->error)))
-            snprintf(result->error, sizeof(result->error), "Bridge returned HTTP %lu.", (unsigned long)status_code);
+            snprintf(result->error, sizeof(result->error), "Hermes gateway returned HTTP %lu.", (unsigned long)status_code);
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
     if (!response_ok(response_body)) {
