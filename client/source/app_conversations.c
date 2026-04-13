@@ -78,21 +78,21 @@ static void handle_activate_conversation(
     }
 
     if (config->recent_conversation_count == 0) {
-        snprintf(status_line, status_line_size, "No saved conversations yet.");
+        snprintf(status_line, status_line_size, "No saved rooms yet.");
         return;
     }
     if (!hermes_app_config_set_active_conversation(config, config->recent_conversations[state->selection])) {
-        snprintf(status_line, status_line_size, "Conversation selection was invalid.");
+        snprintf(status_line, status_line_size, "Room selection was invalid.");
         return;
     }
     if (!hermes_app_config_save(config)) {
-        snprintf(status_line, status_line_size, "Could not save conversation selection.");
+        snprintf(status_line, status_line_size, "Could not save room selection.");
         return;
     }
 
     clear_active_conversation_view(chat_result, last_message, last_message_size, reply_page);
     *screen = APP_SCREEN_HOME;
-    snprintf(status_line, status_line_size, "Conversation %s selected.", config->active_conversation_id);
+    snprintf(status_line, status_line_size, "Room %s selected.", config->active_conversation_id);
 }
 
 static void handle_create_conversation(
@@ -115,26 +115,26 @@ static void handle_create_conversation(
     }
 
     if (!prompt_conversation_input("", conversation_id, sizeof(conversation_id))) {
-        snprintf(status_line, status_line_size, "New conversation canceled.");
+        snprintf(status_line, status_line_size, "New room canceled.");
         return;
     }
     if (!hermes_app_config_is_valid_conversation_id(conversation_id)) {
-        snprintf(status_line, status_line_size, "Conversation IDs only allow letters, numbers, - _ .");
+        snprintf(status_line, status_line_size, "Room IDs only allow letters, numbers, - _ .");
         return;
     }
     if (!hermes_app_config_set_active_conversation(config, conversation_id)) {
-        snprintf(status_line, status_line_size, "Could not activate that conversation.");
+        snprintf(status_line, status_line_size, "Could not activate that room.");
         return;
     }
     if (!hermes_app_config_save(config)) {
-        snprintf(status_line, status_line_size, "Could not save new conversation.");
+        snprintf(status_line, status_line_size, "Could not save the new room.");
         return;
     }
 
     clear_active_conversation_view(chat_result, last_message, last_message_size, reply_page);
     state->selection = find_recent_conversation_index(config, config->active_conversation_id);
     *screen = APP_SCREEN_HOME;
-    snprintf(status_line, status_line_size, "Conversation %s created.", config->active_conversation_id);
+    snprintf(status_line, status_line_size, "Room %s created.", config->active_conversation_id);
 }
 
 static void handle_conversation_sync(
@@ -169,13 +169,13 @@ static void handle_conversation_sync(
         state->list = fetched_conversations;
         merge_synced_conversations_into_config(state, config);
         if (!hermes_app_config_save(config))
-            snprintf(status_line, status_line_size, "Synced, but could not save conversations.");
+            snprintf(status_line, status_line_size, "Synced rooms, but could not save them.");
         else
-            snprintf(status_line, status_line_size, "Synced %lu conversations.", (unsigned long)state->list.count);
+            snprintf(status_line, status_line_size, "Synced %lu rooms.", (unsigned long)state->list.count);
     } else if (fetched_conversations.error[0] != '\0') {
         snprintf(status_line, status_line_size, "%s", fetched_conversations.error);
     } else {
-        snprintf(status_line, status_line_size, "Conversation sync failed: 0x%08lX", (unsigned long)*request_rc);
+        snprintf(status_line, status_line_size, "Room sync failed: 0x%08lX", (unsigned long)*request_rc);
     }
 }
 
@@ -210,7 +210,7 @@ void hermes_app_conversations_open_picker(
 
     *screen = APP_SCREEN_CONVERSATIONS;
     hermes_app_conversations_refresh_selection_from_active(state, config);
-    snprintf(status_line, status_line_size, "Conversation picker opened.");
+    snprintf(status_line, status_line_size, "Room book opened.");
 }
 
 bool hermes_app_conversations_handle_picker_input(

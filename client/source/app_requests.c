@@ -350,7 +350,7 @@ void hermes_app_requests_handle_text(
 
     message_buffer[0] = '\0';
     if (!prompt_message_input(message_buffer, sizeof(message_buffer))) {
-        snprintf(status_line, status_line_size, "Ask Hermes canceled.");
+        snprintf(status_line, status_line_size, "Write note canceled.");
         render_home_request_ui(config, ui, chat_result, last_message, *reply_page, status_line, *request_rc);
         return;
     }
@@ -367,7 +367,7 @@ void hermes_app_requests_handle_text(
         return;
     }
 
-    snprintf(status_line, status_line_size, "Asking Hermes over v2...");
+    snprintf(status_line, status_line_size, "Sending note to Hermes...");
     render_home_request_ui(config, ui, chat_result, last_message, *reply_page, status_line, *request_rc);
     gspWaitForVBlank();
 
@@ -378,7 +378,7 @@ void hermes_app_requests_handle_text(
             if (R_SUCCEEDED(*request_rc)) {
                 if (chat_result->success)
                     hermes_app_ui_home_history_push(APP_UI_MESSAGE_HERMES, chat_result->reply);
-                format_roundtrip_status(chat_result, missed_events, "Reply received over native v2.", status_line, status_line_size);
+                format_roundtrip_status(chat_result, missed_events, "Reply note received over native v2.", status_line, status_line_size);
             }
             else if (chat_result->error[0] != '\0')
                 snprintf(status_line, status_line_size, "%s", chat_result->error);
@@ -444,7 +444,7 @@ void hermes_app_requests_handle_voice(
     hermes_app_ui_home_history_push(APP_UI_MESSAGE_USER, "[mic] voice input");
     reset_chat_request_state(chat_result, &message_result, request_rc, reply_page);
 
-    snprintf(status_line, status_line_size, "Sending mic input to Hermes...");
+    snprintf(status_line, status_line_size, "Sending mic note to Hermes...");
     render_home_request_ui(config, ui, chat_result, last_message, *reply_page, status_line, *request_rc);
     gspWaitForVBlank();
 
@@ -457,7 +457,7 @@ void hermes_app_requests_handle_voice(
         if (R_SUCCEEDED(*request_rc)) {
             if (chat_result->success)
                 hermes_app_ui_home_history_push(APP_UI_MESSAGE_HERMES, chat_result->reply);
-            format_roundtrip_status(chat_result, missed_events, "Voice reply received over native v2.", status_line, status_line_size);
+            format_roundtrip_status(chat_result, missed_events, "Voice note reply received over native v2.", status_line, status_line_size);
         }
         else if (chat_result->error[0] != '\0')
             snprintf(status_line, status_line_size, "%s", chat_result->error);

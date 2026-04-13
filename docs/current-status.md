@@ -33,8 +33,8 @@ Last major verified milestone: **the V2-only 3DS client is validated end-to-end 
   - ack cursor handoff
   - matching `reply_to`
   - longer wait window for final replies
-- a refined dark-mode Hermes + PictoChat baseline build has been deployed to the real Old 3DS and received strong positive first-impression feedback from the user
-- the home screen now uses a simplified Old-3DS-safe layout with no telemetry strip or relay crest block
+- a PictoChat-clone Hermes baseline is now the active visual direction for the handheld client
+- the home screen now targets a ruled-paper room board on top and a tool tray on the bottom
 - the home action list now uses D-pad / Circle Pad selection with A-to-confirm instead of labeled home-screen hotkeys
 - reply, thread/link, and token/detail text containment now uses pixel-width wrapping and tighter panel sizing instead of overflowing fixed rows
 
@@ -88,7 +88,7 @@ Latest built artifact:
 
 ## Recommended next steps
 
-1. verify on the real Old 3DS that the cleaned home layout, D-pad / Circle Pad action flow, and reply paging feel good in practice
-2. tune any remaining per-panel text scale issues found on hardware with especially long status strings or thread titles
-3. decide whether to convert the non-home screens to the same selection-driven interaction model, or keep their current direct button handlers
-4. if desired later, add real Hermes handheld art only after the simplified Old-3DS-safe layout is confirmed stable
+1. verify on the real Old 3DS that the PictoChat-clone room board and tool tray feel natural in practice
+2. tune any remaining text-fit issues found on hardware with especially long room titles or gateway errors
+3. decide whether to import sprite-backed DS icons through `client/gfx/` or keep the procedural shell for Old-3DS simplicity
+4. continue tightening the room-book and setup-sheet screens if hardware testing exposes readability issues

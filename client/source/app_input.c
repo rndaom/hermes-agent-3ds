@@ -139,7 +139,7 @@ bool prompt_message_input(char* out_message, size_t out_size)
 {
     return prompt_text_input(
         SWKBD_TYPE_WESTERN,
-        "Write a message for Hermes",
+        "Write a note for Hermes",
         "",
         out_message,
         out_size,
@@ -151,7 +151,7 @@ bool prompt_conversation_input(const char* initial_text, char* out_conversation_
 {
     return prompt_text_input(
         SWKBD_TYPE_WESTERN,
-        "Conversation ID: letters, numbers, - _ .",
+        "Room ID: letters, numbers, - _ .",
         initial_text,
         out_conversation_id,
         out_size,

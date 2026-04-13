@@ -1,30 +1,30 @@
 # Design language
 
-The app should feel like Hermes translated onto real Nintendo handheld hardware.
+The app should feel like Hermes translated into a real PictoChat-era Nintendo handheld app.
 
 ## Mood
 
-- dark-mode first
-- calm
-- compact
+- light paper first
 - tactile
+- friendly
+- compact
 - structured
-- a little playful, never noisy
+- playful, never noisy
 
 ## Visual cues
 
-- dark graphite and slate surfaces over pure black slabs
-- framed handheld chrome inspired by PictoChat and DS firmware
-- thin borders, inset lines, and restrained gradients
-- small pixel-crisp labels and icons
-- subtle ruled/grid textures where they help the handheld feel
-- readable message cards with attached identity chips
+- ruled paper and soft off-white surfaces
+- DS firmware rails and slim frame gradients
+- color-coded room chips and sender tags
+- thin borders, notebook rules, and touch-friendly buttons
+- small labels and clear utility copy
+- note cards that feel lifted from PictoChat
 
 ## UI rules
 
 - one clear focus per screen
-- top screen = conversation/status stage
-- bottom screen = command/input deck
+- top screen = room board
+- bottom screen = tool tray
 - keep button hints obvious
 - keep text short and width-bounded
 - never assume the user wants to read a wall of text on a 3DS
@@ -47,11 +47,11 @@ No Pokemon theme. No Nous theme. No generic terminal skin.
 ## Current visual direction
 
 The current source-of-truth direction is:
-- dark-mode Hermes + PictoChat + DS firmware messenger
-- compact note-card message framing
-- dark framed rails and command decks
-- color used as accent and identity, not as full-surface flood
+- PictoChat-clone Hermes messenger
+- light ruled-paper message framing
+- DS firmware rails and tool trays
+- bright room-color accents over neutral paper surfaces
 - Old-3DS-safe graphical UI via Citro2D/Citro3D
 
-See `docs/hermes-pictochat-dark-mode-spec.md` for the current spec.
+See `docs/hermes-pictochat-clone-spec.md` for the current spec.
 Historical docs such as `docs/pixel-rpg-visual-direction.md` remain in the repo for reference only.

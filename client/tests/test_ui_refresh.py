@@ -22,13 +22,13 @@ def test_phase1_ui_refresh_doc_defines_hermes_handheld_direction():
 def test_app_ui_uses_message_focused_top_screen_and_bottom_action_deck():
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
-    assert "ACTION DECK" in ui_c
+    assert "TOOL TRAY" in ui_c
     assert '"YOU"' in ui_c
     assert '"HERMES"' in ui_c
-    assert '"THREAD"' in ui_c
-    assert '"LINK"' in ui_c
-    assert "THREAD ARCHIVE" in ui_c
-    assert "SYSTEM CONFIG" in ui_c
+    assert '"ROOM"' in ui_c
+    assert '"RELAY"' in ui_c
+    assert "ROOM BOOK" in ui_c
+    assert "SETUP SHEET" in ui_c
     assert '"ACTIVE THREAD"' not in ui_c
     assert '"MODEL"' not in ui_c
     assert '"CONTEXT"' not in ui_c

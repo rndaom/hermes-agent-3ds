@@ -76,8 +76,8 @@ The health check request is not just a bare route hit. The client currently call
 
 Open **Hermes Agent 3DS** in Homebrew Launcher.
 
-- move to `Settings` with the D-pad / Circle Pad
-- press `A` to open settings
+- move to `Setup` with the D-pad / Circle Pad
+- press `A` to open setup
 - set `Host`
 - set `Port`
 - set `Token`
@@ -101,7 +101,7 @@ Open **Hermes Agent 3DS** in Homebrew Launcher.
 - Touch the bottom-screen action buttons — select and run that action
 - START — exit
 
-### Conversations
+### Rooms
 - UP/DOWN or Circle Pad UP/DOWN — select a conversation slot
 - A — activate the highlighted conversation
 - X — create a new conversation ID
@@ -109,7 +109,7 @@ Open **Hermes Agent 3DS** in Homebrew Launcher.
 - B — return home
 - START — exit
 
-### Settings
+### Setup
 - UP/DOWN or Circle Pad UP/DOWN — select field
 - A — edit field
 - X — save settings
@@ -142,8 +142,8 @@ In `hermes-agent`, where 3DS should behave like a normal Hermes gateway platform
 - [`docs/architecture.md`](docs/architecture.md)
 - [`docs/roadmap.md`](docs/roadmap.md)
 - [`docs/design-language.md`](docs/design-language.md)
-- [`docs/hermes-pictochat-dark-mode-spec.md`](docs/hermes-pictochat-dark-mode-spec.md)
-- [`docs/plans/2026-04-12-hermes-pictochat-dark-mode-ui.md`](docs/plans/2026-04-12-hermes-pictochat-dark-mode-ui.md)
+- [`docs/hermes-pictochat-clone-spec.md`](docs/hermes-pictochat-clone-spec.md)
+- [`docs/plans/2026-04-13-hermes-pictochat-clone-ui.md`](docs/plans/2026-04-13-hermes-pictochat-clone-ui.md)
 - [`CONTRIBUTING.md`](CONTRIBUTING.md)
 
 ## License

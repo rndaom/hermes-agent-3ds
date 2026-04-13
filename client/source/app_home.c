@@ -56,15 +56,15 @@ static void handle_home_health_check(const HermesAppConfig* config, bool network
         return;
     }
 
-    snprintf(context->status_line, context->status_line_size, "Checking Hermes gateway...");
+    snprintf(context->status_line, context->status_line_size, "Checking Hermes relay...");
     render_home_screen(config, context);
     gspWaitForVBlank();
 
     *context->request_rc = bridge_health_check_run(health_url, context->health_result);
     if (R_SUCCEEDED(*context->request_rc) && context->health_result->success)
-        snprintf(context->status_line, context->status_line_size, "Hermes gateway OK.");
+        snprintf(context->status_line, context->status_line_size, "Hermes relay OK.");
     else if (context->health_result->error[0] == '\0')
-        snprintf(context->status_line, context->status_line_size, "Gateway check failed: 0x%08lX", (unsigned long)*context->request_rc);
+        snprintf(context->status_line, context->status_line_size, "Relay check failed: 0x%08lX", (unsigned long)*context->request_rc);
     else
         snprintf(context->status_line, context->status_line_size, "%s", context->health_result->error);
 
@@ -110,7 +110,7 @@ static void execute_selected_home_command(
             break;
         case HOME_COMMAND_CONFIG:
             *screen = APP_SCREEN_SETTINGS;
-            snprintf(context->status_line, context->status_line_size, "Settings opened.");
+            snprintf(context->status_line, context->status_line_size, "Setup sheet opened.");
             render_screen(*screen, config, context);
             break;
         case HOME_COMMAND_MIC:
@@ -134,7 +134,7 @@ static void execute_selected_home_command(
             context->last_message[0] = '\0';
             *context->reply_page = 0;
             *context->request_rc = 0;
-            snprintf(context->status_line, context->status_line_size, "Status cleared. Ready to test again.");
+            snprintf(context->status_line, context->status_line_size, "Board cleared. Ready for a new note.");
             render_home_screen(config, context);
             break;
     }

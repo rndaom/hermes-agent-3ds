@@ -1,6 +1,6 @@
 # Actual 3DS GUI Implementation Plan
 
-> Historical note: this document reflects the earlier transition plan away from the console-only UI. It is now superseded by `docs/hermes-pictochat-dark-mode-spec.md` and `docs/plans/2026-04-12-hermes-pictochat-dark-mode-ui.md`.
+> Historical note: this document reflects the earlier transition plan away from the console-only UI. It is now superseded by `docs/hermes-pictochat-clone-spec.md` and `docs/plans/2026-04-13-hermes-pictochat-clone-ui.md`.
 
 > For Hermes: replace the current console-only presentation with a real graphical GUI, Old-3DS-safe, while keeping the existing app behavior and navigation logic.
 

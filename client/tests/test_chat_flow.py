@@ -21,7 +21,9 @@ def test_legacy_v1_chat_transport_module_is_removed():
     header_path = CLIENT_DIR / "include" / "bridge_chat.h"
     source_path = CLIENT_DIR / "source" / "bridge_chat.c"
 
-    assert header_path.exists(), "client/include/bridge_chat.h should remain as shared chat result types"
+    assert header_path.exists(), (
+        "client/include/bridge_chat.h should remain as shared chat result types"
+    )
     assert not source_path.exists(), "client/source/bridge_chat.c should be removed"
 
     header = header_path.read_text()
@@ -79,21 +81,24 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "KEY_CPAD_LEFT" in home_c
     assert "KEY_CPAD_RIGHT" in home_c
     assert "KEY_DOWN" in conv_c
-    assert "Write a message" in input_c
+    assert "Write a note" in input_c
     assert "Record mic" in request_c or "mic" in request_c.lower()
     assert "bridge_v2_send_voice_message" in request_c
     assert "config->active_conversation_id" in request_c
     assert "wav_data" in request_c
     assert "MICU_StartSampling" in main_c or "voice_input_record_prompt" in request_c
-    assert "Last message" in main_c or "draw_message_card" in (CLIENT_DIR / "source" / "app_ui.c").read_text()
+    assert (
+        "Last message" in main_c
+        or "draw_message_card" in (CLIENT_DIR / "source" / "app_ui.c").read_text()
+    )
     assert '"YOU"' in (CLIENT_DIR / "source" / "app_ui.c").read_text()
     assert '"HERMES"' in (CLIENT_DIR / "source" / "app_ui.c").read_text()
     assert "swkbdInputText" in input_c
     assert "hermes_app_home_handle_input" in main_c
     assert "hermes_app_requests_handle_text" in home_c
     assert "hermes_app_requests_handle_voice" in home_c
-    assert "Asking Hermes over v2..." in request_c
-    assert "Sending mic input to Hermes..." in request_c
+    assert "Sending note to Hermes..." in request_c
+    assert "Sending mic note to Hermes..." in request_c
     assert '"/api/v1/chat"' not in main_c
 
 
@@ -140,7 +145,6 @@ def test_voice_input_uses_graphical_recording_render_helpers_without_console_pri
     assert "consoleSelect" not in voice_input_c
     assert "consoleClear" not in voice_input_c
     assert "current_tenths != last_render_tenths" in voice_input_c
-
 
 
 def test_main_c_uses_both_top_and_bottom_screens_for_ui():

@@ -20,10 +20,10 @@ The client now has:
 - reply paging for long output
 
 Current design work is now driven by:
-- `docs/hermes-pictochat-dark-mode-spec.md`
-- `docs/plans/2026-04-12-hermes-pictochat-dark-mode-ui.md`
+- `docs/hermes-pictochat-clone-spec.md`
+- `docs/plans/2026-04-13-hermes-pictochat-clone-ui.md`
 
-The remaining UI job is to keep tightening the dark-mode Hermes + PictoChat visual pass and move more of the shell toward asset-backed handheld chrome where it helps readability.
+The current UI target is a PictoChat-clone handheld shell for Hermes, using ruled paper, DS gradient rails, and room-colored note cards instead of the previous dark-mode direction.
 
 Current controls:
 
@@ -34,14 +34,14 @@ Current controls:
 - touch the bottom-screen action buttons — select and run that action
 - `START` — exit back to Homebrew Launcher
 
-### Conversations
+### Rooms
 - `UP/DOWN` or Circle Pad `UP/DOWN` — select a conversation slot
 - `A` — activate the highlighted conversation
 - `X` — create a new conversation ID
 - `Y` — sync recent conversation slots from Hermes
 - `B` — return home
 
-### Settings
+### Setup
 - `UP/DOWN` or Circle Pad `UP/DOWN` — select host / port / token / device ID
 - `A` — edit selected field
 - `X` — save settings to SD

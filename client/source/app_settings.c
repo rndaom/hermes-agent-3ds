@@ -20,7 +20,7 @@ bool hermes_app_settings_handle_input(
 
     if ((kDown & KEY_B) != 0) {
         *screen = APP_SCREEN_HOME;
-        snprintf(status_line, status_line_size, *settings_dirty ? "Settings closed with unsaved changes." : "Returned home.");
+        snprintf(status_line, status_line_size, *settings_dirty ? "Setup closed with unsaved changes." : "Returned home.");
         return true;
     }
 
@@ -44,7 +44,7 @@ bool hermes_app_settings_handle_input(
         if (context != NULL && context->conversation_state != NULL)
             hermes_app_conversations_refresh_selection_from_active(context->conversation_state, config);
         *settings_dirty = true;
-        snprintf(status_line, status_line_size, "Defaults restored. Save settings to keep them.");
+        snprintf(status_line, status_line_size, "Defaults restored. Save setup to keep them.");
         return true;
     }
 
@@ -57,9 +57,9 @@ bool hermes_app_settings_handle_input(
     if ((kDown & KEY_X) != 0) {
         if (hermes_app_config_save(config)) {
             *settings_dirty = false;
-            snprintf(status_line, status_line_size, "Settings saved to SD card.");
+            snprintf(status_line, status_line_size, "Setup saved to SD card.");
         } else {
-            snprintf(status_line, status_line_size, "Could not save settings to SD card.");
+            snprintf(status_line, status_line_size, "Could not save setup to SD card.");
         }
         return true;
     }

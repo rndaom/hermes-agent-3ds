@@ -105,18 +105,16 @@ The important V2 behaviors are:
 ## UI composition
 
 ### Top screen
-- current status
-- last message
-- last reply
-- paging indicators
-- health / error output
+- room board header
+- room and relay status cards
+- recent note history
+- latest Hermes reply with paging indicators
 
 ### Bottom screen
-- actions
-- current host/port
-- token summary
-- page hints
-- settings help
+- tool tray
+- selected-tool detail
+- footer hints
+- setup / room-book action legends
 
 ## What is intentionally gone
 

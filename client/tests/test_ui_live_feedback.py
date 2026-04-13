@@ -13,16 +13,16 @@ def test_home_ui_cleanup_removes_telemetry_strip_and_moves_thread_status_to_bott
     assert "AppUiHomeTelemetry" not in ui_h
     assert "home_telemetry" not in ui_c
     assert "home_telemetry" not in main_c
-    assert 'app_gfx_panel_inset(8.0f, 8.0f, 384.0f, 224.0f' in ui_c
-    assert 'app_gfx_panel_inset(8.0f, 160.0f, 304.0f, 72.0f' in ui_c
-    assert '"THREAD"' in ui_c
-    assert '"LINK"' in ui_c
+    assert "draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f" in ui_c
+    assert "draw_ruled_paper(8.0f, 156.0f, 304.0f, 52.0f" in ui_c
+    assert '"ROOM BOARD"' in ui_c
+    assert '"TOOL TRAY"' in ui_c
     assert '"ACTIVE THREAD"' not in ui_c
     assert '"MODEL"' not in ui_c
     assert '"CONTEXT"' not in ui_c
     assert '"SESSION"' not in ui_c
     assert "model_name" in health_h
-    assert 'draw_header("HERMES AGENT", "RELAY DECK")' not in ui_c
+    assert '"RELAY DECK"' not in ui_c
 
 
 def test_home_command_menu_has_touch_support_and_reply_paging_on_pad_circle_and_shoulders():
@@ -53,12 +53,12 @@ def test_home_command_menu_has_touch_support_and_reply_paging_on_pad_circle_and_
     assert "home_command_from_touch" in home_c
     assert "execute_selected_home_command" in home_c
     assert "command_selection != NULL" in home_c
-    assert 'draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Ask Hermes"' in ui_c
-    assert 'draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Check Link"' in ui_c
-    assert 'draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Conversations"' in ui_c
-    assert 'draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Settings"' in ui_c
-    assert 'draw_action_button(16.0f, 116.0f, 136.0f, 28.0f, "Mic Input"' in ui_c
-    assert 'draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Clear Reply"' in ui_c
+    assert 'draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Write Note"' in ui_c
+    assert 'draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Check Relay"' in ui_c
+    assert 'draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Rooms"' in ui_c
+    assert 'draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Setup"' in ui_c
+    assert 'draw_action_button(16.0f, 116.0f, 136.0f, 28.0f, "Mic Note"' in ui_c
+    assert 'draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Clear Board"' in ui_c
     assert '"B Ask Hermes"' not in ui_c
     assert '"A Check Link"' not in ui_c
     assert '"SELECT Threads"' not in ui_c

@@ -1,6 +1,6 @@
 # Hermes Handheld — Phase 1 UI refresh
 
-> Historical note: this document captures an earlier UI phase and remains in the repo for reference only. The current visual source of truth is `docs/hermes-pictochat-dark-mode-spec.md`.
+> Historical note: this document captures an earlier UI phase and remains in the repo for reference only. The current visual source of truth is `docs/hermes-pictochat-clone-spec.md`.
 
 Goal: move the 3DS app from plain debug-console screens toward a Hermes-branded handheld UI without adding heavy graphics work yet.
 
