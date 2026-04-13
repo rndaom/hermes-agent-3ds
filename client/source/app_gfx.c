@@ -1,6 +1,5 @@
 #include "app_gfx.h"
 
-#include "nintendo_ds_bios_body_font_bin.h"
 #include "nintendo_ds_bios_font_bin.h"
 
 #include <stdio.h>
@@ -11,53 +10,22 @@ static C3D_RenderTarget* g_bottom_target = NULL;
 static C2D_TextBuf g_text_buf = NULL;
 static C2D_TextBuf g_measure_buf = NULL;
 static C2D_Font g_ui_font = NULL;
-static C2D_Font g_ui_body_font = NULL;
 static float g_text_scale_adjust = 1.0f;
-static float g_body_text_scale_adjust = 1.0f;
 
-#define APP_GFX_BODY_FONT_THRESHOLD 0.36f
-
-typedef enum AppGfxFontKind {
-    APP_GFX_FONT_DISPLAY = 0,
-    APP_GFX_FONT_BODY = 1,
-} AppGfxFontKind;
-
-static bool app_gfx_should_use_body_font(float scale_x, float scale_y)
+static bool app_gfx_parse_text(C2D_Text* draw_text, C2D_TextBuf buf, const char* text)
 {
-    return scale_x <= APP_GFX_BODY_FONT_THRESHOLD && scale_y <= APP_GFX_BODY_FONT_THRESHOLD;
-}
-
-static C2D_Font app_gfx_font_for_kind(AppGfxFontKind kind)
-{
-    if (kind == APP_GFX_FONT_BODY && g_ui_body_font != NULL)
-        return g_ui_body_font;
-    return g_ui_font;
-}
-
-static float app_gfx_scale_adjust_for_kind(AppGfxFontKind kind)
-{
-    if (kind == APP_GFX_FONT_BODY && g_ui_body_font != NULL)
-        return g_body_text_scale_adjust;
-    return g_text_scale_adjust;
-}
-
-static bool app_gfx_parse_text(C2D_Text* draw_text, C2D_TextBuf buf, const char* text, AppGfxFontKind kind)
-{
-    C2D_Font font;
-
     if (draw_text == NULL || buf == NULL || text == NULL)
         return false;
 
-    font = app_gfx_font_for_kind(kind);
-    if (font != NULL)
-        return C2D_TextFontParse(draw_text, font, buf, text) != NULL;
+    if (g_ui_font != NULL)
+        return C2D_TextFontParse(draw_text, g_ui_font, buf, text) != NULL;
 
     return C2D_TextParse(draw_text, buf, text) != NULL;
 }
 
-static float app_gfx_scale_text(float scale, AppGfxFontKind kind)
+static float app_gfx_scale_text(float scale)
 {
-    return scale * app_gfx_scale_adjust_for_kind(kind);
+    return scale * g_text_scale_adjust;
 }
 
 static void app_gfx_refresh_scale_adjust(void)
@@ -65,29 +33,19 @@ static void app_gfx_refresh_scale_adjust(void)
     FINF_s* font_info;
 
     g_text_scale_adjust = 1.0f;
-    g_body_text_scale_adjust = 1.0f;
     if (g_ui_font == NULL)
-        ;
-    else {
-        font_info = C2D_FontGetInfo(g_ui_font);
-        if (font_info != NULL && font_info->lineFeed > 0)
-            g_text_scale_adjust = 30.0f / (float)font_info->lineFeed;
-    }
-
-    if (g_ui_body_font == NULL)
         return;
 
-    font_info = C2D_FontGetInfo(g_ui_body_font);
+    font_info = C2D_FontGetInfo(g_ui_font);
     if (font_info != NULL && font_info->lineFeed > 0)
-        g_body_text_scale_adjust = 30.0f / (float)font_info->lineFeed;
+        g_text_scale_adjust = 30.0f / (float)font_info->lineFeed;
 }
 
 bool app_gfx_measure_text(const char* text, float scale_x, float scale_y, float* out_width, float* out_height)
 {
-    AppGfxFontKind kind = app_gfx_should_use_body_font(scale_x, scale_y) ? APP_GFX_FONT_BODY : APP_GFX_FONT_DISPLAY;
     C2D_Text draw_text;
-    float draw_scale_x = app_gfx_scale_text(scale_x, kind);
-    float draw_scale_y = app_gfx_scale_text(scale_y, kind);
+    float draw_scale_x = app_gfx_scale_text(scale_x);
+    float draw_scale_y = app_gfx_scale_text(scale_y);
 
     if (g_measure_buf == NULL || text == NULL || text[0] == '\0') {
         if (out_width != NULL)
@@ -98,7 +56,7 @@ bool app_gfx_measure_text(const char* text, float scale_x, float scale_y, float*
     }
 
     C2D_TextBufClear(g_measure_buf);
-    if (!app_gfx_parse_text(&draw_text, g_measure_buf, text, kind))
+    if (!app_gfx_parse_text(&draw_text, g_measure_buf, text))
         return false;
     C2D_TextOptimize(&draw_text);
     C2D_TextGetDimensions(&draw_text, draw_scale_x, draw_scale_y, out_width, out_height);
@@ -168,11 +126,8 @@ bool app_gfx_init(void)
     g_text_buf = C2D_TextBufNew(8192);
     g_measure_buf = C2D_TextBufNew(4096);
     g_ui_font = C2D_FontLoadFromMem(nintendo_ds_bios_font_bin, nintendo_ds_bios_font_bin_size);
-    g_ui_body_font = C2D_FontLoadFromMem(nintendo_ds_bios_body_font_bin, nintendo_ds_bios_body_font_bin_size);
     if (g_ui_font != NULL)
         C2D_FontSetFilter(g_ui_font, GPU_NEAREST, GPU_LINEAR);
-    if (g_ui_body_font != NULL)
-        C2D_FontSetFilter(g_ui_body_font, GPU_NEAREST, GPU_LINEAR);
     app_gfx_refresh_scale_adjust();
 
     return g_top_target != NULL && g_bottom_target != NULL && g_text_buf != NULL && g_measure_buf != NULL;
@@ -183,11 +138,6 @@ void app_gfx_fini(void)
     if (g_ui_font != NULL) {
         C2D_FontFree(g_ui_font);
         g_ui_font = NULL;
-    }
-
-    if (g_ui_body_font != NULL) {
-        C2D_FontFree(g_ui_body_font);
-        g_ui_body_font = NULL;
     }
 
     if (g_measure_buf != NULL) {
@@ -249,15 +199,14 @@ void app_gfx_highlight_bar(float x, float y, float w, float h, u32 color)
 
 void app_gfx_text(float x, float y, float scale_x, float scale_y, u32 color, const char* text)
 {
-    AppGfxFontKind kind = app_gfx_should_use_body_font(scale_x, scale_y) ? APP_GFX_FONT_BODY : APP_GFX_FONT_DISPLAY;
     C2D_Text draw_text;
-    float draw_scale_x = app_gfx_scale_text(scale_x, kind);
-    float draw_scale_y = app_gfx_scale_text(scale_y, kind);
+    float draw_scale_x = app_gfx_scale_text(scale_x);
+    float draw_scale_y = app_gfx_scale_text(scale_y);
 
     if (g_text_buf == NULL || text == NULL || text[0] == '\0')
         return;
 
-    if (!app_gfx_parse_text(&draw_text, g_text_buf, text, kind))
+    if (!app_gfx_parse_text(&draw_text, g_text_buf, text))
         return;
     C2D_TextOptimize(&draw_text);
     C2D_DrawText(&draw_text, C2D_WithColor, x, y, 0.5f, draw_scale_x, draw_scale_y, color);
@@ -337,17 +286,16 @@ void app_gfx_text_fit(float x, float y, float max_width, float scale_x, float sc
 
 void app_gfx_text_right(float right_x, float y, float scale_x, float scale_y, u32 color, const char* text)
 {
-    AppGfxFontKind kind = app_gfx_should_use_body_font(scale_x, scale_y) ? APP_GFX_FONT_BODY : APP_GFX_FONT_DISPLAY;
     C2D_Text draw_text;
     float width = 0.0f;
     float height = 0.0f;
-    float draw_scale_x = app_gfx_scale_text(scale_x, kind);
-    float draw_scale_y = app_gfx_scale_text(scale_y, kind);
+    float draw_scale_x = app_gfx_scale_text(scale_x);
+    float draw_scale_y = app_gfx_scale_text(scale_y);
 
     if (g_text_buf == NULL || text == NULL || text[0] == '\0')
         return;
 
-    if (!app_gfx_parse_text(&draw_text, g_text_buf, text, kind))
+    if (!app_gfx_parse_text(&draw_text, g_text_buf, text))
         return;
     C2D_TextOptimize(&draw_text);
     C2D_TextGetDimensions(&draw_text, draw_scale_x, draw_scale_y, &width, &height);

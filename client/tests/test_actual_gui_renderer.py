@@ -29,8 +29,6 @@ def test_app_gfx_module_exists_with_citro2d_screen_targets_and_panel_primitives(
     assert "C2D_TextFontParse" in source
     assert "GPU_NEAREST" in source
     assert "nintendo_ds_bios_font_bin" in source
-    assert "nintendo_ds_bios_body_font_bin" in source
-    assert "APP_GFX_BODY_FONT_THRESHOLD" in source
 
 
 def test_app_ui_exposes_graphical_ui_lifecycle_without_printconsole_render_args():
