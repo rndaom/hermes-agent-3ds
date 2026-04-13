@@ -18,21 +18,24 @@ def test_phase2_ui_doc_describes_ascii_framed_handheld_pass():
     assert "crest" in doc.lower() or "relay" in doc.lower()
 
 
-def test_app_ui_uses_phase2_framed_sections_and_thread_status_language():
+def test_app_ui_uses_phase2_message_cards_and_bottom_summary_language():
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
     assert "app_gfx_panel_inset" in ui_c
-    assert '"ACTIVE THREAD"' in ui_c
+    assert '"YOU"' in ui_c
+    assert '"HERMES"' in ui_c
+    assert '"THREAD"' in ui_c
     assert '"LINK"' in ui_c
     assert "THREAD ARCHIVE" in ui_c
     assert "LINK SETTINGS" in ui_c
-    assert "HERMES REPLY" in ui_c
     assert "relay crest" not in ui_c
 
 
-def test_phase2_followup_uses_wider_graphical_panels_and_less_duplicate_home_info():
+def test_phase2_followup_uses_touch_sized_home_buttons_and_message_cards():
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
-    assert "app_gfx_panel_inset(10.0f, 84.0f, 380.0f, 146.0f" in ui_c
-    assert 'printf("ACTIVE THREAD\\n%s\\n", conversation_label);' not in ui_c
+    assert 'app_gfx_panel_inset(8.0f, 8.0f, 384.0f, 224.0f' in ui_c
+    assert 'draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Ask Hermes"' in ui_c
+    assert 'draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Clear Reply"' in ui_c
+    assert 'draw_message_card(' in ui_c
     assert 'printf("Gateway:' not in ui_c

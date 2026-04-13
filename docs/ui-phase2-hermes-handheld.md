@@ -1,5 +1,7 @@
 # Hermes Handheld — Phase 2 UI pass
 
+> Historical note: this document captures an earlier UI phase and remains in the repo for reference only. The current visual source of truth is `docs/hermes-pictochat-dark-mode-spec.md`.
+
 Goal: keep the Phase 1 text-first layout, but give it stronger handheld personality with ASCII-framed chrome that still runs cleanly on an Old 3DS.
 
 ## Direction

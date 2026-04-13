@@ -72,6 +72,9 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "KEY_UP" in home_c
     assert "KEY_LEFT" in home_c
     assert "KEY_RIGHT" in home_c
+    assert "KEY_L" in home_c
+    assert "KEY_R" in home_c
+    assert "KEY_TOUCH" in home_c
     assert "KEY_CPAD_UP" in home_c
     assert "KEY_CPAD_LEFT" in home_c
     assert "KEY_CPAD_RIGHT" in home_c
@@ -82,8 +85,9 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "config->active_conversation_id" in request_c
     assert "wav_data" in request_c
     assert "MICU_StartSampling" in main_c or "voice_input_record_prompt" in request_c
-    assert "Last message" in main_c or "Last message" in (CLIENT_DIR / "source" / "app_ui.c").read_text()
-    assert "HERMES REPLY" in (CLIENT_DIR / "source" / "app_ui.c").read_text()
+    assert "Last message" in main_c or "draw_message_card" in (CLIENT_DIR / "source" / "app_ui.c").read_text()
+    assert '"YOU"' in (CLIENT_DIR / "source" / "app_ui.c").read_text()
+    assert '"HERMES"' in (CLIENT_DIR / "source" / "app_ui.c").read_text()
     assert "swkbdInputText" in input_c
     assert "hermes_app_home_handle_input" in main_c
     assert "hermes_app_requests_handle_text" in home_c
@@ -100,6 +104,8 @@ def test_main_c_wraps_and_pages_long_reply_text_for_small_screens():
 
     assert "KEY_LEFT" in home_c
     assert "KEY_RIGHT" in home_c
+    assert "KEY_L" in home_c
+    assert "KEY_R" in home_c
     assert "reply_page" in main_c
     assert "hermes_app_ui_reply_page_count" in home_c
     assert "wrap_text_for_pixels" in ui_c

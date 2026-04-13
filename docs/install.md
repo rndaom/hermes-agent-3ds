@@ -10,10 +10,19 @@ If your console is not already modded, use:
 
 - a modded 3DS on Wi-Fi
 - this repo on a PC for building the client
+- the current devkitPro 3DS toolchain installed on that PC
 - a Hermes checkout with the native 3DS gateway enabled
 - the 3DS and PC on the same LAN
 - a token you configure on the Hermes-side 3DS gateway
 - a stable `device_id` for this handheld
+
+For the toolchain, use the official devkitPro getting-started guide and make sure the 3DS stack used by this repo is available:
+
+- https://devkitpro.org/wiki/Getting_Started
+- `devkitARM`
+- `libctru`
+- `citro2d`
+- `citro3d`
 
 ## 1) Build the app
 
@@ -52,6 +61,8 @@ Run Hermes from the main `hermes-agent` repo with the 3DS gateway enabled on you
 - `GET /api/v2/events`
 - `POST /api/v2/interactions/{request_id}/respond`
 
+The handheld health check currently calls `GET /api/v2/health` with `token`, `device_id`, and the active `conversation_id` in the query string.
+
 By default the local setup here uses port `8787`.
 
 ## 4) Configure the app on the 3DS
@@ -73,9 +84,11 @@ On the home screen:
 On the home screen:
 - move to `Check Link` with the D-pad / Circle Pad and press `A`
 - if that succeeds, move to `Conversations` and press `A` to open the picker
+- use the D-pad or Circle Pad there to move through saved conversation slots
 - press `X` there if you want to create a new conversation ID, or `Y` to sync recent conversation slots from Hermes
 - return home, move to `Ask Hermes`, and press `A` to send a test message in the active conversation
-- or move to `Mic Input` and press `A` to record mic input and send it through host-side speech-to-text
+- or move to `Mic Input` and press `A` to start recording, then press `UP` to stop and send it through host-side speech-to-text
+- press `B` during mic capture to cancel, or `START` to abort that recording session
 - use D-pad / Circle Pad `LEFT/RIGHT` if the reply spans multiple pages
 
 ## Common issues
@@ -100,3 +113,12 @@ On the home screen:
 ## Current release note
 
 The current user-facing release path is `.3dsx` for Homebrew Launcher. A `.cia` build can be added later if the install flow stays clean and reliable.
+
+## Verification
+
+From the repo root, the current local verification commands are:
+
+```bash
+.venv/bin/python -m pytest client/tests -q
+make -C client clean && make -C client
+```

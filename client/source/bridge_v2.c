@@ -18,6 +18,7 @@
 #define BRIDGE_V2_CONNECT_TIMEOUT_SECONDS 5
 #define BRIDGE_V2_IO_TIMEOUT_SECONDS 20
 #define BRIDGE_V2_RESPONSE_MAX 4096
+#define BRIDGE_V2_MESSAGE_BODY_MAX ((BRIDGE_V2_TEXT_MAX * 2) + (BRIDGE_V2_CONVERSATION_ID_MAX * 4) + 256)
 
 static void set_error(char* out, size_t out_size, const char* message)
 {
@@ -393,6 +394,8 @@ static Result connect_with_timeout(int socket_fd, const struct sockaddr_in* addr
 {
     int flags;
     int connect_rc;
+    int socket_error = 0;
+    socklen_t socket_error_size = sizeof(socket_error);
     Result wait_rc;
 
     flags = fcntl(socket_fd, F_GETFL, 0);
@@ -417,6 +420,16 @@ static Result connect_with_timeout(int socket_fd, const struct sockaddr_in* addr
     if (R_FAILED(wait_rc)) {
         fcntl(socket_fd, F_SETFL, flags);
         return wait_rc;
+    }
+
+    if (getsockopt(socket_fd, SOL_SOCKET, SO_ERROR, &socket_error, &socket_error_size) != 0) {
+        fcntl(socket_fd, F_SETFL, flags);
+        return MAKERESULT(RL_FATAL, RS_INTERNAL, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
+    }
+    if (socket_error != 0) {
+        errno = socket_error;
+        fcntl(socket_fd, F_SETFL, flags);
+        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
 
     if (fcntl(socket_fd, F_SETFL, flags) < 0)
@@ -775,7 +788,7 @@ Result bridge_v2_send_message(const char* url, const char* token, const char* de
     char escaped_message[(BRIDGE_V2_TEXT_MAX * 2) + 32];
     char escaped_device_id[(BRIDGE_V2_CONVERSATION_ID_MAX * 2) + 32];
     char escaped_conversation_id[(BRIDGE_V2_CONVERSATION_ID_MAX * 2) + 32];
-    char body[1024];
+    char body[BRIDGE_V2_MESSAGE_BODY_MAX];
     char response[BRIDGE_V2_RESPONSE_MAX];
     u32 status_code = 0;
     Result rc;

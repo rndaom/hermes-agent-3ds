@@ -50,7 +50,7 @@ The client should only accept final replies that match the current user message.
 ## Expected host-side API
 
 The native 3DS gateway should expose:
-- `GET /api/v2/health`
+- `GET /api/v2/health` with `token`, `device_id`, and active `conversation_id` query parameters
 - `GET /api/v2/conversations`
 - `POST /api/v2/messages`
 - `POST /api/v2/voice`

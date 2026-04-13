@@ -41,7 +41,7 @@ Last major verified milestone: **the V2-only 3DS client is validated end-to-end 
 ### Host-side integration
 - native 3DS gateway support now exists in `hermes-agent`
 - the gateway exposes the expected V2 surface used by the handheld client:
-  - `GET /api/v2/health`
+  - `GET /api/v2/health` with `token`, `device_id`, and active `conversation_id` query parameters
   - `GET /api/v2/conversations`
   - `POST /api/v2/messages`
   - `POST /api/v2/voice`
@@ -66,10 +66,11 @@ Host-side gateway ownership belongs in `hermes-agent`, where 3DS behaves like an
 
 ## Current known-good validation
 
-- `python3 -m pytest client/tests -q`
+- `.venv/bin/python -m pytest client/tests -q`
 - `make -C client clean && make -C client`
+- `make -C client release RELEASE_VERSION=local`
 - live V2 gateway checks for:
-  - `/api/v2/health`
+  - `/api/v2/health` with query-string identity parameters
   - `/api/v2/conversations`
   - `/api/v2/messages`
   - `/api/v2/voice`

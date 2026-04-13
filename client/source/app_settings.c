@@ -24,7 +24,7 @@ bool hermes_app_settings_handle_input(
         return true;
     }
 
-    if ((kDown & KEY_UP) != 0) {
+    if ((kDown & (KEY_UP | KEY_CPAD_UP)) != 0) {
         if (*selected_field == 0)
             *selected_field = SETTINGS_FIELD_COUNT - 1;
         else
@@ -33,7 +33,7 @@ bool hermes_app_settings_handle_input(
         return true;
     }
 
-    if ((kDown & KEY_DOWN) != 0) {
+    if ((kDown & (KEY_DOWN | KEY_CPAD_DOWN)) != 0) {
         *selected_field = (SettingsField)((*selected_field + 1) % SETTINGS_FIELD_COUNT);
         snprintf(status_line, status_line_size, "Selected %s.", settings_field_label(*selected_field));
         return true;

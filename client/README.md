@@ -23,29 +23,35 @@ Current design work is now driven by:
 - `docs/hermes-pictochat-dark-mode-spec.md`
 - `docs/plans/2026-04-12-hermes-pictochat-dark-mode-ui.md`
 
-The remaining UI job is to finish the dark-mode Hermes + PictoChat visual pass and remove the last mixed console/graphical transient flows.
+The remaining UI job is to keep tightening the dark-mode Hermes + PictoChat visual pass and move more of the shell toward asset-backed handheld chrome where it helps readability.
 
 Current controls:
 
 ### Home
-- `UP/DOWN` — move through the home action list
-- `LEFT/RIGHT` — page long replies
+- `UP/DOWN` or Circle Pad `UP/DOWN` — move through the home action list
+- `LEFT/RIGHT` or Circle Pad `LEFT/RIGHT` — page long replies
 - `A` — run the selected action
+- touch the bottom-screen action buttons — select and run that action
 - `START` — exit back to Homebrew Launcher
 
 ### Conversations
-- `UP/DOWN` — select a conversation slot
+- `UP/DOWN` or Circle Pad `UP/DOWN` — select a conversation slot
 - `A` — activate the highlighted conversation
 - `X` — create a new conversation ID
 - `Y` — sync recent conversation slots from Hermes
 - `B` — return home
 
 ### Settings
-- `UP/DOWN` — select host / port / token / device ID
+- `UP/DOWN` or Circle Pad `UP/DOWN` — select host / port / token / device ID
 - `A` — edit selected field
 - `X` — save settings to SD
 - `Y` — restore defaults
 - `B` — return home
+
+### Mic Session
+- `UP` — stop recording and send the captured audio
+- `B` — cancel the recording
+- `START` — abort the recording
 
 Config is stored at:
 
@@ -59,7 +65,13 @@ That file now also persists:
 
 ## Build
 
-Install the normal 3DS devkitPro toolchain, then run:
+Install the current devkitPro 3DS toolchain first:
+
+- official guide: https://devkitpro.org/wiki/Getting_Started
+- required stack for this app: `devkitARM`, `libctru`, `citro2d`, `citro3d`
+- `DEVKITARM` must be set in your shell
+
+Then run:
 
 ```bash
 make clean && make
@@ -100,3 +112,5 @@ It expects the Hermes-side 3DS gateway to implement the active client flow:
 - `/api/v2/voice`
 - `/api/v2/events`
 - `/api/v2/interactions/{request_id}/respond`
+
+The current health-check request includes `token`, `device_id`, and the active `conversation_id` as query parameters.

@@ -4,7 +4,7 @@ from pathlib import Path
 CLIENT_DIR = Path(__file__).resolve().parents[1]
 
 
-def test_home_ui_cleanup_removes_telemetry_strip_and_uses_single_thread_status_box():
+def test_home_ui_cleanup_removes_telemetry_strip_and_moves_thread_status_to_bottom_summary():
     ui_h = (CLIENT_DIR / "include" / "app_ui.h").read_text()
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
@@ -13,9 +13,11 @@ def test_home_ui_cleanup_removes_telemetry_strip_and_uses_single_thread_status_b
     assert "AppUiHomeTelemetry" not in ui_h
     assert "home_telemetry" not in ui_c
     assert "home_telemetry" not in main_c
-    assert 'app_gfx_panel_inset(10.0f, 10.0f, 380.0f, 64.0f' in ui_c
-    assert '"ROOM"' in ui_c
+    assert 'app_gfx_panel_inset(8.0f, 8.0f, 384.0f, 224.0f' in ui_c
+    assert 'app_gfx_panel_inset(8.0f, 160.0f, 304.0f, 72.0f' in ui_c
+    assert '"THREAD"' in ui_c
     assert '"LINK"' in ui_c
+    assert '"ACTIVE THREAD"' not in ui_c
     assert '"MODEL"' not in ui_c
     assert '"CONTEXT"' not in ui_c
     assert '"SESSION"' not in ui_c
@@ -23,7 +25,7 @@ def test_home_ui_cleanup_removes_telemetry_strip_and_uses_single_thread_status_b
     assert 'draw_header("HERMES AGENT", "RELAY DECK")' not in ui_c
 
 
-def test_home_command_menu_has_real_navigation_state_and_unlabeled_rows():
+def test_home_command_menu_has_touch_support_and_reply_paging_on_pad_circle_and_shoulders():
     home_h = (CLIENT_DIR / "include" / "app_home.h").read_text()
     home_c = (CLIENT_DIR / "source" / "app_home.c").read_text()
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
@@ -35,26 +37,28 @@ def test_home_command_menu_has_real_navigation_state_and_unlabeled_rows():
     assert "HOME_COMMAND_CONFIG" in home_h
     assert "HOME_COMMAND_MIC" in home_h
     assert "HOME_COMMAND_CLEAR" in home_h
-    assert "HOME_COMMAND_EXIT" in home_h
     assert "HomeCommand* command_selection" in home_h
     assert "KEY_DOWN" in home_c
     assert "KEY_UP" in home_c
     assert "KEY_LEFT" in home_c
     assert "KEY_RIGHT" in home_c
+    assert "KEY_L" in home_c
+    assert "KEY_R" in home_c
     assert "KEY_CPAD_DOWN" in home_c
     assert "KEY_CPAD_UP" in home_c
     assert "KEY_CPAD_LEFT" in home_c
     assert "KEY_CPAD_RIGHT" in home_c
-    assert "KEY_SELECT" not in home_c
+    assert "KEY_TOUCH" in home_c
+    assert "hidTouchRead" in home_c
+    assert "home_command_from_touch" in home_c
     assert "execute_selected_home_command" in home_c
     assert "command_selection != NULL" in home_c
-    assert 'draw_menu_row(16.0f, 40.0f, 124.0f, "Ask Hermes", selected_command' in ui_c
-    assert 'draw_menu_row(16.0f, 64.0f, 124.0f, "Check Link", selected_command' in ui_c
-    assert 'draw_menu_row(16.0f, 88.0f, 124.0f, "Conversations", selected_command' in ui_c
-    assert 'draw_menu_row(16.0f, 112.0f, 124.0f, "Settings", selected_command' in ui_c
-    assert 'draw_menu_row(16.0f, 136.0f, 124.0f, "Mic Input", selected_command' in ui_c
-    assert 'draw_menu_row(16.0f, 160.0f, 124.0f, "Clear Reply", selected_command' in ui_c
-    assert 'draw_menu_row(16.0f, 184.0f, 124.0f, "Exit", selected_command' in ui_c
+    assert 'draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Ask Hermes"' in ui_c
+    assert 'draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Check Link"' in ui_c
+    assert 'draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Conversations"' in ui_c
+    assert 'draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Settings"' in ui_c
+    assert 'draw_action_button(16.0f, 116.0f, 136.0f, 28.0f, "Mic Input"' in ui_c
+    assert 'draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Clear Reply"' in ui_c
     assert '"B Ask Hermes"' not in ui_c
     assert '"A Check Link"' not in ui_c
     assert '"SELECT Threads"' not in ui_c

@@ -56,7 +56,7 @@ def test_bridge_v2_module_exists_for_native_gateway_protocol():
     assert "device_id" in source
     assert "conversation_id" in source
     assert "audio/wav" in source
-    assert "extract_json_u32(response_body, \"cursor\"" in source
+    assert 'extract_json_u32(response_body, "cursor"' in source
     assert "cursor" in source
     assert "wait" in source
     assert "approval.request" in source
@@ -74,6 +74,13 @@ def test_bridge_v2_decodes_common_json_unicode_punctuation_for_3ds_console():
     assert "0x2019" in source
     assert "0x2014" in source
     assert "0x2026" in source
+
+
+def test_bridge_v2_message_body_buffer_matches_the_advertised_text_limit():
+    source = (CLIENT_DIR / "source" / "bridge_v2.c").read_text()
+
+    assert "BRIDGE_V2_MESSAGE_BODY_MAX" in source
+    assert "char body[1024]" not in source
 
 
 def test_makefile_picks_up_bridge_v2_sources_automatically():

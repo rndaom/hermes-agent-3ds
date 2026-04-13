@@ -68,23 +68,23 @@ def test_transient_ui_paths_do_not_expose_printconsole_or_manual_buffer_swaps():
     assert "hermes_app_ui_render_voice_recording" in ui_h
 
 
-def test_graphical_ui_bounds_variable_length_fields_and_removes_hotkey_labeled_rows():
+def test_graphical_ui_bounds_variable_length_fields_and_uses_touch_sized_action_buttons():
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
     assert "wrap_text_for_pixels" in ui_c
     assert "HOME_REPLY_MAX_WIDTH" in ui_c
-    assert 'app_gfx_panel_inset(156.0f, 8.0f, 156.0f, 96.0f' in ui_c
-    assert 'draw_text_lines(166.0f, 80.0f, 10.0f, 136.0f' in ui_c
-    assert 'draw_text_lines(166.0f, 156.0f, 10.0f, 136.0f' in ui_c
+    assert 'draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Ask Hermes"' in ui_c
+    assert 'draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Settings"' in ui_c
+    assert 'app_gfx_panel_inset(8.0f, 160.0f, 304.0f, 72.0f' in ui_c
     assert '"A Edit value"' not in ui_c
     assert '"A Use thread"' not in ui_c
     assert '"B Ask Hermes"' not in ui_c
 
 
-def test_home_reply_card_uses_note_card_styling_helpers():
+def test_home_message_cards_use_note_card_styling_helpers():
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
     assert "draw_note_lines" in ui_c
-    assert "draw_chip" in ui_c
-    assert 'draw_chip(18.0f, 90.0f, 92.0f, "HERMES REPLY"' in ui_c
-    assert 'draw_note_lines(20.0f, 150.0f, 360.0f, HOME_REPLY_LINES_PER_PAGE)' in ui_c
+    assert "draw_message_card" in ui_c
+    assert '"Tap Ask Hermes below to start chatting."' in ui_c
+    assert 'entry->author == APP_UI_MESSAGE_USER ? "YOU" : "HERMES"' in ui_c

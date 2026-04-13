@@ -217,6 +217,8 @@ static Result connect_with_timeout(int socket_fd, const struct sockaddr_in* addr
 {
     int flags;
     int connect_rc;
+    int socket_error = 0;
+    socklen_t socket_error_size = sizeof(socket_error);
     Result wait_rc;
 
     flags = fcntl(socket_fd, F_GETFL, 0);
@@ -244,6 +246,18 @@ static Result connect_with_timeout(int socket_fd, const struct sockaddr_in* addr
         set_socket_debug(result, "connect-wait", errno);
         fcntl(socket_fd, F_SETFL, flags);
         return wait_rc;
+    }
+
+    if (getsockopt(socket_fd, SOL_SOCKET, SO_ERROR, &socket_error, &socket_error_size) != 0) {
+        set_socket_debug(result, "connect-verify", errno);
+        fcntl(socket_fd, F_SETFL, flags);
+        return MAKERESULT(RL_FATAL, RS_INTERNAL, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
+    }
+    if (socket_error != 0) {
+        set_socket_debug(result, "connect-error", socket_error);
+        errno = socket_error;
+        fcntl(socket_fd, F_SETFL, flags);
+        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
 
     set_socket_debug(result, "connect-ready", 0);
@@ -386,7 +400,7 @@ Result bridge_health_check_run(const char* url, BridgeHealthResult* result)
         sizeof(request),
         "GET %s HTTP/1.1\r\n"
         "Host: %s:%u\r\n"
-        "User-Agent: hermes-agent-3ds/0.1.0\r\n"
+        "User-Agent: hermes-agent-3ds/0.2.0\r\n"
         "Connection: close\r\n"
         "Accept: application/json\r\n"
         "\r\n",

@@ -21,6 +21,16 @@ This repo is now the **3DS client only**.
 
 This repo is V2-only now. The old bundled bridge path is gone.
 
+## Build prerequisites
+
+Install the current devkitPro 3DS toolchain before building:
+
+- follow the official devkitPro getting-started guide: https://devkitpro.org/wiki/Getting_Started
+- make sure `DEVKITARM` is set in your shell
+- install the 3DS stack this repo uses: `devkitARM`, `libctru`, `citro2d`, `citro3d`
+
+The local machine used for this repo also has the reference examples under `/opt/devkitpro/examples/3ds`.
+
 ## Quick start
 
 ### 1) Build the 3DS app
@@ -60,6 +70,8 @@ The 3DS client expects the gateway to support the active handheld flow:
 - `GET /api/v2/events`
 - `POST /api/v2/interactions/{request_id}/respond`
 
+The health check request is not just a bare route hit. The client currently calls `GET /api/v2/health` with `token`, `device_id`, and the active `conversation_id` as query parameters.
+
 ### 4) Configure the app on the 3DS
 
 Open **Hermes Agent 3DS** in Homebrew Launcher.
@@ -75,6 +87,7 @@ Open **Hermes Agent 3DS** in Homebrew Launcher.
 
 ### 5) Test it
 
+- run `.venv/bin/python -m pytest client/tests -q`
 - D-pad / Circle Pad `UP/DOWN` — choose a home action
 - `A` — run the selected action
 - D-pad / Circle Pad `LEFT/RIGHT` — page long replies
@@ -82,13 +95,14 @@ Open **Hermes Agent 3DS** in Homebrew Launcher.
 ## Controls
 
 ### Home
-- UP/DOWN — move through the home action list
-- LEFT/RIGHT — page long replies
+- UP/DOWN or Circle Pad UP/DOWN — move through the home action list
+- LEFT/RIGHT or Circle Pad LEFT/RIGHT — page long replies
 - A — run the selected action
+- Touch the bottom-screen action buttons — select and run that action
 - START — exit
 
 ### Conversations
-- UP/DOWN — select a conversation slot
+- UP/DOWN or Circle Pad UP/DOWN — select a conversation slot
 - A — activate the highlighted conversation
 - X — create a new conversation ID
 - Y — sync recent conversation slots from Hermes
@@ -96,11 +110,16 @@ Open **Hermes Agent 3DS** in Homebrew Launcher.
 - START — exit
 
 ### Settings
-- UP/DOWN — select field
+- UP/DOWN or Circle Pad UP/DOWN — select field
 - A — edit field
 - X — save settings
 - Y — restore defaults
 - B — return home
+
+### Mic Session
+- UP — stop recording and send the captured audio
+- B — cancel the recording
+- START — abort the recording
 
 ## FAQ
 

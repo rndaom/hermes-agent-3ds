@@ -66,7 +66,7 @@ static bool prompt_text_input(SwkbdType type, const char* hint, const char* init
     }
 
     button = swkbdInputText(&swkbd, out_text, out_size);
-    return button != SWKBD_BUTTON_NONE;
+    return button == SWKBD_BUTTON_CONFIRM;
 }
 
 bool edit_selected_setting(HermesAppConfig* config, SettingsField field, char* status_line, size_t status_line_size)

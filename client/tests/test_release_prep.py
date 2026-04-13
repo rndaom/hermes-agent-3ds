@@ -5,14 +5,17 @@ REPO_DIR = Path(__file__).resolve().parents[2]
 CLIENT_DIR = REPO_DIR / "client"
 
 
-def test_home_bottom_screen_avoids_duplicate_output_sections():
+def test_home_bottom_screen_uses_action_deck_and_minimal_thread_summary():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
     assert 'printf("Health:' not in main_c
     assert 'printf("Reply page:' not in main_c
-    assert '"CONNECTION"' in ui_c
-    assert '"Token"' in ui_c
+    assert '"ACTION DECK"' in ui_c
+    assert '"THREAD"' in ui_c
+    assert '"LINK"' in ui_c
+    assert 'app_gfx_text(18.0f, 170.0f, 0.30f, 0.30f, UI_SIGNAL_HI, "THREAD")' in ui_c
+    assert 'app_gfx_text(18.0f, 196.0f, 0.30f, 0.30f, UI_SIGNAL_HI, "LINK")' in ui_c
 
 
 def test_makefile_supports_packaged_release_zip_output():

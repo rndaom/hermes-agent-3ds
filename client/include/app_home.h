@@ -19,7 +19,6 @@ typedef enum HomeCommand {
     HOME_COMMAND_CONFIG = 3,
     HOME_COMMAND_MIC = 4,
     HOME_COMMAND_CLEAR = 5,
-    HOME_COMMAND_EXIT = 6,
 } HomeCommand;
 
 typedef void (*AppHomeRenderFn)(
@@ -46,7 +45,6 @@ typedef struct AppHomeContext {
     size_t last_message_size;
     size_t* reply_page;
     HomeCommand* command_selection;
-    bool* exit_requested;
     char* status_line;
     size_t status_line_size;
     Result* request_rc;

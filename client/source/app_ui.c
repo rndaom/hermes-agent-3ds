@@ -7,23 +7,26 @@
 
 #define HOME_WRAP_MAX_LINES 128
 #define HOME_WRAP_LINE_MAX 192
-#define HOME_MESSAGE_WRAP_MAX_LINES 16
 #define HOME_SUMMARY_WRAP_MAX_LINES 4
 #define HOME_INFO_WRAP_MAX_LINES 8
-#define HOME_MESSAGE_LINES_PER_PAGE 2
+#define HOME_HISTORY_MAX 6
+#define HOME_HISTORY_CARD_LINES 8
 #define HOME_REPLY_LINES_PER_PAGE 6
-#define HOME_MESSAGE_MAX_WIDTH 348.0f
 #define HOME_REPLY_MAX_WIDTH 348.0f
-#define HOME_MESSAGE_SCALE 0.30f
 #define HOME_REPLY_SCALE 0.32f
 
+typedef struct AppUiHomeHistoryEntry {
+    AppUiMessageAuthor author;
+    char text[BRIDGE_CHAT_REPLY_MAX];
+} AppUiHomeHistoryEntry;
+
 static char g_reply_page_lines[HOME_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
-static char g_home_message_lines[HOME_MESSAGE_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
-static char g_home_reply_lines[HOME_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
 static char g_home_room_lines[HOME_SUMMARY_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
 static char g_home_status_lines[HOME_SUMMARY_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
-static char g_home_token_lines[HOME_SUMMARY_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
 static char g_home_detail_lines[HOME_INFO_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
+static char g_home_card_lines[HOME_HISTORY_CARD_LINES][HOME_WRAP_LINE_MAX];
+static AppUiHomeHistoryEntry g_home_history[HOME_HISTORY_MAX];
+static size_t g_home_history_count = 0;
 
 static void copy_bounded_string(char* dest, size_t dest_size, const char* src)
 {
@@ -313,6 +316,36 @@ size_t hermes_app_ui_reply_page_count(const char* reply_text)
     return page_count_for_lines(total_lines, HOME_REPLY_LINES_PER_PAGE);
 }
 
+void hermes_app_ui_home_history_reset(void)
+{
+    memset(g_home_history, 0, sizeof(g_home_history));
+    g_home_history_count = 0;
+}
+
+void hermes_app_ui_home_history_push(AppUiMessageAuthor author, const char* text)
+{
+    size_t index;
+
+    if (text == NULL || text[0] == '\0')
+        return;
+
+    if (g_home_history_count > 0) {
+        AppUiHomeHistoryEntry* last = &g_home_history[g_home_history_count - 1];
+        if (last->author == author && strcmp(last->text, text) == 0)
+            return;
+    }
+
+    if (g_home_history_count < HOME_HISTORY_MAX) {
+        index = g_home_history_count++;
+    } else {
+        memmove(&g_home_history[0], &g_home_history[1], sizeof(g_home_history[0]) * (HOME_HISTORY_MAX - 1));
+        index = HOME_HISTORY_MAX - 1;
+    }
+
+    g_home_history[index].author = author;
+    copy_bounded_string(g_home_history[index].text, sizeof(g_home_history[index].text), text);
+}
+
 static const BridgeV2ConversationInfo* find_synced_conversation(
     const BridgeV2ConversationListResult* conversation_list,
     const char* conversation_id
@@ -435,6 +468,51 @@ static void draw_menu_row(float x, float y, float w, const char* label, bool sel
     app_gfx_text_fit(x + 8.0f, y + 3.0f, w - 16.0f, 0.43f, 0.43f, selected ? UI_BG_TOP : UI_TEXT, label);
 }
 
+static void draw_action_button(float x, float y, float w, float h, const char* label, bool selected)
+{
+    app_gfx_panel(x, y, w, h, selected ? UI_ACCENT : UI_PANEL_ALT, selected ? UI_BORDER_STRONG : UI_BORDER);
+    app_gfx_text_fit(x + 10.0f, y + 10.0f, w - 20.0f, 0.36f, 0.36f, selected ? UI_BG_TOP : UI_TEXT, label);
+}
+
+static size_t wrap_message_card_text(const char* text, float max_width, float scale)
+{
+    return wrap_text_for_pixels(text, max_width, scale, scale, g_home_card_lines, HOME_HISTORY_CARD_LINES);
+}
+
+static void draw_message_card(
+    float x,
+    float y,
+    float w,
+    float h,
+    const char* label,
+    bool is_user,
+    const char* text,
+    size_t start_line,
+    size_t max_lines,
+    float text_scale,
+    const char* page_label
+)
+{
+    size_t total_lines;
+    u32 fill = is_user ? UI_PANEL_ALT : UI_REPLY_CARD;
+    u32 border = is_user ? UI_BORDER_STRONG : UI_BORDER;
+    u32 chip_fill = is_user ? UI_SIGNAL : UI_ACCENT;
+    u32 chip_text = is_user ? UI_BG_TOP : UI_TEXT;
+    u32 text_color = UI_TEXT;
+
+    total_lines = wrap_message_card_text(text, w - 24.0f, text_scale);
+    if (start_line >= total_lines)
+        start_line = 0;
+
+    app_gfx_panel_inset(x, y, w, h, fill, border, chip_fill);
+    app_gfx_highlight_bar(x + 6.0f, y + 10.0f, 2.0f, h - 20.0f, chip_fill);
+    draw_chip(x + 10.0f, y + 8.0f, is_user ? 48.0f : 68.0f, label, chip_fill, chip_text);
+    if (page_label != NULL && page_label[0] != '\0')
+        app_gfx_text_right(x + w - 10.0f, y + 10.0f, 0.28f, 0.28f, UI_SIGNAL_HI, page_label);
+    draw_note_lines(x + 12.0f, y + 32.0f, w - 24.0f, max_lines);
+    draw_text_lines(x + 12.0f, y + 36.0f, 12.0f, w - 24.0f, text_scale, text_scale, text_color, g_home_card_lines, total_lines, start_line, max_lines);
+}
+
 static const char* home_command_label_for_selection(size_t command_selection)
 {
     switch ((HomeCommand)command_selection) {
@@ -448,8 +526,6 @@ static const char* home_command_label_for_selection(size_t command_selection)
             return "Mic Input";
         case HOME_COMMAND_CLEAR:
             return "Clear Reply";
-        case HOME_COMMAND_EXIT:
-            return "Exit";
         case HOME_COMMAND_NONE:
         case HOME_COMMAND_ASK:
         default:
@@ -470,8 +546,6 @@ static const char* home_command_detail_for_selection(size_t command_selection)
             return "Record a short microphone message on-device and send it through Hermes speech-to-text.";
         case HOME_COMMAND_CLEAR:
             return "Clear the current reply, health state, and request status so the home screen starts clean again.";
-        case HOME_COMMAND_EXIT:
-            return "Close Hermes Agent 3DS and return to the Homebrew Launcher.";
         case HOME_COMMAND_NONE:
         case HOME_COMMAND_ASK:
         default:
@@ -491,143 +565,139 @@ static void render_home_graphical(
 )
 {
     char conversation_label[HERMES_APP_CONVERSATION_ID_MAX];
-    char token_summary[48];
-    char bridge_summary[80];
     char page_label[24];
     size_t room_line_count;
     size_t status_line_count;
-    size_t token_line_count;
     size_t detail_line_count;
-    size_t message_line_count;
-    size_t reply_line_count = 0;
     size_t page_count = 1;
     size_t reply_start = 0;
-    bool has_selection = command_selection <= (size_t)HOME_COMMAND_EXIT;
+    bool has_selection = command_selection <= (size_t)HOME_COMMAND_CLEAR;
     size_t selected_command = has_selection ? command_selection : (size_t)HOME_COMMAND_ASK;
-    const char* reply_source = NULL;
+    const char* latest_reply_text = NULL;
+    size_t history_start;
+    size_t index;
+    float card_y = 16.0f;
+
+    (void)health_result;
+    (void)last_message;
 
     format_active_conversation_label(config, conversation_list, conversation_label, sizeof(conversation_label));
-    format_token_summary(config, token_summary, sizeof(token_summary));
-    snprintf(bridge_summary, sizeof(bridge_summary), "%s:%u", config->host, (unsigned int)config->port);
+    if (g_home_history_count > 0 && g_home_history[g_home_history_count - 1].author == APP_UI_MESSAGE_HERMES)
+        latest_reply_text = g_home_history[g_home_history_count - 1].text;
+    else if (chat_result != NULL && chat_result->success)
+        latest_reply_text = chat_result->reply;
 
-    if (chat_result != NULL && chat_result->success)
-        reply_source = chat_result->reply;
-    else if (chat_result != NULL && chat_result->error[0] != '\0')
-        reply_source = chat_result->error;
-    else if (health_result != NULL && health_result->success)
-        reply_source = "Hermes gateway OK.";
-    else if (health_result != NULL && health_result->error[0] != '\0')
-        reply_source = health_result->error;
-    else
-        reply_source = "Ready for a request.";
-
-    room_line_count = wrap_text_for_pixels(
-        conversation_label,
-        210.0f,
-        0.32f,
-        0.32f,
-        g_home_room_lines,
-        2
-    );
-    status_line_count = wrap_text_for_pixels(
-        status_line,
-        124.0f,
-        0.29f,
-        0.29f,
-        g_home_status_lines,
-        2
-    );
-    token_line_count = wrap_text_for_pixels(
-        token_summary,
-        136.0f,
-        0.28f,
-        0.28f,
-        g_home_token_lines,
-        3
-    );
-    detail_line_count = wrap_text_for_pixels(
-        home_command_detail_for_selection(selected_command),
-        136.0f,
-        0.29f,
-        0.29f,
-        g_home_detail_lines,
-        5
-    );
-    message_line_count = wrap_text_for_pixels(
-        last_message,
-        HOME_MESSAGE_MAX_WIDTH,
-        HOME_MESSAGE_SCALE,
-        HOME_MESSAGE_SCALE,
-        g_home_message_lines,
-        HOME_MESSAGE_LINES_PER_PAGE
-    );
-    reply_line_count = wrap_text_for_pixels(
-        reply_source,
-        HOME_REPLY_MAX_WIDTH,
-        HOME_REPLY_SCALE,
-        HOME_REPLY_SCALE,
-        g_home_reply_lines,
-        HOME_WRAP_MAX_LINES
-    );
-    page_count = page_count_for_lines(reply_line_count, HOME_REPLY_LINES_PER_PAGE);
+    if (latest_reply_text != NULL && latest_reply_text[0] != '\0')
+        page_count = hermes_app_ui_reply_page_count(latest_reply_text);
     if (reply_page >= page_count)
         reply_page = page_count - 1;
     reply_start = reply_page * HOME_REPLY_LINES_PER_PAGE;
     snprintf(page_label, sizeof(page_label), "%lu/%lu", (unsigned long)(reply_page + 1), (unsigned long)page_count);
 
-    app_gfx_begin_top(UI_BG_TOP);
-    app_gfx_panel_inset(10.0f, 10.0f, 380.0f, 64.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
-    draw_chip(18.0f, 16.0f, 110.0f, "ACTIVE THREAD", UI_ACCENT, UI_TEXT);
-    app_gfx_text(20.0f, 42.0f, 0.30f, 0.30f, UI_META, "ROOM");
-    app_gfx_text(246.0f, 42.0f, 0.30f, 0.30f, UI_META, "LINK");
-    draw_text_lines(20.0f, 54.0f, 10.0f, 210.0f, 0.32f, 0.32f, UI_TEXT, g_home_room_lines, room_line_count, 0, 2);
-    draw_text_lines(
-        246.0f,
-        54.0f,
-        10.0f,
-        124.0f,
-        0.29f,
-        0.29f,
-        health_result != NULL && health_result->success ? UI_SIGNAL_HI : UI_MUTED,
+    room_line_count = wrap_text_for_pixels(
+        conversation_label,
+        108.0f,
+        0.28f,
+        0.28f,
+        g_home_room_lines,
+        2
+    );
+    status_line_count = wrap_text_for_pixels(
+        status_line,
+        108.0f,
+        0.28f,
+        0.28f,
         g_home_status_lines,
-        status_line_count,
-        0,
+        2
+    );
+    detail_line_count = wrap_text_for_pixels(
+        home_command_detail_for_selection(selected_command),
+        112.0f,
+        0.27f,
+        0.27f,
+        g_home_detail_lines,
         2
     );
 
-    app_gfx_panel_inset(10.0f, 84.0f, 380.0f, 146.0f, UI_REPLY_CARD, UI_BORDER_STRONG, UI_SIGNAL);
-    draw_chip(18.0f, 90.0f, 92.0f, "HERMES REPLY", UI_SIGNAL, UI_BG_TOP);
-    app_gfx_text_right(380.0f, 92.0f, 0.32f, 0.32f, UI_SIGNAL_HI, page_label);
-    app_gfx_text(20.0f, 114.0f, 0.28f, 0.28f, UI_META, "Last message");
-    draw_text_lines(20.0f, 126.0f, 10.0f, 350.0f, HOME_MESSAGE_SCALE, HOME_MESSAGE_SCALE, UI_MUTED, g_home_message_lines, message_line_count, 0, HOME_MESSAGE_LINES_PER_PAGE);
-    draw_note_lines(20.0f, 150.0f, 360.0f, HOME_REPLY_LINES_PER_PAGE);
-    draw_text_lines(20.0f, 154.0f, 10.0f, HOME_REPLY_MAX_WIDTH, HOME_REPLY_SCALE, HOME_REPLY_SCALE, UI_TEXT, g_home_reply_lines, reply_line_count, reply_start, HOME_REPLY_LINES_PER_PAGE);
+    app_gfx_begin_top(UI_BG_TOP);
+    app_gfx_panel_inset(8.0f, 8.0f, 384.0f, 224.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
+    if (g_home_history_count == 0) {
+        draw_message_card(
+            16.0f,
+            74.0f,
+            368.0f,
+            92.0f,
+            "HERMES",
+            false,
+            "Tap Ask Hermes below to start chatting.",
+            0,
+            4,
+            0.31f,
+            ""
+        );
+    } else {
+        history_start = g_home_history_count > 3 ? g_home_history_count - 3 : 0;
+        for (index = history_start; index < g_home_history_count; index++) {
+            const AppUiHomeHistoryEntry* entry = &g_home_history[index];
+            bool latest = index == g_home_history_count - 1;
+            bool latest_reply = latest && entry->author == APP_UI_MESSAGE_HERMES;
+            float card_height = latest_reply ? 96.0f : (latest ? 50.0f : 36.0f);
+            size_t max_lines = latest_reply ? HOME_REPLY_LINES_PER_PAGE : (latest ? 2 : 1);
+            float text_scale = latest_reply ? 0.31f : (latest ? 0.29f : 0.27f);
+
+            draw_message_card(
+                16.0f,
+                card_y,
+                368.0f,
+                card_height,
+                entry->author == APP_UI_MESSAGE_USER ? "YOU" : "HERMES",
+                entry->author == APP_UI_MESSAGE_USER,
+                entry->text,
+                latest_reply ? reply_start : 0,
+                max_lines,
+                text_scale,
+                latest_reply ? page_label : ""
+            );
+            card_y += card_height + 6.0f;
+        }
+
+        if (g_home_history[g_home_history_count - 1].author != APP_UI_MESSAGE_HERMES && card_y + 64.0f <= 224.0f) {
+            draw_message_card(
+                16.0f,
+                card_y,
+                368.0f,
+                64.0f,
+                "HERMES",
+                false,
+                status_line != NULL && status_line[0] != '\0' ? status_line : "Waiting for Hermes...",
+                0,
+                2,
+                0.29f,
+                ""
+            );
+        }
+    }
 
     app_gfx_begin_bottom(UI_BG_BOTTOM);
-    app_gfx_panel_inset(8.0f, 8.0f, 140.0f, 224.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
-    app_gfx_text(18.0f, 18.0f, 0.36f, 0.36f, UI_SIGNAL_HI, "ACTIONS");
-    draw_menu_row(16.0f, 40.0f, 124.0f, "Ask Hermes", selected_command == (size_t)HOME_COMMAND_ASK);
-    draw_menu_row(16.0f, 64.0f, 124.0f, "Check Link", selected_command == (size_t)HOME_COMMAND_CHECK);
-    draw_menu_row(16.0f, 88.0f, 124.0f, "Conversations", selected_command == (size_t)HOME_COMMAND_THREADS);
-    draw_menu_row(16.0f, 112.0f, 124.0f, "Settings", selected_command == (size_t)HOME_COMMAND_CONFIG);
-    draw_menu_row(16.0f, 136.0f, 124.0f, "Mic Input", selected_command == (size_t)HOME_COMMAND_MIC);
-    draw_menu_row(16.0f, 160.0f, 124.0f, "Clear Reply", selected_command == (size_t)HOME_COMMAND_CLEAR);
-    draw_menu_row(16.0f, 184.0f, 124.0f, "Exit", selected_command == (size_t)HOME_COMMAND_EXIT);
+    draw_bottom_header("ACTION DECK");
+    draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Ask Hermes", selected_command == (size_t)HOME_COMMAND_ASK);
+    draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Check Link", selected_command == (size_t)HOME_COMMAND_CHECK);
+    draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Conversations", selected_command == (size_t)HOME_COMMAND_THREADS);
+    draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Settings", selected_command == (size_t)HOME_COMMAND_CONFIG);
+    draw_action_button(16.0f, 116.0f, 136.0f, 28.0f, "Mic Input", selected_command == (size_t)HOME_COMMAND_MIC);
+    draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Clear Reply", selected_command == (size_t)HOME_COMMAND_CLEAR);
 
-    app_gfx_panel_inset(156.0f, 8.0f, 156.0f, 96.0f, UI_PANEL_ALT, UI_BORDER, UI_ACCENT);
-    app_gfx_text(166.0f, 18.0f, 0.34f, 0.34f, UI_SIGNAL_HI, "CONNECTION");
-    app_gfx_text(166.0f, 38.0f, 0.28f, 0.28f, UI_META, "Gateway");
-    app_gfx_text_fit(166.0f, 50.0f, 136.0f, 0.30f, 0.30f, UI_TEXT, bridge_summary);
-    app_gfx_text(166.0f, 68.0f, 0.28f, 0.28f, UI_META, "Token");
-    draw_text_lines(166.0f, 80.0f, 10.0f, 136.0f, 0.28f, 0.28f, UI_TEXT, g_home_token_lines, token_line_count, 0, 3);
-
-    app_gfx_panel_inset(156.0f, 112.0f, 156.0f, 120.0f, UI_PANEL_ALT, UI_BORDER, UI_ACCENT);
-    app_gfx_text(166.0f, 122.0f, 0.34f, 0.34f, UI_SIGNAL_HI, "CURRENT ACTION");
-    app_gfx_text_fit(166.0f, 140.0f, 136.0f, 0.32f, 0.32f, UI_TEXT, home_command_label_for_selection(selected_command));
-    draw_text_lines(166.0f, 156.0f, 10.0f, 136.0f, 0.29f, 0.29f, UI_MUTED, g_home_detail_lines, detail_line_count, 0, 5);
-    app_gfx_text(166.0f, 214.0f, 0.28f, 0.28f, UI_META, "Reply page");
-    app_gfx_text_right(302.0f, 214.0f, 0.30f, 0.30f, UI_TEXT, page_label);
+    app_gfx_panel_inset(8.0f, 160.0f, 304.0f, 72.0f, UI_PANEL_ALT, UI_BORDER, UI_SIGNAL);
+    app_gfx_text(18.0f, 170.0f, 0.30f, 0.30f, UI_SIGNAL_HI, "THREAD");
+    draw_text_lines(66.0f, 170.0f, 10.0f, 108.0f, 0.28f, 0.28f, UI_TEXT, g_home_room_lines, room_line_count, 0, 2);
+    app_gfx_text(18.0f, 196.0f, 0.30f, 0.30f, UI_SIGNAL_HI, "LINK");
+    draw_text_lines(66.0f, 196.0f, 10.0f, 108.0f, 0.28f, 0.28f, UI_MUTED, g_home_status_lines, status_line_count, 0, 2);
+    app_gfx_text(188.0f, 170.0f, 0.30f, 0.30f, UI_SIGNAL_HI, "ACTION");
+    app_gfx_text_fit(188.0f, 182.0f, 108.0f, 0.30f, 0.30f, UI_TEXT, home_command_label_for_selection(selected_command));
+    draw_text_lines(188.0f, 196.0f, 10.0f, 108.0f, 0.27f, 0.27f, UI_MUTED, g_home_detail_lines, detail_line_count, 0, 2);
+    app_gfx_text_right(302.0f, 214.0f, 0.28f, 0.28f, UI_SIGNAL_HI, page_label);
 }
+
 
 static void render_settings_graphical(
     const HermesAppConfig* config,
@@ -678,7 +748,7 @@ static void render_settings_graphical(
     draw_menu_row(16.0f, 78.0f, 288.0f, "Save settings", false);
     draw_menu_row(16.0f, 98.0f, 288.0f, "Restore defaults", false);
     draw_menu_row(16.0f, 118.0f, 288.0f, "Return home", false);
-    draw_menu_row(16.0f, 138.0f, 288.0f, "Exit app", false);
+    draw_menu_row(16.0f, 138.0f, 288.0f, "START Exit app", false);
 }
 
 static void render_conversations_graphical(
@@ -734,7 +804,7 @@ static void render_conversations_graphical(
     draw_menu_row(16.0f, 78.0f, 288.0f, "New thread", false);
     draw_menu_row(16.0f, 98.0f, 288.0f, "Sync Hermes", false);
     draw_menu_row(16.0f, 118.0f, 288.0f, "Return home", false);
-    draw_menu_row(16.0f, 138.0f, 288.0f, "Exit app", false);
+    draw_menu_row(16.0f, 138.0f, 288.0f, "START Exit app", false);
 }
 
 void hermes_app_ui_render_approval_prompt(const char* request_id)
@@ -795,9 +865,9 @@ void hermes_app_ui_render_voice_recording(unsigned long tenths, size_t pcm_size,
     app_gfx_begin_bottom(UI_BG_BOTTOM);
     draw_bottom_header("MIC SESSION");
     app_gfx_panel_inset(8.0f, 46.0f, 304.0f, 138.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
-    draw_menu_row(16.0f, 58.0f, 288.0f, "Stop and send", !waiting_for_up_release);
-    draw_menu_row(16.0f, 78.0f, 288.0f, "Cancel recording", false);
-    draw_menu_row(16.0f, 98.0f, 288.0f, "Exit app", false);
+    draw_menu_row(16.0f, 58.0f, 288.0f, "UP Stop and send", !waiting_for_up_release);
+    draw_menu_row(16.0f, 78.0f, 288.0f, "B Cancel recording", false);
+    draw_menu_row(16.0f, 98.0f, 288.0f, "START Abort recording", false);
     draw_menu_row(16.0f, 118.0f, 288.0f, "5 min safety timeout", false);
     draw_menu_row(16.0f, 138.0f, 288.0f, capture_state, false);
 

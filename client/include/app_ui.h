@@ -16,7 +16,14 @@ typedef enum AppScreen {
     APP_SCREEN_CONVERSATIONS = 2,
 } AppScreen;
 
+typedef enum AppUiMessageAuthor {
+    APP_UI_MESSAGE_USER = 0,
+    APP_UI_MESSAGE_HERMES = 1,
+} AppUiMessageAuthor;
+
 size_t hermes_app_ui_reply_page_count(const char* reply_text);
+void hermes_app_ui_home_history_reset(void);
+void hermes_app_ui_home_history_push(AppUiMessageAuthor author, const char* text);
 
 bool hermes_app_ui_init(void);
 void hermes_app_ui_exit(void);

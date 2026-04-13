@@ -356,6 +356,7 @@ void hermes_app_requests_handle_text(
     }
 
     copy_bounded_string(last_message, last_message_size, message_buffer);
+    hermes_app_ui_home_history_push(APP_UI_MESSAGE_USER, message_buffer);
     reset_chat_request_state(chat_result, &message_result, request_rc, reply_page);
 
     if (!hermes_app_config_build_messages_url(config, messages_url, sizeof(messages_url)) ||
@@ -374,8 +375,11 @@ void hermes_app_requests_handle_text(
         *request_rc = bridge_v2_send_message(messages_url, config->token, config->device_id, config->active_conversation_id, message_buffer, &message_result);
         if (R_SUCCEEDED(*request_rc) && message_result.success) {
             *request_rc = complete_v2_roundtrip(config, ui, events_url, &message_result, chat_result, &missed_events);
-            if (R_SUCCEEDED(*request_rc))
+            if (R_SUCCEEDED(*request_rc)) {
+                if (chat_result->success)
+                    hermes_app_ui_home_history_push(APP_UI_MESSAGE_HERMES, chat_result->reply);
                 format_roundtrip_status(chat_result, missed_events, "Reply received over native v2.", status_line, status_line_size);
+            }
             else if (chat_result->error[0] != '\0')
                 snprintf(status_line, status_line_size, "%s", chat_result->error);
             else
@@ -437,6 +441,7 @@ void hermes_app_requests_handle_voice(
     }
 
     copy_bounded_string(last_message, last_message_size, "[mic] voice input");
+    hermes_app_ui_home_history_push(APP_UI_MESSAGE_USER, "[mic] voice input");
     reset_chat_request_state(chat_result, &message_result, request_rc, reply_page);
 
     snprintf(status_line, status_line_size, "Sending mic input to Hermes...");
@@ -449,8 +454,11 @@ void hermes_app_requests_handle_voice(
 
     if (R_SUCCEEDED(*request_rc) && message_result.success) {
         *request_rc = complete_v2_roundtrip(config, ui, events_url, &message_result, chat_result, &missed_events);
-        if (R_SUCCEEDED(*request_rc))
+        if (R_SUCCEEDED(*request_rc)) {
+            if (chat_result->success)
+                hermes_app_ui_home_history_push(APP_UI_MESSAGE_HERMES, chat_result->reply);
             format_roundtrip_status(chat_result, missed_events, "Voice reply received over native v2.", status_line, status_line_size);
+        }
         else if (chat_result->error[0] != '\0')
             snprintf(status_line, status_line_size, "%s", chat_result->error);
         else

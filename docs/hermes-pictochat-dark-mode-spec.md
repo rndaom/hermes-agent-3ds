@@ -61,8 +61,8 @@ This spec is grounded in four inputs:
 4. Current repo audit
 - active graphical UI lives in `client/source/app_ui.c` + `client/source/app_gfx.c`
 - current implementation already uses Citro2D/Citro3D
-- current implementation is visually and architecturally incomplete for the desired target
-- current implementation still mixes graphical UI with `PrintConsole`-based transient flows
+- approval and voice transient flows now render through the same graphical renderer language
+- current implementation is closer to the target, but still visually incomplete for the desired PictoChat-first finish
 
 ## Core product fantasy
 
@@ -216,13 +216,10 @@ The current graphical pass is not the source of truth.
 This spec exists partly to replace ambiguity.
 
 ### Known current issues from repo audit
-- mixed Citro2D + `PrintConsole` flow
-- multiple presentation paths
-- hardcoded placeholder visual language closer to pixel-RPG than PictoChat messenger
-- no consistent clipping/truncation budgets
-- misleading static menu highlights
-- broken reply pagination logic in the graphical pass
-- incomplete transient-screen styling coverage
+- some cards and action wells still read as generic dark UI instead of a stronger PictoChat note-card system
+- some action/help rows still need better control-label accuracy and tighter composition
+- long text containment still needs hardware validation for extreme thread titles and status strings
+- the first polished asset-backed crest/icon pass is still pending
 
 This spec treats those as defects, not as precedent.
 
@@ -571,10 +568,12 @@ Default control mapping remains explicit and first-class.
 - `LEFT/RIGHT` = reply page
 - `Circle Pad LEFT/RIGHT` = reply page
 - `A` = run the selected home action
+- touch = tap a bottom-screen home action button
 - `START` = exit
 
 ### Threads
 - `UP/DOWN` = move selection
+- `Circle Pad UP/DOWN` = move selection
 - `A` = use selected thread
 - `X` = create thread
 - `Y` = sync threads
@@ -583,6 +582,7 @@ Default control mapping remains explicit and first-class.
 
 ### Settings
 - `UP/DOWN` = move field selection
+- `Circle Pad UP/DOWN` = move field selection
 - `A` = edit selected field
 - `X` = save settings
 - `Y` = restore defaults
@@ -590,16 +590,18 @@ Default control mapping remains explicit and first-class.
 - `START` = exit
 
 ### Approval flow
-- `A` = approve
-- `B` = reject/back
-- `START` = exit only if safe to leave the prompt
+- `A` = allow once
+- `X` = allow for the current session
+- `Y` = always allow
+- `B` = deny
+- `START` = cancel the prompt only if it is safe to leave it
 
 ### Voice-input flow
-- `A` = stop/send when recording UI presents a confirm action
+- `UP` = stop/send once recording is armed
 - `B` = cancel
 - `START` = abort only if it is mapped to the same safe cancel path
 
-Touch input may be added later for bottom-screen affordances, but none of these mappings may become touch-only.
+Touch input already exists for the home action deck. None of these mappings may become touch-only.
 
 ## Compose and keyboard policy
 For this UI rewrite, the project should keep the built-in software keyboard for message compose and field editing.
@@ -667,7 +669,8 @@ Bottom screen:
 - config
 - mic input
 - clear reply
-- exit
+
+App exit remains on `START` rather than a dedicated home action row.
 
 ## Settings screen
 Top screen:
@@ -680,7 +683,7 @@ Bottom screen:
 - save
 - restore defaults
 - back/home
-- exit
+- `START` exit hint
 
 ## Conversation screen
 Top screen:
@@ -694,7 +697,7 @@ Bottom screen:
 - create thread
 - sync threads
 - back/home
-- exit
+- `START` exit hint
 
 ## Voice input screen
 This screen must be graphical too.

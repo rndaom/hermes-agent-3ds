@@ -74,12 +74,20 @@ def test_main_c_has_settings_and_conversation_picker_navigation():
     assert "KEY_UP" in home_c
     assert "KEY_LEFT" in home_c
     assert "KEY_RIGHT" in home_c
+    assert "KEY_L" in home_c
+    assert "KEY_R" in home_c
     assert "KEY_CPAD_UP" in home_c
     assert "KEY_CPAD_LEFT" in home_c
     assert "KEY_CPAD_RIGHT" in home_c
+    assert "KEY_CPAD_UP" in conv_c
+    assert "KEY_CPAD_DOWN" in conv_c
+    assert "KEY_CPAD_UP" in settings_c
+    assert "KEY_CPAD_DOWN" in settings_c
     assert "KEY_DOWN" in conv_c
     assert "swkbdInit" in input_c
     assert "swkbdInputText" in input_c
+    assert "SWKBD_BUTTON_CONFIRM" in input_c
+    assert "button != SWKBD_BUTTON_NONE" not in input_c
     assert "SettingsField" in input_header
     assert "settings_field_label" in input_header
     assert "AppConversationState" in conv_header

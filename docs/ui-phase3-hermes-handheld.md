@@ -1,5 +1,7 @@
 # Hermes Handheld — Phase 3 UI pass
 
+> Historical note: this document captures an earlier UI phase and remains in the repo for reference only. The current visual source of truth is `docs/hermes-pictochat-dark-mode-spec.md`.
+
 Goal: expand the top screen composition so it uses more of the available width and add the first true pixel art style pass without moving the whole app to a heavier renderer yet.
 
 ## Direction

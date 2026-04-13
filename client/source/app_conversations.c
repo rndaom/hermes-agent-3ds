@@ -51,6 +51,7 @@ static void merge_synced_conversations_into_config(AppConversationState* state, 
 
 static void clear_active_conversation_view(BridgeChatResult* chat_result, char* last_message, size_t last_message_size, size_t* reply_page)
 {
+    hermes_app_ui_home_history_reset();
     if (chat_result != NULL)
         bridge_chat_result_reset(chat_result);
     if (last_message != NULL && last_message_size > 0)
@@ -238,7 +239,7 @@ bool hermes_app_conversations_handle_picker_input(
         return true;
     }
 
-    if ((kDown & KEY_UP) != 0 && config->recent_conversation_count > 0) {
+    if ((kDown & (KEY_UP | KEY_CPAD_UP)) != 0 && config->recent_conversation_count > 0) {
         if (state->selection == 0)
             state->selection = config->recent_conversation_count - 1;
         else
@@ -247,7 +248,7 @@ bool hermes_app_conversations_handle_picker_input(
         return true;
     }
 
-    if ((kDown & KEY_DOWN) != 0 && config->recent_conversation_count > 0) {
+    if ((kDown & (KEY_DOWN | KEY_CPAD_DOWN)) != 0 && config->recent_conversation_count > 0) {
         state->selection = (state->selection + 1) % config->recent_conversation_count;
         snprintf(status_line, status_line_size, "Selected %s.", config->recent_conversations[state->selection]);
         return true;

@@ -130,15 +130,12 @@ static void execute_selected_home_command(
         case HOME_COMMAND_CLEAR:
             bridge_health_result_reset(context->health_result);
             bridge_chat_result_reset(context->chat_result);
+            hermes_app_ui_home_history_reset();
             context->last_message[0] = '\0';
             *context->reply_page = 0;
             *context->request_rc = 0;
             snprintf(context->status_line, context->status_line_size, "Status cleared. Ready to test again.");
             render_home_screen(config, context);
-            break;
-        case HOME_COMMAND_EXIT:
-            if (context->exit_requested != NULL)
-                *context->exit_requested = true;
             break;
     }
 }
@@ -151,14 +148,31 @@ static void move_home_command_selection(AppHomeContext* context, int direction)
         return;
 
     selection = context->command_selection != NULL && *context->command_selection == HOME_COMMAND_NONE
-        ? (direction > 0 ? (int)HOME_COMMAND_ASK : (int)HOME_COMMAND_EXIT)
+        ? (direction > 0 ? (int)HOME_COMMAND_ASK : (int)HOME_COMMAND_CLEAR)
         : (int)*context->command_selection + direction;
     if (selection < (int)HOME_COMMAND_ASK)
-        selection = (int)HOME_COMMAND_EXIT;
-    else if (selection > (int)HOME_COMMAND_EXIT)
+        selection = (int)HOME_COMMAND_CLEAR;
+    else if (selection > (int)HOME_COMMAND_CLEAR)
         selection = (int)HOME_COMMAND_ASK;
 
     *context->command_selection = (HomeCommand)selection;
+}
+
+static HomeCommand home_command_from_touch(int px, int py)
+{
+    if (px >= 16 && px < 152 && py >= 44 && py < 72)
+        return HOME_COMMAND_ASK;
+    if (px >= 168 && px < 304 && py >= 44 && py < 72)
+        return HOME_COMMAND_CHECK;
+    if (px >= 16 && px < 152 && py >= 80 && py < 108)
+        return HOME_COMMAND_THREADS;
+    if (px >= 168 && px < 304 && py >= 80 && py < 108)
+        return HOME_COMMAND_CONFIG;
+    if (px >= 16 && px < 152 && py >= 116 && py < 144)
+        return HOME_COMMAND_MIC;
+    if (px >= 168 && px < 304 && py >= 116 && py < 144)
+        return HOME_COMMAND_CLEAR;
+    return HOME_COMMAND_NONE;
 }
 
 bool hermes_app_home_handle_input(
@@ -170,6 +184,7 @@ bool hermes_app_home_handle_input(
 )
 {
     AppRequestUiContext request_ui;
+    touchPosition touch;
     bool nav_down;
     bool nav_up;
     bool nav_left;
@@ -189,8 +204,8 @@ bool hermes_app_home_handle_input(
 
     nav_down = (kDown & (KEY_DOWN | KEY_CPAD_DOWN)) != 0;
     nav_up = (kDown & (KEY_UP | KEY_CPAD_UP)) != 0;
-    nav_left = (kDown & (KEY_LEFT | KEY_CPAD_LEFT)) != 0;
-    nav_right = (kDown & (KEY_RIGHT | KEY_CPAD_RIGHT)) != 0;
+    nav_left = (kDown & (KEY_LEFT | KEY_CPAD_LEFT | KEY_L)) != 0;
+    nav_right = (kDown & (KEY_RIGHT | KEY_CPAD_RIGHT | KEY_R)) != 0;
 
     if (nav_down) {
         move_home_command_selection(context, 1);
@@ -216,6 +231,16 @@ bool hermes_app_home_handle_input(
             (*context->reply_page)++;
         render_home_screen(config, context);
         return true;
+    }
+
+    if ((kDown & KEY_TOUCH) != 0) {
+        hidTouchRead(&touch);
+        *context->command_selection = home_command_from_touch((int)touch.px, (int)touch.py);
+        if (*context->command_selection != HOME_COMMAND_NONE) {
+            request_ui.command_selection = (size_t)*context->command_selection;
+            execute_selected_home_command(config, network_ready, screen, context, &request_ui);
+            return true;
+        }
     }
 
     if ((kDown & KEY_A) != 0) {

@@ -53,7 +53,6 @@ int main(int argc, char* argv[])
     bool ac_ready = false;
     bool network_ready = false;
     bool settings_dirty = false;
-    bool exit_requested = false;
     AppScreen screen = APP_SCREEN_HOME;
     SettingsField selected_field = SETTINGS_FIELD_HOST;
     HomeCommand command_selection = HOME_COMMAND_ASK;
@@ -70,6 +69,7 @@ int main(int argc, char* argv[])
 
     bridge_health_result_reset(&health_result);
     bridge_chat_result_reset(&chat_result);
+    hermes_app_ui_home_history_reset();
     hermes_app_conversations_init(&g_conversation_state);
     last_message[0] = '\0';
 
@@ -128,7 +128,6 @@ int main(int argc, char* argv[])
                 sizeof(last_message),
                 &reply_page,
                 &command_selection,
-                &exit_requested,
                 status_line,
                 sizeof(status_line),
                 &request_rc,
@@ -136,8 +135,6 @@ int main(int argc, char* argv[])
             };
 
             hermes_app_home_handle_input(kDown, &config, network_ready, &screen, &home_context);
-            if (exit_requested)
-                break;
         } else if (screen == APP_SCREEN_CONVERSATIONS) {
             if (hermes_app_conversations_handle_picker_input(
                     &g_conversation_state,
