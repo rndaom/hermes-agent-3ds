@@ -456,6 +456,70 @@ static Result send_all(int socket_fd, const void* buffer, size_t length)
     return 0;
 }
 
+static bool parse_content_length_header(const char* response, size_t* out_content_length)
+{
+    const char* header;
+    const char* body;
+    char* end_ptr = NULL;
+    unsigned long parsed;
+
+    if (response == NULL || out_content_length == NULL)
+        return false;
+
+    body = strstr(response, "\r\n\r\n");
+    if (body == NULL)
+        return false;
+
+    header = strstr(response, "\r\nContent-Length:");
+    if (header != NULL)
+        header += 2;
+    else if (strncmp(response, "Content-Length:", strlen("Content-Length:")) == 0)
+        header = response;
+    else
+        return false;
+
+    if (header >= body)
+        return false;
+
+    header = strchr(header, ':');
+    if (header == NULL)
+        return false;
+    header++;
+
+    while (*header == ' ' || *header == '\t')
+        header++;
+
+    parsed = strtoul(header, &end_ptr, 10);
+    if (end_ptr == header)
+        return false;
+
+    *out_content_length = (size_t)parsed;
+    return true;
+}
+
+static bool response_complete(const char* response, size_t response_used)
+{
+    const char* body;
+    size_t header_bytes;
+    size_t content_length;
+
+    if (response == NULL)
+        return false;
+
+    body = strstr(response, "\r\n\r\n");
+    if (body == NULL)
+        return false;
+
+    if (!parse_content_length_header(response, &content_length))
+        return false;
+
+    header_bytes = (size_t)((body + 4) - response);
+    if (response_used < header_bytes)
+        return false;
+
+    return (response_used - header_bytes) >= content_length;
+}
+
 static Result perform_request(
     const char* method,
     const char* url,
@@ -622,6 +686,9 @@ static Result perform_request(
             break;
 
         response_used += (size_t)received;
+        response[response_used] = '\0';
+        if (response_complete(response, response_used))
+            break;
     }
 
     close(socket_fd);

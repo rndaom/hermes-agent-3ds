@@ -62,6 +62,14 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "hermes_app_config_build_events_url" in request_c
     assert "hermes_app_config_build_conversations_url" in conv_c
     assert "bridge_v2_send_message" in request_c
+    assert (
+        "parse_content_length_header"
+        in (CLIENT_DIR / "source" / "bridge_v2.c").read_text()
+    )
+    assert (
+        "response_complete(response, response_used)"
+        in (CLIENT_DIR / "source" / "bridge_v2.c").read_text()
+    )
     assert "config->active_conversation_id" in request_c
     assert "message_buffer" in request_c
     assert "bridge_v2_list_conversations" in conv_c

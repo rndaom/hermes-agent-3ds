@@ -35,6 +35,8 @@ def test_health_check_implementation_uses_wifi_and_timeout_based_socket_networki
     assert "Bridge timed out." in source
     assert "socket_errno" in source
     assert "socket_stage" in source
+    assert "parse_content_length_header" in source
+    assert "response_complete" in source
 
 
 def test_main_c_offers_a_button_driven_native_v2_gateway_health_check_ui():
@@ -61,6 +63,7 @@ def test_main_c_offers_a_button_driven_native_v2_gateway_health_check_ui():
     assert '"context_percent"' in health_c
     assert "BRIDGE_HEALTH_PATH_MAX" in health_c
     assert "char request[1400]" in health_c
+    assert "response_complete(response, response_used)" in health_c
     assert "url_encode_component" in app_config_c
     assert "token=%s&device_id=%s&conversation_id=%s" in app_config_c
     assert "bridge_v2_get_capabilities" not in main_c
