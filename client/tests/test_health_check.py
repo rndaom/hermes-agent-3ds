@@ -37,6 +37,7 @@ def test_health_check_implementation_uses_wifi_and_timeout_based_socket_networki
     assert "socket_stage" in source
     assert "parse_content_length_header" in source
     assert "response_complete" in source
+    assert "getpeername(socket_fd" in source
 
 
 def test_main_c_offers_a_button_driven_native_v2_gateway_health_check_ui():
@@ -51,6 +52,8 @@ def test_main_c_offers_a_button_driven_native_v2_gateway_health_check_ui():
     assert "TOOL TRAY" in ui_c
     assert "AppHomeContext" in home_h
     assert "Checking Hermes relay..." in home_c
+    assert "format_health_status_line" in home_c
+    assert '"%s [%s/%d]"' in home_c
     assert "Reply note received over native v2." in request_c
     assert "KEY_A" in home_c
     assert "bridge_health_check_run" in home_c

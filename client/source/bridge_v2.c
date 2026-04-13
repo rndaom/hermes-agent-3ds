@@ -396,6 +396,8 @@ static Result connect_with_timeout(int socket_fd, const struct sockaddr_in* addr
     int connect_rc;
     int socket_error = 0;
     socklen_t socket_error_size = sizeof(socket_error);
+    struct sockaddr_in peer_address;
+    socklen_t peer_address_size = sizeof(peer_address);
     Result wait_rc;
 
     flags = fcntl(socket_fd, F_GETFL, 0);
@@ -427,6 +429,12 @@ static Result connect_with_timeout(int socket_fd, const struct sockaddr_in* addr
         return MAKERESULT(RL_FATAL, RS_INTERNAL, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
     if (socket_error != 0) {
+        memset(&peer_address, 0, sizeof(peer_address));
+        if (getpeername(socket_fd, (struct sockaddr*)&peer_address, &peer_address_size) == 0) {
+            if (fcntl(socket_fd, F_SETFL, flags) < 0)
+                return MAKERESULT(RL_FATAL, RS_INTERNAL, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
+            return 0;
+        }
         errno = socket_error;
         fcntl(socket_fd, F_SETFL, flags);
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);

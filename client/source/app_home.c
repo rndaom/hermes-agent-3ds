@@ -31,6 +31,36 @@ static void render_home_screen(const HermesAppConfig* config, const AppHomeConte
     render_screen(APP_SCREEN_HOME, config, context);
 }
 
+static void format_health_status_line(char* out, size_t out_size, const BridgeHealthResult* result)
+{
+    if (out == NULL || out_size == 0 || result == NULL)
+        return;
+
+    if (result->error[0] == '\0') {
+        snprintf(out, out_size, "Relay check failed.");
+        return;
+    }
+
+    if (result->socket_stage[0] != '\0') {
+        snprintf(
+            out,
+            out_size,
+            "%s [%s/%d]",
+            result->error,
+            result->socket_stage,
+            result->socket_errno
+        );
+        return;
+    }
+
+    if (result->http_status != 0) {
+        snprintf(out, out_size, "%s [http %lu]", result->error, (unsigned long)result->http_status);
+        return;
+    }
+
+    snprintf(out, out_size, "%s", result->error);
+}
+
 static void handle_home_health_check(const HermesAppConfig* config, bool network_ready, AppHomeContext* context)
 {
     char health_url[HERMES_APP_HEALTH_URL_MAX];
@@ -66,7 +96,7 @@ static void handle_home_health_check(const HermesAppConfig* config, bool network
     else if (context->health_result->error[0] == '\0')
         snprintf(context->status_line, context->status_line_size, "Relay check failed: 0x%08lX", (unsigned long)*context->request_rc);
     else
-        snprintf(context->status_line, context->status_line_size, "%s", context->health_result->error);
+        format_health_status_line(context->status_line, context->status_line_size, context->health_result);
 
     render_home_screen(config, context);
 }
