@@ -566,13 +566,11 @@ If later art or font changes require different numbers, update this table and th
 Default control mapping remains explicit and first-class.
 
 ### Home
-- `A` = check link / health
-- `B` = ask Hermes
-- `UP` = mic input
-- `X` = settings
-- `SELECT` = threads
-- `Y` = clear reply/status
-- `L/R` = reply page
+- `UP/DOWN` = move through the home action list
+- `Circle Pad UP/DOWN` = move through the home action list
+- `LEFT/RIGHT` = reply page
+- `Circle Pad LEFT/RIGHT` = reply page
+- `A` = run the selected home action
 - `START` = exit
 
 ### Threads

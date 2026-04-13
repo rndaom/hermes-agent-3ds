@@ -71,9 +71,12 @@ def test_main_c_has_settings_and_conversation_picker_navigation():
     assert '"app_settings.h"' in main_c
     assert "AppHomeContext" in home_header
     assert "hermes_app_home_handle_input" in home_header
-    assert "KEY_X" in home_c
     assert "KEY_UP" in home_c
-    assert "KEY_SELECT" in home_c
+    assert "KEY_LEFT" in home_c
+    assert "KEY_RIGHT" in home_c
+    assert "KEY_CPAD_UP" in home_c
+    assert "KEY_CPAD_LEFT" in home_c
+    assert "KEY_CPAD_RIGHT" in home_c
     assert "KEY_DOWN" in conv_c
     assert "swkbdInit" in input_c
     assert "swkbdInputText" in input_c
@@ -89,7 +92,6 @@ def test_main_c_has_settings_and_conversation_picker_navigation():
     assert "Conversation picker opened" in conv_c
     assert "bridge_v2_list_conversations" in conv_c
     assert "active_conversation_id" in conv_c
-    assert "Status cleared. Ready to test again." in home_c
     assert "Settings opened." in home_c
     assert "Settings closed with unsaved changes." in settings_c
     assert "Defaults restored. Save settings to keep them." in settings_c
@@ -97,5 +99,5 @@ def test_main_c_has_settings_and_conversation_picker_navigation():
     assert "edit_selected_setting" in settings_c
     assert "settings_field_label" in settings_c
     assert "info != NULL && info->title[0] != '\\0'" in ui_c
-    assert "SELECT Threads" in ui_c or "THREAD MENU" in ui_c
-    assert "X Save settings" in ui_c or "OPTIONS MENU" in ui_c
+    assert "Conversations" in ui_c or "THREAD ACTIONS" in ui_c
+    assert "Save settings" in ui_c or "SETTINGS ACTIONS" in ui_c

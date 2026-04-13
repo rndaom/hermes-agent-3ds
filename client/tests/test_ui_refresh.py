@@ -19,12 +19,16 @@ def test_phase1_ui_refresh_doc_defines_hermes_handheld_direction():
     assert "Old 3DS" in doc
 
 
-def test_app_ui_uses_phase1_command_deck_language_and_branding():
+def test_app_ui_uses_home_action_list_and_clean_thread_summary():
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
-    assert "COMMAND MENU" in ui_c
-    assert "RELAY DECK" in ui_c
+    assert "ACTIONS" in ui_c
     assert "ACTIVE THREAD" in ui_c
+    assert '"ROOM"' in ui_c
+    assert '"LINK"' in ui_c
     assert "HERMES REPLY" in ui_c
     assert "THREAD ARCHIVE" in ui_c
     assert "SYSTEM CONFIG" in ui_c
+    assert '"MODEL"' not in ui_c
+    assert '"CONTEXT"' not in ui_c
+    assert '"SESSION"' not in ui_c

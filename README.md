@@ -64,7 +64,8 @@ The 3DS client expects the gateway to support the active handheld flow:
 
 Open **Hermes Agent 3DS** in Homebrew Launcher.
 
-- `X` — open settings
+- move to `Settings` with the D-pad / Circle Pad
+- press `A` to open settings
 - set `Host`
 - set `Port`
 - set `Token`
@@ -74,21 +75,16 @@ Open **Hermes Agent 3DS** in Homebrew Launcher.
 
 ### 5) Test it
 
-- `A` — check Hermes gateway health
-- `B` — ask Hermes
-- `UP` — start mic input and send it through host-side speech-to-text
-- `L/R` — page long replies
+- D-pad / Circle Pad `UP/DOWN` — choose a home action
+- `A` — run the selected action
+- D-pad / Circle Pad `LEFT/RIGHT` — page long replies
 
 ## Controls
 
 ### Home
-- A — check Hermes gateway health
-- B — ask Hermes
-- UP — start mic input
-- X — open settings
-- SELECT — open the conversation picker
-- Y — clear status
-- L/R — page long replies
+- UP/DOWN — move through the home action list
+- LEFT/RIGHT — page long replies
+- A — run the selected action
 - START — exit
 
 ### Conversations

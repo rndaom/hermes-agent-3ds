@@ -59,7 +59,8 @@ By default the local setup here uses port `8787`.
 Open **Hermes Agent 3DS** in Homebrew Launcher.
 
 On the home screen:
-- press `X` to open settings
+- move to `Settings` with the D-pad / Circle Pad
+- press `A` to open settings
 - set `Host` to your PC's LAN IP
 - set `Port` to the gateway port
 - set `Token` to the same value configured in Hermes
@@ -70,12 +71,12 @@ On the home screen:
 ## 5) Test the connection
 
 On the home screen:
-- press `A` to run a health check
-- if that succeeds, press `SELECT` and make sure the conversation picker opens
+- move to `Check Link` with the D-pad / Circle Pad and press `A`
+- if that succeeds, move to `Conversations` and press `A` to open the picker
 - press `X` there if you want to create a new conversation ID, or `Y` to sync recent conversation slots from Hermes
-- return home and press `B` to send a test message in the active conversation
-- or press `UP` to record mic input and send it through host-side speech-to-text
-- use `L/R` if the reply spans multiple pages
+- return home, move to `Ask Hermes`, and press `A` to send a test message in the active conversation
+- or move to `Mic Input` and press `A` to record mic input and send it through host-side speech-to-text
+- use D-pad / Circle Pad `LEFT/RIGHT` if the reply spans multiple pages
 
 ## Common issues
 
@@ -88,7 +89,7 @@ On the home screen:
 - the token saved on the 3DS must exactly match the Hermes-side 3DS gateway token
 
 ### App says V2 config is incomplete
-- open settings with `X`
+- open `Settings` from the home action list
 - set `Device ID`
 - save again with `X`
 

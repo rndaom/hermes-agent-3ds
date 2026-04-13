@@ -21,6 +21,7 @@ typedef void (*AppRequestRenderFn)(
     const BridgeChatResult* chat_result,
     const char* last_message,
     size_t reply_page,
+    size_t command_selection,
     const char* status_line,
     Result last_rc
 );
@@ -29,6 +30,7 @@ typedef struct AppRequestUiContext {
     SettingsField selected_field;
     bool settings_dirty;
     const BridgeHealthResult* health_result;
+    size_t command_selection;
     AppRequestRenderFn render;
 } AppRequestUiContext;
 

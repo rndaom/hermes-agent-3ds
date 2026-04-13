@@ -8,7 +8,7 @@ static C3D_RenderTarget* g_bottom_target = NULL;
 static C2D_TextBuf g_text_buf = NULL;
 static C2D_TextBuf g_measure_buf = NULL;
 
-static bool app_gfx_measure_text_dimensions(const char* text, float scale_x, float scale_y, float* out_width, float* out_height)
+bool app_gfx_measure_text(const char* text, float scale_x, float scale_y, float* out_width, float* out_height)
 {
     C2D_Text draw_text;
 
@@ -179,7 +179,7 @@ void app_gfx_text_fit(float x, float y, float max_width, float scale_x, float sc
         return;
     }
 
-    if (app_gfx_measure_text_dimensions(text, scale_x, scale_y, &width, &height) && width <= max_width) {
+    if (app_gfx_measure_text(text, scale_x, scale_y, &width, &height) && width <= max_width) {
         app_gfx_text(x, y, scale_x, scale_y, color, text);
         return;
     }
@@ -208,7 +208,7 @@ void app_gfx_text_fit(float x, float y, float max_width, float scale_x, float sc
             }
         }
 
-        if (app_gfx_measure_text_dimensions(fitted, scale_x, scale_y, &width, &height) && width <= max_width) {
+        if (app_gfx_measure_text(fitted, scale_x, scale_y, &width, &height) && width <= max_width) {
             best = mid;
             low = mid + 1;
         } else {

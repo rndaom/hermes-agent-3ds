@@ -39,6 +39,44 @@ static void copy_string(char* dest, size_t dest_size, const char* src)
     snprintf(dest, dest_size, "%s", src);
 }
 
+static bool url_encode_component(const char* input, char* out, size_t out_size)
+{
+    static const char hex[] = "0123456789ABCDEF";
+    size_t write_index = 0;
+
+    if (out == NULL || out_size == 0)
+        return false;
+
+    out[0] = '\0';
+    if (input == NULL)
+        return true;
+
+    while (*input != '\0') {
+        unsigned char ch = (unsigned char)*input;
+        bool safe = (ch >= 'a' && ch <= 'z') ||
+                    (ch >= 'A' && ch <= 'Z') ||
+                    (ch >= '0' && ch <= '9') ||
+                    ch == '-' || ch == '_' || ch == '.' || ch == '~';
+
+        if (safe) {
+            if (write_index + 1 >= out_size)
+                return false;
+            out[write_index++] = (char)ch;
+        } else {
+            if (write_index + 3 >= out_size)
+                return false;
+            out[write_index++] = '%';
+            out[write_index++] = hex[(ch >> 4) & 0x0F];
+            out[write_index++] = hex[ch & 0x0F];
+        }
+
+        input++;
+    }
+
+    out[write_index] = '\0';
+    return true;
+}
+
 static bool is_safe_conversation_id(const char* value)
 {
     if (value == NULL || value[0] == '\0')
@@ -315,7 +353,36 @@ static bool build_url(const HermesAppConfig* config, const char* endpoint_path, 
 
 bool hermes_app_config_build_health_url(const HermesAppConfig* config, char* out_url, size_t out_size)
 {
-    return build_url(config, "/api/v2/health", out_url, out_size);
+    int written;
+    char encoded_device_id[HERMES_APP_DEVICE_ID_MAX * 3 + 1];
+    char encoded_conversation_id[HERMES_APP_CONVERSATION_ID_MAX * 3 + 1];
+    char encoded_token[HERMES_APP_CONFIG_TOKEN_MAX * 3 + 1];
+
+    if (config == NULL || out_url == NULL || out_size == 0)
+        return false;
+
+    if (config->host[0] == '\0' || config->port == 0)
+        return false;
+
+    if (!url_encode_component(config->device_id[0] != '\0' ? config->device_id : "", encoded_device_id, sizeof(encoded_device_id)) ||
+        !url_encode_component(config->active_conversation_id[0] != '\0' ? config->active_conversation_id : DEFAULT_CONVERSATION_ID,
+            encoded_conversation_id,
+            sizeof(encoded_conversation_id)) ||
+        !url_encode_component(config->token[0] != '\0' ? config->token : "", encoded_token, sizeof(encoded_token))) {
+        return false;
+    }
+
+    written = snprintf(
+        out_url,
+        out_size,
+        "http://%s:%u/api/v2/health?token=%s&device_id=%s&conversation_id=%s",
+        config->host,
+        (unsigned int)config->port,
+        encoded_token,
+        encoded_device_id,
+        encoded_conversation_id
+    );
+    return written > 0 && (size_t)written < out_size;
 }
 
 bool hermes_app_config_build_conversations_url(const HermesAppConfig* config, char* out_url, size_t out_size)

@@ -1,13 +1,29 @@
 #include "app_ui.h"
 #include "app_gfx.h"
+#include "app_home.h"
 
 #include <stdio.h>
 #include <string.h>
 
-#define HOME_WRAP_WIDTH 46
 #define HOME_WRAP_MAX_LINES 128
+#define HOME_WRAP_LINE_MAX 192
+#define HOME_MESSAGE_WRAP_MAX_LINES 16
+#define HOME_SUMMARY_WRAP_MAX_LINES 4
+#define HOME_INFO_WRAP_MAX_LINES 8
 #define HOME_MESSAGE_LINES_PER_PAGE 2
-#define HOME_REPLY_LINES_PER_PAGE 4
+#define HOME_REPLY_LINES_PER_PAGE 6
+#define HOME_MESSAGE_MAX_WIDTH 348.0f
+#define HOME_REPLY_MAX_WIDTH 348.0f
+#define HOME_MESSAGE_SCALE 0.30f
+#define HOME_REPLY_SCALE 0.32f
+
+static char g_reply_page_lines[HOME_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
+static char g_home_message_lines[HOME_MESSAGE_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
+static char g_home_reply_lines[HOME_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
+static char g_home_room_lines[HOME_SUMMARY_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
+static char g_home_status_lines[HOME_SUMMARY_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
+static char g_home_token_lines[HOME_SUMMARY_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
+static char g_home_detail_lines[HOME_INFO_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
 
 static void copy_bounded_string(char* dest, size_t dest_size, const char* src)
 {
@@ -41,31 +57,6 @@ static void format_token_summary(const HermesAppConfig* config, char* out, size_
         snprintf(out, out_size, "<empty>");
     else
         snprintf(out, out_size, "configured (%lu chars)", (unsigned long)token_length);
-}
-
-static void add_truncation_marker(char* line)
-{
-    size_t length;
-
-    if (line == NULL)
-        return;
-
-    length = strlen(line);
-    if (HOME_WRAP_WIDTH == 0)
-        return;
-
-    if (length == 0) {
-        line[0] = '~';
-        line[1] = '\0';
-        return;
-    }
-
-    if (length >= HOME_WRAP_WIDTH)
-        line[HOME_WRAP_WIDTH - 1] = '~';
-    else {
-        line[length] = '~';
-        line[length + 1] = '\0';
-    }
 }
 
 static size_t utf8_prefix_boundary(const char* text, size_t max_bytes)
@@ -117,7 +108,92 @@ static size_t utf8_prefix_boundary(const char* text, size_t max_bytes)
     return last_valid;
 }
 
-static size_t wrap_text_for_console(const char* input, char lines[][HOME_WRAP_WIDTH + 1], size_t max_lines)
+static size_t fit_prefix_to_width(const char* text, size_t max_bytes, float max_width, float scale_x, float scale_y)
+{
+    char candidate[HOME_WRAP_LINE_MAX];
+    float width = 0.0f;
+    float height = 0.0f;
+    size_t low = 0;
+    size_t high;
+    size_t best = 0;
+
+    if (text == NULL || text[0] == '\0' || max_bytes == 0)
+        return 0;
+
+    high = max_bytes;
+    if (high >= sizeof(candidate))
+        high = sizeof(candidate) - 1;
+
+    while (low <= high) {
+        size_t mid = low + (high - low) / 2;
+        size_t keep = utf8_prefix_boundary(text, mid);
+
+        if (keep == 0 && mid > 0)
+            keep = utf8_prefix_boundary(text, 1);
+
+        memcpy(candidate, text, keep);
+        candidate[keep] = '\0';
+        if (app_gfx_measure_text(candidate, scale_x, scale_y, &width, &height) && width <= max_width) {
+            best = keep;
+            low = mid + 1;
+        } else {
+            if (mid == 0)
+                break;
+            high = mid - 1;
+        }
+    }
+
+    return best;
+}
+
+static void append_truncation_ellipsis(char* line, float max_width, float scale_x, float scale_y)
+{
+    char candidate[HOME_WRAP_LINE_MAX];
+    size_t length;
+    size_t keep;
+    float width = 0.0f;
+    float height = 0.0f;
+
+    if (line == NULL)
+        return;
+
+    length = strlen(line);
+    if (length == 0) {
+        copy_bounded_string(line, HOME_WRAP_LINE_MAX, "...");
+        return;
+    }
+
+    candidate[0] = '\0';
+    copy_bounded_string(candidate, sizeof(candidate), line);
+    strncat(candidate, "...", sizeof(candidate) - strlen(candidate) - 1);
+    if (app_gfx_measure_text(candidate, scale_x, scale_y, &width, &height) && width <= max_width) {
+        copy_bounded_string(line, HOME_WRAP_LINE_MAX, candidate);
+        return;
+    }
+
+    keep = fit_prefix_to_width(line, length, max_width, scale_x, scale_y);
+    while (keep > 0) {
+        memcpy(candidate, line, keep);
+        candidate[keep] = '\0';
+        strncat(candidate, "...", sizeof(candidate) - strlen(candidate) - 1);
+        if (app_gfx_measure_text(candidate, scale_x, scale_y, &width, &height) && width <= max_width) {
+            copy_bounded_string(line, HOME_WRAP_LINE_MAX, candidate);
+            return;
+        }
+        keep = utf8_prefix_boundary(line, keep - 1);
+    }
+
+    copy_bounded_string(line, HOME_WRAP_LINE_MAX, "...");
+}
+
+static size_t wrap_text_for_pixels(
+    const char* input,
+    float max_width,
+    float scale_x,
+    float scale_y,
+    char lines[][HOME_WRAP_LINE_MAX],
+    size_t max_lines
+)
 {
     const char* cursor;
     size_t line_count = 0;
@@ -126,15 +202,16 @@ static size_t wrap_text_for_console(const char* input, char lines[][HOME_WRAP_WI
         return 0;
 
     if (input == NULL || input[0] == '\0') {
-        copy_bounded_string(lines[0], HOME_WRAP_WIDTH + 1, "<none>");
+        copy_bounded_string(lines[0], HOME_WRAP_LINE_MAX, "<none>");
         return 1;
     }
 
     cursor = input;
     while (*cursor != '\0' && line_count < max_lines) {
-        char line[HOME_WRAP_WIDTH + 1];
+        char line[HOME_WRAP_LINE_MAX];
         size_t line_len = 0;
 
+        line[0] = '\0';
         if (*cursor == '\n') {
             lines[line_count][0] = '\0';
             line_count++;
@@ -148,7 +225,9 @@ static size_t wrap_text_for_console(const char* input, char lines[][HOME_WRAP_WI
         while (*cursor != '\0' && *cursor != '\n') {
             const char* word_start;
             size_t word_len = 0;
-            size_t needed;
+            char candidate[HOME_WRAP_LINE_MAX];
+            float width = 0.0f;
+            float height = 0.0f;
 
             while (*cursor == ' ' || *cursor == '\t' || *cursor == '\r')
                 cursor++;
@@ -163,28 +242,30 @@ static size_t wrap_text_for_console(const char* input, char lines[][HOME_WRAP_WI
                    word_start[word_len] != '\n')
                 word_len++;
 
-            if (line_len == 0 && word_len > HOME_WRAP_WIDTH) {
-                size_t safe_len = utf8_prefix_boundary(word_start, HOME_WRAP_WIDTH);
-                if (safe_len == 0)
-                    safe_len = HOME_WRAP_WIDTH;
-                memcpy(line, word_start, safe_len);
-                line[safe_len] = '\0';
-                cursor = word_start + safe_len;
-                line_len = safe_len;
-                break;
+            if (line_len == 0) {
+                size_t keep = fit_prefix_to_width(word_start, word_len, max_width, scale_x, scale_y);
+                if (keep == 0)
+                    keep = utf8_prefix_boundary(word_start, word_len > 0 ? 1 : 0);
+                if (keep == 0)
+                    break;
+                memcpy(line, word_start, keep);
+                line[keep] = '\0';
+                line_len = keep;
+                cursor = word_start + keep;
+                if (keep < word_len)
+                    break;
+                continue;
             }
 
-            needed = word_len + (line_len > 0 ? 1 : 0);
-            if (line_len + needed > HOME_WRAP_WIDTH)
-                break;
+            snprintf(candidate, sizeof(candidate), "%s %.*s", line, (int)word_len, word_start);
+            if (app_gfx_measure_text(candidate, scale_x, scale_y, &width, &height) && width <= max_width) {
+                copy_bounded_string(line, sizeof(line), candidate);
+                line_len = strlen(line);
+                cursor = word_start + word_len;
+                continue;
+            }
 
-            if (line_len > 0)
-                line[line_len++] = ' ';
-
-            memcpy(line + line_len, word_start, word_len);
-            line_len += word_len;
-            line[line_len] = '\0';
-            cursor = word_start + word_len;
+            break;
         }
 
         if (line_len == 0) {
@@ -193,7 +274,7 @@ static size_t wrap_text_for_console(const char* input, char lines[][HOME_WRAP_WI
                 cursor++;
         }
 
-        copy_bounded_string(lines[line_count], HOME_WRAP_WIDTH + 1, line);
+        copy_bounded_string(lines[line_count], HOME_WRAP_LINE_MAX, line);
         line_count++;
 
         if (*cursor == '\n')
@@ -201,10 +282,10 @@ static size_t wrap_text_for_console(const char* input, char lines[][HOME_WRAP_WI
     }
 
     if (*cursor != '\0' && line_count > 0)
-        add_truncation_marker(lines[line_count - 1]);
+        append_truncation_ellipsis(lines[line_count - 1], max_width, scale_x, scale_y);
 
     if (line_count == 0) {
-        copy_bounded_string(lines[0], HOME_WRAP_WIDTH + 1, "<none>");
+        copy_bounded_string(lines[0], HOME_WRAP_LINE_MAX, "<none>");
         return 1;
     }
 
@@ -221,8 +302,14 @@ static size_t page_count_for_lines(size_t total_lines, size_t lines_per_page)
 
 size_t hermes_app_ui_reply_page_count(const char* reply_text)
 {
-    char wrapped_lines[HOME_WRAP_MAX_LINES][HOME_WRAP_WIDTH + 1];
-    size_t total_lines = wrap_text_for_console(reply_text, wrapped_lines, HOME_WRAP_MAX_LINES);
+    size_t total_lines = wrap_text_for_pixels(
+        reply_text,
+        HOME_REPLY_MAX_WIDTH,
+        HOME_REPLY_SCALE,
+        HOME_REPLY_SCALE,
+        g_reply_page_lines,
+        HOME_WRAP_MAX_LINES
+    );
     return page_count_for_lines(total_lines, HOME_REPLY_LINES_PER_PAGE);
 }
 
@@ -329,7 +416,7 @@ static void draw_text_lines(
     float scale_x,
     float scale_y,
     u32 color,
-    char lines[][HOME_WRAP_WIDTH + 1],
+    char lines[][HOME_WRAP_LINE_MAX],
     size_t total_lines,
     size_t start,
     size_t max_lines
@@ -348,10 +435,48 @@ static void draw_menu_row(float x, float y, float w, const char* label, bool sel
     app_gfx_text_fit(x + 8.0f, y + 3.0f, w - 16.0f, 0.43f, 0.43f, selected ? UI_BG_TOP : UI_TEXT, label);
 }
 
-static void draw_status_line(float x, float y, float max_width, const char* label, const char* value)
+static const char* home_command_label_for_selection(size_t command_selection)
 {
-    app_gfx_text(x, y, 0.38f, 0.38f, UI_SIGNAL_HI, label);
-    app_gfx_text_fit(x, y + 10.0f, max_width, 0.36f, 0.36f, UI_TEXT, value != NULL ? value : "<none>");
+    switch ((HomeCommand)command_selection) {
+        case HOME_COMMAND_CHECK:
+            return "Check Link";
+        case HOME_COMMAND_THREADS:
+            return "Conversations";
+        case HOME_COMMAND_CONFIG:
+            return "Settings";
+        case HOME_COMMAND_MIC:
+            return "Mic Input";
+        case HOME_COMMAND_CLEAR:
+            return "Clear Reply";
+        case HOME_COMMAND_EXIT:
+            return "Exit";
+        case HOME_COMMAND_NONE:
+        case HOME_COMMAND_ASK:
+        default:
+            return "Ask Hermes";
+    }
+}
+
+static const char* home_command_detail_for_selection(size_t command_selection)
+{
+    switch ((HomeCommand)command_selection) {
+        case HOME_COMMAND_CHECK:
+            return "Run a health check against the configured Hermes gateway and refresh the link status.";
+        case HOME_COMMAND_THREADS:
+            return "Open the conversation list so you can switch threads, create one, or sync recent entries.";
+        case HOME_COMMAND_CONFIG:
+            return "Open the settings screen to edit host, port, token, and device ID.";
+        case HOME_COMMAND_MIC:
+            return "Record a short microphone message on-device and send it through Hermes speech-to-text.";
+        case HOME_COMMAND_CLEAR:
+            return "Clear the current reply, health state, and request status so the home screen starts clean again.";
+        case HOME_COMMAND_EXIT:
+            return "Close Hermes Agent 3DS and return to the Homebrew Launcher.";
+        case HOME_COMMAND_NONE:
+        case HOME_COMMAND_ASK:
+        default:
+            return "Open the software keyboard and send a text prompt in the active conversation.";
+    }
 }
 
 static void render_home_graphical(
@@ -360,6 +485,7 @@ static void render_home_graphical(
     const BridgeChatResult* chat_result,
     const char* last_message,
     size_t reply_page,
+    size_t command_selection,
     const char* status_line,
     const BridgeV2ConversationListResult* conversation_list
 )
@@ -368,12 +494,16 @@ static void render_home_graphical(
     char token_summary[48];
     char bridge_summary[80];
     char page_label[24];
-    char message_lines[16][HOME_WRAP_WIDTH + 1];
-    char reply_lines[HOME_WRAP_MAX_LINES][HOME_WRAP_WIDTH + 1];
-    size_t message_line_count = wrap_text_for_console(last_message, message_lines, 16);
+    size_t room_line_count;
+    size_t status_line_count;
+    size_t token_line_count;
+    size_t detail_line_count;
+    size_t message_line_count;
     size_t reply_line_count = 0;
     size_t page_count = 1;
     size_t reply_start = 0;
+    bool has_selection = command_selection <= (size_t)HOME_COMMAND_EXIT;
+    size_t selected_command = has_selection ? command_selection : (size_t)HOME_COMMAND_ASK;
     const char* reply_source = NULL;
 
     format_active_conversation_label(config, conversation_list, conversation_label, sizeof(conversation_label));
@@ -391,7 +521,54 @@ static void render_home_graphical(
     else
         reply_source = "Ready for a request.";
 
-    reply_line_count = wrap_text_for_console(reply_source, reply_lines, HOME_WRAP_MAX_LINES);
+    room_line_count = wrap_text_for_pixels(
+        conversation_label,
+        210.0f,
+        0.32f,
+        0.32f,
+        g_home_room_lines,
+        2
+    );
+    status_line_count = wrap_text_for_pixels(
+        status_line,
+        124.0f,
+        0.29f,
+        0.29f,
+        g_home_status_lines,
+        2
+    );
+    token_line_count = wrap_text_for_pixels(
+        token_summary,
+        136.0f,
+        0.28f,
+        0.28f,
+        g_home_token_lines,
+        3
+    );
+    detail_line_count = wrap_text_for_pixels(
+        home_command_detail_for_selection(selected_command),
+        136.0f,
+        0.29f,
+        0.29f,
+        g_home_detail_lines,
+        5
+    );
+    message_line_count = wrap_text_for_pixels(
+        last_message,
+        HOME_MESSAGE_MAX_WIDTH,
+        HOME_MESSAGE_SCALE,
+        HOME_MESSAGE_SCALE,
+        g_home_message_lines,
+        HOME_MESSAGE_LINES_PER_PAGE
+    );
+    reply_line_count = wrap_text_for_pixels(
+        reply_source,
+        HOME_REPLY_MAX_WIDTH,
+        HOME_REPLY_SCALE,
+        HOME_REPLY_SCALE,
+        g_home_reply_lines,
+        HOME_WRAP_MAX_LINES
+    );
     page_count = page_count_for_lines(reply_line_count, HOME_REPLY_LINES_PER_PAGE);
     if (reply_page >= page_count)
         reply_page = page_count - 1;
@@ -399,48 +576,57 @@ static void render_home_graphical(
     snprintf(page_label, sizeof(page_label), "%lu/%lu", (unsigned long)(reply_page + 1), (unsigned long)page_count);
 
     app_gfx_begin_top(UI_BG_TOP);
-    draw_header("HERMES AGENT", "RELAY DECK");
-    app_gfx_panel_inset(12.0f, 48.0f, 226.0f, 76.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
-    draw_chip(22.0f, 54.0f, 86.0f, "ACTIVE THREAD", UI_ACCENT, UI_TEXT);
-    draw_status_line(22.0f, 76.0f, 190.0f, "ROOM", conversation_label);
-    draw_status_line(22.0f, 100.0f, 190.0f, "LINK STATUS", status_line);
+    app_gfx_panel_inset(10.0f, 10.0f, 380.0f, 64.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
+    draw_chip(18.0f, 16.0f, 110.0f, "ACTIVE THREAD", UI_ACCENT, UI_TEXT);
+    app_gfx_text(20.0f, 42.0f, 0.30f, 0.30f, UI_META, "ROOM");
+    app_gfx_text(246.0f, 42.0f, 0.30f, 0.30f, UI_META, "LINK");
+    draw_text_lines(20.0f, 54.0f, 10.0f, 210.0f, 0.32f, 0.32f, UI_TEXT, g_home_room_lines, room_line_count, 0, 2);
+    draw_text_lines(
+        246.0f,
+        54.0f,
+        10.0f,
+        124.0f,
+        0.29f,
+        0.29f,
+        health_result != NULL && health_result->success ? UI_SIGNAL_HI : UI_MUTED,
+        g_home_status_lines,
+        status_line_count,
+        0,
+        2
+    );
 
-    app_gfx_panel_inset(248.0f, 48.0f, 140.0f, 76.0f, UI_PANEL_ALT, UI_BORDER, UI_ACCENT);
-    draw_chip(258.0f, 54.0f, 72.0f, "RELAY", UI_SIGNAL, UI_BG_TOP);
-    app_gfx_panel(284.0f, 70.0f, 40.0f, 32.0f, UI_ACCENT, UI_BORDER_STRONG);
-    app_gfx_panel(292.0f, 62.0f, 24.0f, 8.0f, UI_SIGNAL_HI, UI_BORDER_STRONG);
-    app_gfx_panel(298.0f, 82.0f, 12.0f, 14.0f, UI_SIGNAL_HI, UI_BORDER_STRONG);
-    app_gfx_text_fit(258.0f, 108.0f, 118.0f, 0.30f, 0.30f, UI_MUTED, health_result != NULL && health_result->success ? "relay crest ready" : "relay crest standby");
-
-    app_gfx_panel_inset(12.0f, 132.0f, 376.0f, 96.0f, UI_REPLY_CARD, UI_BORDER_STRONG, UI_SIGNAL);
-    draw_chip(20.0f, 138.0f, 88.0f, "HERMES REPLY", UI_SIGNAL, UI_BG_TOP);
-    app_gfx_text_right(380.0f, 140.0f, 0.36f, 0.36f, UI_SIGNAL_HI, page_label);
-    draw_note_lines(20.0f, 184.0f, 360.0f, 4);
-    app_gfx_text(20.0f, 160.0f, 0.32f, 0.32f, UI_META, "Last message:");
-    draw_text_lines(20.0f, 166.0f, 10.0f, 356.0f, 0.32f, 0.32f, UI_TEXT, message_lines, message_line_count, 0, 2);
-    draw_text_lines(20.0f, 190.0f, 10.0f, 356.0f, 0.34f, 0.34f, UI_TEXT, reply_lines, reply_line_count, reply_start, HOME_REPLY_LINES_PER_PAGE);
+    app_gfx_panel_inset(10.0f, 84.0f, 380.0f, 146.0f, UI_REPLY_CARD, UI_BORDER_STRONG, UI_SIGNAL);
+    draw_chip(18.0f, 90.0f, 92.0f, "HERMES REPLY", UI_SIGNAL, UI_BG_TOP);
+    app_gfx_text_right(380.0f, 92.0f, 0.32f, 0.32f, UI_SIGNAL_HI, page_label);
+    app_gfx_text(20.0f, 114.0f, 0.28f, 0.28f, UI_META, "Last message");
+    draw_text_lines(20.0f, 126.0f, 10.0f, 350.0f, HOME_MESSAGE_SCALE, HOME_MESSAGE_SCALE, UI_MUTED, g_home_message_lines, message_line_count, 0, HOME_MESSAGE_LINES_PER_PAGE);
+    draw_note_lines(20.0f, 150.0f, 360.0f, HOME_REPLY_LINES_PER_PAGE);
+    draw_text_lines(20.0f, 154.0f, 10.0f, HOME_REPLY_MAX_WIDTH, HOME_REPLY_SCALE, HOME_REPLY_SCALE, UI_TEXT, g_home_reply_lines, reply_line_count, reply_start, HOME_REPLY_LINES_PER_PAGE);
 
     app_gfx_begin_bottom(UI_BG_BOTTOM);
-    draw_bottom_header("COMMAND MENU");
-    app_gfx_panel_inset(8.0f, 46.0f, 184.0f, 138.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
-    draw_menu_row(16.0f, 56.0f, 168.0f, "B Ask Hermes", false);
-    draw_menu_row(16.0f, 74.0f, 168.0f, "A Check Link", false);
-    draw_menu_row(16.0f, 92.0f, 168.0f, "SELECT Threads", false);
-    draw_menu_row(16.0f, 110.0f, 168.0f, "X Config", false);
-    draw_menu_row(16.0f, 128.0f, 168.0f, "UP Mic Input", false);
-    draw_menu_row(16.0f, 146.0f, 168.0f, "Y Clear Reply", false);
-    draw_menu_row(16.0f, 164.0f, 168.0f, "START Exit", false);
+    app_gfx_panel_inset(8.0f, 8.0f, 140.0f, 224.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
+    app_gfx_text(18.0f, 18.0f, 0.36f, 0.36f, UI_SIGNAL_HI, "ACTIONS");
+    draw_menu_row(16.0f, 40.0f, 124.0f, "Ask Hermes", selected_command == (size_t)HOME_COMMAND_ASK);
+    draw_menu_row(16.0f, 64.0f, 124.0f, "Check Link", selected_command == (size_t)HOME_COMMAND_CHECK);
+    draw_menu_row(16.0f, 88.0f, 124.0f, "Conversations", selected_command == (size_t)HOME_COMMAND_THREADS);
+    draw_menu_row(16.0f, 112.0f, 124.0f, "Settings", selected_command == (size_t)HOME_COMMAND_CONFIG);
+    draw_menu_row(16.0f, 136.0f, 124.0f, "Mic Input", selected_command == (size_t)HOME_COMMAND_MIC);
+    draw_menu_row(16.0f, 160.0f, 124.0f, "Clear Reply", selected_command == (size_t)HOME_COMMAND_CLEAR);
+    draw_menu_row(16.0f, 184.0f, 124.0f, "Exit", selected_command == (size_t)HOME_COMMAND_EXIT);
 
-    app_gfx_panel_inset(202.0f, 46.0f, 110.0f, 66.0f, UI_PANEL_ALT, UI_BORDER, UI_ACCENT);
-    app_gfx_text(210.0f, 56.0f, 0.34f, 0.34f, UI_SIGNAL_HI, "GATEWAY");
-    app_gfx_text_fit(210.0f, 70.0f, 94.0f, 0.32f, 0.32f, UI_TEXT, bridge_summary);
-    app_gfx_text(210.0f, 88.0f, 0.34f, 0.34f, UI_SIGNAL_HI, "TOKEN");
-    app_gfx_text_fit(210.0f, 102.0f, 94.0f, 0.30f, 0.30f, UI_TEXT, token_summary);
+    app_gfx_panel_inset(156.0f, 8.0f, 156.0f, 96.0f, UI_PANEL_ALT, UI_BORDER, UI_ACCENT);
+    app_gfx_text(166.0f, 18.0f, 0.34f, 0.34f, UI_SIGNAL_HI, "CONNECTION");
+    app_gfx_text(166.0f, 38.0f, 0.28f, 0.28f, UI_META, "Gateway");
+    app_gfx_text_fit(166.0f, 50.0f, 136.0f, 0.30f, 0.30f, UI_TEXT, bridge_summary);
+    app_gfx_text(166.0f, 68.0f, 0.28f, 0.28f, UI_META, "Token");
+    draw_text_lines(166.0f, 80.0f, 10.0f, 136.0f, 0.28f, 0.28f, UI_TEXT, g_home_token_lines, token_line_count, 0, 3);
 
-    app_gfx_panel_inset(202.0f, 120.0f, 110.0f, 64.0f, UI_PANEL_ALT, UI_BORDER, UI_ACCENT);
-    app_gfx_text(210.0f, 130.0f, 0.33f, 0.33f, UI_SIGNAL_HI, "HINT");
-    app_gfx_text_fit(210.0f, 144.0f, 94.0f, 0.30f, 0.30f, UI_TEXT, "L/R page reply");
-    app_gfx_text_fit(210.0f, 156.0f, 94.0f, 0.30f, 0.30f, UI_TEXT, "Old 3DS safe");
+    app_gfx_panel_inset(156.0f, 112.0f, 156.0f, 120.0f, UI_PANEL_ALT, UI_BORDER, UI_ACCENT);
+    app_gfx_text(166.0f, 122.0f, 0.34f, 0.34f, UI_SIGNAL_HI, "CURRENT ACTION");
+    app_gfx_text_fit(166.0f, 140.0f, 136.0f, 0.32f, 0.32f, UI_TEXT, home_command_label_for_selection(selected_command));
+    draw_text_lines(166.0f, 156.0f, 10.0f, 136.0f, 0.29f, 0.29f, UI_MUTED, g_home_detail_lines, detail_line_count, 0, 5);
+    app_gfx_text(166.0f, 214.0f, 0.28f, 0.28f, UI_META, "Reply page");
+    app_gfx_text_right(302.0f, 214.0f, 0.30f, 0.30f, UI_TEXT, page_label);
 }
 
 static void render_settings_graphical(
@@ -486,13 +672,13 @@ static void render_settings_graphical(
     app_gfx_text_fit(20.0f, 208.0f, 356.0f, 0.30f, 0.30f, UI_MUTED, status_line);
 
     app_gfx_begin_bottom(UI_BG_BOTTOM);
-    draw_bottom_header("OPTIONS MENU");
+    draw_bottom_header("SETTINGS ACTIONS");
     app_gfx_panel_inset(8.0f, 46.0f, 304.0f, 138.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
-    draw_menu_row(16.0f, 58.0f, 288.0f, "A Edit value", false);
-    draw_menu_row(16.0f, 78.0f, 288.0f, "X Save settings", false);
-    draw_menu_row(16.0f, 98.0f, 288.0f, "Y Restore defaults", false);
-    draw_menu_row(16.0f, 118.0f, 288.0f, "B Home", false);
-    draw_menu_row(16.0f, 138.0f, 288.0f, "START Exit", false);
+    draw_menu_row(16.0f, 58.0f, 288.0f, "Edit value", false);
+    draw_menu_row(16.0f, 78.0f, 288.0f, "Save settings", false);
+    draw_menu_row(16.0f, 98.0f, 288.0f, "Restore defaults", false);
+    draw_menu_row(16.0f, 118.0f, 288.0f, "Return home", false);
+    draw_menu_row(16.0f, 138.0f, 288.0f, "Exit app", false);
 }
 
 static void render_conversations_graphical(
@@ -519,7 +705,7 @@ static void render_conversations_graphical(
 
     if (config == NULL || config->recent_conversation_count == 0) {
         app_gfx_text(20.0f, 98.0f, 0.38f, 0.38f, UI_TEXT, "No saved conversations.");
-        app_gfx_text(20.0f, 116.0f, 0.34f, 0.34f, UI_MUTED, "Press X to add one.");
+        app_gfx_text(20.0f, 116.0f, 0.34f, 0.34f, UI_MUTED, "Create one from the lower action list.");
     } else {
         if (conversation_selection >= visible)
             start = conversation_selection - (visible - 1);
@@ -542,13 +728,13 @@ static void render_conversations_graphical(
     }
 
     app_gfx_begin_bottom(UI_BG_BOTTOM);
-    draw_bottom_header("THREAD MENU");
+    draw_bottom_header("THREAD ACTIONS");
     app_gfx_panel_inset(8.0f, 46.0f, 304.0f, 138.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
-    draw_menu_row(16.0f, 58.0f, 288.0f, "A Use thread", false);
-    draw_menu_row(16.0f, 78.0f, 288.0f, "X New thread", false);
-    draw_menu_row(16.0f, 98.0f, 288.0f, "Y Sync Hermes", false);
-    draw_menu_row(16.0f, 118.0f, 288.0f, "B Home", false);
-    draw_menu_row(16.0f, 138.0f, 288.0f, "START Exit", false);
+    draw_menu_row(16.0f, 58.0f, 288.0f, "Use thread", false);
+    draw_menu_row(16.0f, 78.0f, 288.0f, "New thread", false);
+    draw_menu_row(16.0f, 98.0f, 288.0f, "Sync Hermes", false);
+    draw_menu_row(16.0f, 118.0f, 288.0f, "Return home", false);
+    draw_menu_row(16.0f, 138.0f, 288.0f, "Exit app", false);
 }
 
 void hermes_app_ui_render_approval_prompt(const char* request_id)
@@ -571,13 +757,13 @@ void hermes_app_ui_render_approval_prompt(const char* request_id)
     app_gfx_text_fit(36.0f, 144.0f, 328.0f, 0.32f, 0.32f, UI_TEXT, "Choose how long to allow the action, or deny it.");
 
     app_gfx_begin_bottom(UI_BG_BOTTOM);
-    draw_bottom_header("APPROVAL CONTROLS");
+    draw_bottom_header("APPROVAL OPTIONS");
     app_gfx_panel_inset(8.0f, 46.0f, 304.0f, 138.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
-    draw_menu_row(16.0f, 58.0f, 288.0f, "A Allow once", false);
-    draw_menu_row(16.0f, 78.0f, 288.0f, "X Allow session", false);
-    draw_menu_row(16.0f, 98.0f, 288.0f, "Y Allow always", false);
-    draw_menu_row(16.0f, 118.0f, 288.0f, "B Deny", false);
-    draw_menu_row(16.0f, 138.0f, 288.0f, "START Cancel", false);
+    draw_menu_row(16.0f, 58.0f, 288.0f, "Allow once", false);
+    draw_menu_row(16.0f, 78.0f, 288.0f, "Allow for session", false);
+    draw_menu_row(16.0f, 98.0f, 288.0f, "Always allow", false);
+    draw_menu_row(16.0f, 118.0f, 288.0f, "Deny request", false);
+    draw_menu_row(16.0f, 138.0f, 288.0f, "Cancel", false);
 
     app_gfx_end_frame();
 }
@@ -586,7 +772,7 @@ void hermes_app_ui_render_voice_recording(unsigned long tenths, size_t pcm_size,
 {
     char time_line[32];
     char audio_line[48];
-    const char* capture_state = waiting_for_up_release ? "Release UP to arm stop." : "Press UP to stop and send.";
+    const char* capture_state = waiting_for_up_release ? "Release upward input to arm stop." : "Move upward to stop and send.";
 
     snprintf(time_line, sizeof(time_line), "%lu.%lus", tenths / 10, tenths % 10);
     snprintf(audio_line, sizeof(audio_line), "%lu bytes", (unsigned long)pcm_size);
@@ -607,11 +793,11 @@ void hermes_app_ui_render_voice_recording(unsigned long tenths, size_t pcm_size,
     app_gfx_text(32.0f, 162.0f, 0.34f, 0.34f, UI_TEXT, capture_state);
 
     app_gfx_begin_bottom(UI_BG_BOTTOM);
-    draw_bottom_header("MIC CONTROLS");
+    draw_bottom_header("MIC SESSION");
     app_gfx_panel_inset(8.0f, 46.0f, 304.0f, 138.0f, UI_PANEL, UI_BORDER, UI_ACCENT);
-    draw_menu_row(16.0f, 58.0f, 288.0f, "UP Stop + send", !waiting_for_up_release);
-    draw_menu_row(16.0f, 78.0f, 288.0f, "B Cancel", false);
-    draw_menu_row(16.0f, 98.0f, 288.0f, "START Cancel", false);
+    draw_menu_row(16.0f, 58.0f, 288.0f, "Stop and send", !waiting_for_up_release);
+    draw_menu_row(16.0f, 78.0f, 288.0f, "Cancel recording", false);
+    draw_menu_row(16.0f, 98.0f, 288.0f, "Exit app", false);
     draw_menu_row(16.0f, 118.0f, 288.0f, "5 min safety timeout", false);
     draw_menu_row(16.0f, 138.0f, 288.0f, capture_state, false);
 
@@ -627,6 +813,7 @@ void hermes_app_ui_render(
     const BridgeChatResult* chat_result,
     const char* last_message,
     size_t reply_page,
+    size_t command_selection,
     const char* status_line,
     Result last_rc,
     const BridgeV2ConversationListResult* conversation_list,
@@ -640,7 +827,7 @@ void hermes_app_ui_render(
     } else if (screen == APP_SCREEN_CONVERSATIONS) {
         render_conversations_graphical(config, status_line, last_rc, conversation_list, conversation_selection);
     } else {
-        render_home_graphical(config, health_result, chat_result, last_message, reply_page, status_line, conversation_list);
+        render_home_graphical(config, health_result, chat_result, last_message, reply_page, command_selection, status_line, conversation_list);
     }
 
     app_gfx_end_frame();

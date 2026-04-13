@@ -21,6 +21,7 @@
 #define BRIDGE_HEALTH_CONNECT_TIMEOUT_SECONDS 5
 #define BRIDGE_HEALTH_IO_TIMEOUT_SECONDS 5
 #define BRIDGE_HEALTH_RESPONSE_MAX 2048
+#define BRIDGE_HEALTH_PATH_MAX 896
 
 static u32* g_soc_buffer = NULL;
 static bool g_soc_ready = false;
@@ -86,6 +87,42 @@ static bool extract_json_string(const char* json, const char* key, char* out, si
     return true;
 }
 
+static bool extract_json_u32(const char* json, const char* key, u32* out_value)
+{
+    char pattern[64];
+    const char* start;
+    char* end_ptr;
+    unsigned long parsed;
+
+    if (json == NULL || key == NULL || out_value == NULL)
+        return false;
+
+    snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+    start = strstr(json, pattern);
+    if (start == NULL)
+        return false;
+
+    start += strlen(pattern);
+    while (*start == ' ' || *start == '\t' || *start == '\r' || *start == '\n')
+        start++;
+    if (*start != ':')
+        return false;
+
+    start++;
+    while (*start == ' ' || *start == '\t' || *start == '\r' || *start == '\n')
+        start++;
+
+    if (*start < '0' || *start > '9')
+        return false;
+
+    parsed = strtoul(start, &end_ptr, 10);
+    if (end_ptr == start)
+        return false;
+
+    *out_value = (u32)parsed;
+    return true;
+}
+
 static bool parse_health_url(const char* url, char* host, size_t host_size, u16* port, char* path, size_t path_size)
 {
     const char* cursor;
@@ -123,10 +160,14 @@ static bool parse_health_url(const char* url, char* host, size_t host_size, u16*
         *port = 80;
     }
 
-    if (*slash == '\0')
-        snprintf(path, path_size, "/");
-    else
-        snprintf(path, path_size, "%s", slash);
+    if (*slash == '\0') {
+        if (snprintf(path, path_size, "/") <= 0 || strlen(path) >= path_size)
+            return false;
+    } else {
+        int written = snprintf(path, path_size, "%s", slash);
+        if (written <= 0 || (size_t)written >= path_size)
+            return false;
+    }
 
     return true;
 }
@@ -278,11 +319,11 @@ Result bridge_health_check_run(const char* url, BridgeHealthResult* result)
     Result rc;
     u32 wifi_status = 0;
     char host[64];
-    char path[128];
+    char path[BRIDGE_HEALTH_PATH_MAX];
     u16 port = 0;
     struct sockaddr_in address;
     int socket_fd = -1;
-    char request[512];
+    char request[1400];
     char response[BRIDGE_HEALTH_RESPONSE_MAX];
     size_t response_used = 0;
     const char* body;
@@ -421,6 +462,16 @@ Result bridge_health_check_run(const char* url, BridgeHealthResult* result)
 
     if (!extract_json_string(body, "version", result->version, sizeof(result->version)))
         snprintf(result->version, sizeof(result->version), "unknown-version");
+
+    if (!extract_json_string(body, "model_name", result->model_name, sizeof(result->model_name)))
+        result->model_name[0] = '\0';
+
+    if (!extract_json_u32(body, "context_length", &result->context_length))
+        result->context_length = 0;
+    if (!extract_json_u32(body, "context_tokens", &result->context_tokens))
+        result->context_tokens = 0;
+    if (!extract_json_u32(body, "context_percent", &result->context_percent))
+        result->context_percent = 0;
 
     result->success = true;
     result->error[0] = '\0';

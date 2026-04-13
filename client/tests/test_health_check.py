@@ -18,7 +18,7 @@ def test_bridge_health_defaults_target_the_native_v2_health_endpoint():
     assert "/api/v2/health" in header
     assert "/api/v1/health" not in header
     assert "hermes_app_config_build_health_url" in app_config_header
-    assert '"/api/v2/health"' in app_config_source
+    assert "/api/v2/health?token=%s&device_id=%s&conversation_id=%s" in app_config_source
     assert '"/api/v1/health"' not in app_config_source
 
 
@@ -41,11 +41,25 @@ def test_main_c_offers_a_button_driven_native_v2_gateway_health_check_ui():
     home_c = (CLIENT_DIR / "source" / "app_home.c").read_text()
     request_c = (CLIENT_DIR / "source" / "app_requests.c").read_text()
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
-    assert "COMMAND MENU" in ui_c
+    health_h = (CLIENT_DIR / "include" / "bridge_health.h").read_text()
+    health_c = (CLIENT_DIR / "source" / "bridge_health.c").read_text()
+    app_config_c = (CLIENT_DIR / "source" / "app_config.c").read_text()
+    assert "ACTIONS" in ui_c
     assert "AppHomeContext" in home_h
     assert "Checking Hermes gateway..." in home_c
     assert "Reply received over native v2." in request_c
     assert "KEY_A" in home_c
     assert "bridge_health_check_run" in home_c
+    assert "model_name" in health_h
+    assert "context_length" in health_h
+    assert "context_tokens" in health_h
+    assert "context_percent" in health_h
+    assert '"model_name"' in health_c
+    assert '"context_length"' in health_c
+    assert '"context_percent"' in health_c
+    assert "BRIDGE_HEALTH_PATH_MAX" in health_c
+    assert "char request[1400]" in health_c
+    assert "url_encode_component" in app_config_c
+    assert "token=%s&device_id=%s&conversation_id=%s" in app_config_c
     assert "bridge_v2_get_capabilities" not in main_c
     assert "Native v2 responded even though v1 health failed." not in main_c

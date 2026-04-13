@@ -69,9 +69,12 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "reply_to_message_id" in request_c
     assert "Approval required" in request_c
     assert "Command denied." in request_c
-    assert "KEY_B" in home_c
     assert "KEY_UP" in home_c
-    assert "KEY_SELECT" in home_c
+    assert "KEY_LEFT" in home_c
+    assert "KEY_RIGHT" in home_c
+    assert "KEY_CPAD_UP" in home_c
+    assert "KEY_CPAD_LEFT" in home_c
+    assert "KEY_CPAD_RIGHT" in home_c
     assert "KEY_DOWN" in conv_c
     assert "Write a message" in input_c
     assert "Record mic" in request_c or "mic" in request_c.lower()
@@ -95,13 +98,13 @@ def test_main_c_wraps_and_pages_long_reply_text_for_small_screens():
     home_c = (CLIENT_DIR / "source" / "app_home.c").read_text()
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
-    assert "KEY_L" in home_c
-    assert "KEY_R" in home_c
+    assert "KEY_LEFT" in home_c
+    assert "KEY_RIGHT" in home_c
     assert "reply_page" in main_c
     assert "hermes_app_ui_reply_page_count" in home_c
-    assert "wrap_text_for_console" in ui_c
+    assert "wrap_text_for_pixels" in ui_c
     assert "page_count_for_lines" in ui_c
-    assert "#define HOME_REPLY_LINES_PER_PAGE 4" in ui_c
+    assert "#define HOME_REPLY_LINES_PER_PAGE 6" in ui_c
     assert "reply_start = reply_page * HOME_REPLY_LINES_PER_PAGE" in ui_c
 
 
@@ -109,7 +112,8 @@ def test_ui_wraps_truncated_lines_on_utf8_boundaries_before_graphical_fit():
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
     assert "utf8_prefix_boundary" in ui_c
-    assert "word_len > HOME_WRAP_WIDTH" in ui_c
+    assert "fit_prefix_to_width" in ui_c
+    assert "append_truncation_ellipsis" in ui_c
 
 
 def test_voice_input_waits_for_up_release_before_allowing_stop():

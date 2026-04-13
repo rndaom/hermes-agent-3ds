@@ -11,6 +11,17 @@
 #include "bridge_chat.h"
 #include "bridge_health.h"
 
+typedef enum HomeCommand {
+    HOME_COMMAND_NONE = -1,
+    HOME_COMMAND_ASK = 0,
+    HOME_COMMAND_CHECK = 1,
+    HOME_COMMAND_THREADS = 2,
+    HOME_COMMAND_CONFIG = 3,
+    HOME_COMMAND_MIC = 4,
+    HOME_COMMAND_CLEAR = 5,
+    HOME_COMMAND_EXIT = 6,
+} HomeCommand;
+
 typedef void (*AppHomeRenderFn)(
     AppScreen screen,
     const HermesAppConfig* config,
@@ -20,6 +31,7 @@ typedef void (*AppHomeRenderFn)(
     const BridgeChatResult* chat_result,
     const char* last_message,
     size_t reply_page,
+    size_t command_selection,
     const char* status_line,
     Result last_rc
 );
@@ -33,6 +45,8 @@ typedef struct AppHomeContext {
     char* last_message;
     size_t last_message_size;
     size_t* reply_page;
+    HomeCommand* command_selection;
+    bool* exit_requested;
     char* status_line;
     size_t status_line_size;
     Result* request_rc;

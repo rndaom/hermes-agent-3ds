@@ -18,21 +18,22 @@ def test_phase3_ui_doc_describes_pixel_art_composition_pass():
     assert "Old 3DS" in doc
 
 
-def test_app_ui_has_phase3_graphical_two_panel_layout_and_crest_block():
+def test_app_ui_has_phase3_graphical_home_cleanup_layout():
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
     assert "render_home_graphical" in ui_c
-    assert "app_gfx_panel_inset(12.0f, 48.0f, 226.0f, 76.0f" in ui_c
-    assert "app_gfx_panel_inset(248.0f, 48.0f, 140.0f, 76.0f" in ui_c
-    assert "relay crest" in ui_c
+    assert "app_gfx_panel_inset(10.0f, 10.0f, 380.0f, 64.0f" in ui_c
+    assert "app_gfx_panel_inset(10.0f, 84.0f, 380.0f, 146.0f" in ui_c
+    assert "app_gfx_panel_inset(156.0f, 8.0f, 156.0f, 96.0f" in ui_c
+    assert "app_gfx_panel_inset(156.0f, 112.0f, 156.0f, 120.0f" in ui_c
     assert "HERMES REPLY" in ui_c
 
 
-def test_phase3_followup_uses_explicit_graphical_panel_layout():
+def test_phase3_followup_keeps_explicit_graphical_panel_layout():
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
     assert "draw_header(" in ui_c
     assert "draw_bottom_header(" in ui_c
     assert "app_gfx_begin_top" in ui_c
     assert "app_gfx_begin_bottom" in ui_c
-    assert "app_gfx_panel_inset(12.0f, 132.0f, 376.0f, 96.0f" in ui_c
+    assert "app_gfx_panel_inset(8.0f, 8.0f, 140.0f, 224.0f" in ui_c

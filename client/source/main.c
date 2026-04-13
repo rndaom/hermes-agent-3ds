@@ -24,6 +24,7 @@ static void render_ui(
     const BridgeChatResult* chat_result,
     const char* last_message,
     size_t reply_page,
+    size_t command_selection,
     const char* status_line,
     Result last_rc
 )
@@ -37,6 +38,7 @@ static void render_ui(
         chat_result,
         last_message,
         reply_page,
+        command_selection,
         status_line,
         last_rc,
         &g_conversation_state.list,
@@ -51,8 +53,10 @@ int main(int argc, char* argv[])
     bool ac_ready = false;
     bool network_ready = false;
     bool settings_dirty = false;
+    bool exit_requested = false;
     AppScreen screen = APP_SCREEN_HOME;
     SettingsField selected_field = SETTINGS_FIELD_HOST;
+    HomeCommand command_selection = HOME_COMMAND_ASK;
     HermesAppConfig config;
     HermesAppConfigLoadStatus load_status;
     BridgeHealthResult health_result;
@@ -100,7 +104,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, init_rc);
+    render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, command_selection, status_line, init_rc);
 
     while (aptMainLoop())
     {
@@ -123,6 +127,8 @@ int main(int argc, char* argv[])
                 last_message,
                 sizeof(last_message),
                 &reply_page,
+                &command_selection,
+                &exit_requested,
                 status_line,
                 sizeof(status_line),
                 &request_rc,
@@ -130,6 +136,8 @@ int main(int argc, char* argv[])
             };
 
             hermes_app_home_handle_input(kDown, &config, network_ready, &screen, &home_context);
+            if (exit_requested)
+                break;
         } else if (screen == APP_SCREEN_CONVERSATIONS) {
             if (hermes_app_conversations_handle_picker_input(
                     &g_conversation_state,
@@ -145,7 +153,7 @@ int main(int argc, char* argv[])
                     sizeof(status_line),
                     &request_rc
                 )) {
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, command_selection, status_line, request_rc);
             }
         } else {
             AppSettingsContext settings_context = {&g_conversation_state};
@@ -160,11 +168,11 @@ int main(int argc, char* argv[])
                     status_line,
                     sizeof(status_line)
                 )) {
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, command_selection, status_line, request_rc);
             }
         }
 
-        render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, status_line, request_rc);
+        render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, command_selection, status_line, request_rc);
     }
 
     if (network_ready)

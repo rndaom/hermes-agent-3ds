@@ -18,8 +18,8 @@ Last major verified milestone: **the V2-only 3DS client is validated end-to-end 
 - settings fields are editable with the 3DS software keyboard
 - active conversation + recent conversation list are persisted on SD
 - top/bottom-screen UI split is implemented
-- long replies page cleanly with `L/R`
-- conversation picker exists on `SELECT` for switching/syncing conversation slots
+- long replies page cleanly with `LEFT/RIGHT`
+- conversation picker exists from the home action list for switching/syncing conversation slots
 - native V2 chat flow is implemented with:
   - `POST /api/v2/messages`
   - `POST /api/v2/voice`
@@ -34,6 +34,9 @@ Last major verified milestone: **the V2-only 3DS client is validated end-to-end 
   - matching `reply_to`
   - longer wait window for final replies
 - a refined dark-mode Hermes + PictoChat baseline build has been deployed to the real Old 3DS and received strong positive first-impression feedback from the user
+- the home screen now uses a simplified Old-3DS-safe layout with no telemetry strip or relay crest block
+- the home action list now uses D-pad / Circle Pad selection with A-to-confirm instead of labeled home-screen hotkeys
+- reply, thread/link, and token/detail text containment now uses pixel-width wrapping and tighter panel sizing instead of overflowing fixed rows
 
 ### Host-side integration
 - native 3DS gateway support now exists in `hermes-agent`
@@ -45,7 +48,7 @@ Last major verified milestone: **the V2-only 3DS client is validated end-to-end 
   - `GET /api/v2/events`
   - `POST /api/v2/interactions/{request_id}/respond`
 - live local integration has been validated against the Hermes-side gateway
-- the latest app build has been deployed over FTPD and verified on real hardware
+- the latest app build has been deployed over FTPD to the real Old 3DS for current hardware verification
 
 ### Repo cleanup
 - this repo is now client-only
@@ -84,7 +87,7 @@ Latest built artifact:
 
 ## Recommended next steps
 
-1. update the top rail to show model / context bar / session-length information instead of `RELAY DECK`
-2. add true D-pad navigation for the command menu while keeping the existing hotkeys
-3. tighten text containment and width usage in the active-thread, reply, command-menu, and gateway boxes based on the latest live hardware feedback
-4. after that, replace the temporary relay/crest placeholder with a real Hermes handheld crest / icon asset pass
+1. verify on the real Old 3DS that the cleaned home layout, D-pad / Circle Pad action flow, and reply paging feel good in practice
+2. tune any remaining per-panel text scale issues found on hardware with especially long status strings or thread titles
+3. decide whether to convert the non-home screens to the same selection-driven interaction model, or keep their current direct button handlers
+4. if desired later, add real Hermes handheld art only after the simplified Old-3DS-safe layout is confirmed stable

@@ -18,6 +18,10 @@ typedef struct BridgeHealthResult {
     char socket_stage[32];
     char service[BRIDGE_HEALTH_TEXT_MAX];
     char version[BRIDGE_HEALTH_TEXT_MAX];
+    char model_name[BRIDGE_HEALTH_TEXT_MAX];
+    u32 context_length;
+    u32 context_tokens;
+    u32 context_percent;
     char error[BRIDGE_HEALTH_ERROR_MAX];
 } BridgeHealthResult;
 

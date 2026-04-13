@@ -11,8 +11,8 @@ def test_home_bottom_screen_avoids_duplicate_output_sections():
 
     assert 'printf("Health:' not in main_c
     assert 'printf("Reply page:' not in main_c
-    assert '"GATEWAY"' in ui_c
-    assert '"TOKEN"' in ui_c
+    assert '"CONNECTION"' in ui_c
+    assert '"Token"' in ui_c
 
 
 def test_makefile_supports_packaged_release_zip_output():
@@ -33,4 +33,4 @@ def test_readme_includes_real_end_user_install_and_native_gateway_steps():
     assert "native 3DS gateway" in readme
     assert "/api/v2/health" in readme
     assert "Open **Hermes Agent 3DS**" in readme
-    assert "A — check Hermes gateway health" in readme
+    assert "A — run the selected action" in readme or "A` — run the selected action" in readme

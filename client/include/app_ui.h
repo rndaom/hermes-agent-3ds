@@ -30,6 +30,7 @@ void hermes_app_ui_render(
     const BridgeChatResult* chat_result,
     const char* last_message,
     size_t reply_page,
+    size_t command_selection,
     const char* status_line,
     Result last_rc,
     const BridgeV2ConversationListResult* conversation_list,

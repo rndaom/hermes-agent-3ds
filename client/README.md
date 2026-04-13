@@ -28,13 +28,9 @@ The remaining UI job is to finish the dark-mode Hermes + PictoChat visual pass a
 Current controls:
 
 ### Home
-- `A` — check Hermes gateway health
-- `B` — Ask Hermes / open the message keyboard in the active conversation
-- `UP` — start mic input and send it for host-side speech-to-text
-- `X` — open settings
-- `SELECT` — open the conversation picker
-- `Y` — clear the current status
-- `L/R` — page long replies
+- `UP/DOWN` — move through the home action list
+- `LEFT/RIGHT` — page long replies
+- `A` — run the selected action
 - `START` — exit back to Homebrew Launcher
 
 ### Conversations

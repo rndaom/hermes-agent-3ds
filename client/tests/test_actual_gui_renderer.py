@@ -68,17 +68,17 @@ def test_transient_ui_paths_do_not_expose_printconsole_or_manual_buffer_swaps():
     assert "hermes_app_ui_render_voice_recording" in ui_h
 
 
-def test_graphical_ui_bounds_variable_length_fields_and_removes_fake_static_menu_selection():
+def test_graphical_ui_bounds_variable_length_fields_and_removes_hotkey_labeled_rows():
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
-    assert "app_gfx_text_fit(210.0f, 70.0f" in ui_c
-    assert "app_gfx_text_fit(210.0f, 102.0f" in ui_c
-    assert "app_gfx_text_fit(206.0f, 80.0f" in ui_c
-    assert "app_gfx_text_fit(206.0f, 148.0f" in ui_c
-    assert "app_gfx_text_fit(24.0f, row_y + 2.0f" in ui_c
-    assert '"B Ask Hermes", true' not in ui_c
-    assert '"A Edit value", true' not in ui_c
-    assert '"A Use thread", true' not in ui_c
+    assert "wrap_text_for_pixels" in ui_c
+    assert "HOME_REPLY_MAX_WIDTH" in ui_c
+    assert 'app_gfx_panel_inset(156.0f, 8.0f, 156.0f, 96.0f' in ui_c
+    assert 'draw_text_lines(166.0f, 80.0f, 10.0f, 136.0f' in ui_c
+    assert 'draw_text_lines(166.0f, 156.0f, 10.0f, 136.0f' in ui_c
+    assert '"A Edit value"' not in ui_c
+    assert '"A Use thread"' not in ui_c
+    assert '"B Ask Hermes"' not in ui_c
 
 
 def test_home_reply_card_uses_note_card_styling_helpers():
@@ -86,5 +86,5 @@ def test_home_reply_card_uses_note_card_styling_helpers():
 
     assert "draw_note_lines" in ui_c
     assert "draw_chip" in ui_c
-    assert 'draw_chip(20.0f, 138.0f, 88.0f, "HERMES REPLY"' in ui_c
-    assert 'draw_note_lines(20.0f, 184.0f, 360.0f, 4)' in ui_c
+    assert 'draw_chip(18.0f, 90.0f, 92.0f, "HERMES REPLY"' in ui_c
+    assert 'draw_note_lines(20.0f, 150.0f, 360.0f, HOME_REPLY_LINES_PER_PAGE)' in ui_c

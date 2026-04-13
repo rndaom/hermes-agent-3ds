@@ -19,7 +19,7 @@ def test_app_config_supports_native_v2_urls_and_device_identity():
     assert "hermes_app_config_build_voice_url" in header
     assert "hermes_app_config_build_interaction_url" in header
 
-    assert '"/api/v2/health"' in source
+    assert "/api/v2/health?token=%s&device_id=%s&conversation_id=%s" in source
     assert '"/api/v1/health"' not in source
     assert '"/api/v2/messages"' in source
     assert '"/api/v2/events"' in source

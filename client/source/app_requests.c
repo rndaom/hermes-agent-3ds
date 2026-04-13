@@ -159,6 +159,7 @@ static void render_home_request_ui(
         chat_result,
         last_message,
         reply_page,
+        ui->command_selection,
         status_line,
         request_rc
     );
