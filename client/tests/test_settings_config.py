@@ -14,8 +14,8 @@ def test_app_config_module_exists_with_sdmc_config_path_and_defaults():
     header = header_path.read_text()
     assert "sdmc:/3ds/hermes-agent-3ds/config.ini" in header
     assert "HermesAppConfig" in header
-    assert "DEFAULT_BRIDGE_HOST" in header
-    assert "DEFAULT_BRIDGE_PORT" in header
+    assert "DEFAULT_GATEWAY_HOST" in header
+    assert "DEFAULT_GATEWAY_PORT" in header
     assert "hermes_app_config_load" in header
     assert "hermes_app_config_save" in header
     assert "active_conversation_id" in header
@@ -36,8 +36,8 @@ def test_app_config_source_reads_and_writes_host_port_token_device_id_and_conver
     assert '"device_id=%s\\n"' in source
     assert '"active_conversation_id=%s\\n"' in source
     assert '"recent_conversations="' in source
-    assert "DEFAULT_BRIDGE_HOST" in source
-    assert "DEFAULT_BRIDGE_PORT" in source
+    assert "DEFAULT_GATEWAY_HOST" in source
+    assert "DEFAULT_GATEWAY_PORT" in source
     assert "DEFAULT_CONVERSATION_ID" in source
 
 
@@ -50,7 +50,7 @@ def test_main_c_loads_saved_config_and_uses_it_for_health_checks():
     assert "hermes_app_config_load" in main_c
     assert "hermes_app_config_save" in settings_c
     assert "hermes_app_config_build_health_url" in home_c
-    assert "bridge_health_check_run(DEFAULT_BRIDGE_HEALTH_URL" not in main_c
+    assert "gateway_health_check_run(DEFAULT_GATEWAY_HEALTH_URL" not in main_c
 
 
 def test_main_c_has_settings_and_conversation_picker_navigation():

@@ -25,6 +25,10 @@ def test_app_gfx_module_exists_with_citro2d_screen_targets_and_panel_primitives(
     assert "C2D_DrawRectSolid" in source
     assert "C2D_DrawText" in source
     assert "C2D_TextGetDimensions" in source
+    assert "C2D_FontLoadFromMem" in source
+    assert "C2D_TextFontParse" in source
+    assert "GPU_NEAREST" in source
+    assert "nintendo_ds_bios_font_bin" in source
 
 
 def test_app_ui_exposes_graphical_ui_lifecycle_without_printconsole_render_args():

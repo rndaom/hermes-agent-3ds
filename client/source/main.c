@@ -20,7 +20,7 @@ static void render_ui(
     const HermesAppConfig* config,
     SettingsField selected_field,
     bool settings_dirty,
-    const BridgeHealthResult* health_result,
+    const GatewayHealthResult* health_result,
     const BridgeChatResult* chat_result,
     const char* last_message,
     size_t reply_page,
@@ -58,7 +58,7 @@ int main(int argc, char* argv[])
     HomeCommand command_selection = HOME_COMMAND_ASK;
     HermesAppConfig config;
     HermesAppConfigLoadStatus load_status;
-    BridgeHealthResult health_result;
+    GatewayHealthResult health_result;
     BridgeChatResult chat_result;
     char last_message[BRIDGE_CHAT_MESSAGE_MAX];
     char status_line[BRIDGE_CHAT_ERROR_MAX];
@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
     (void)argc;
     (void)argv;
 
-    bridge_health_result_reset(&health_result);
+    gateway_health_result_reset(&health_result);
     bridge_chat_result_reset(&chat_result);
     hermes_app_ui_home_history_reset();
     hermes_app_conversations_init(&g_conversation_state);
@@ -96,7 +96,7 @@ int main(int argc, char* argv[])
         snprintf(status_line, sizeof(status_line), "acInit failed: 0x%08lX", (unsigned long)init_rc);
     } else {
         ac_ready = true;
-        init_rc = bridge_health_network_init();
+        init_rc = gateway_health_network_init();
         if (R_FAILED(init_rc)) {
             snprintf(status_line, sizeof(status_line), "socInit failed: 0x%08lX", (unsigned long)init_rc);
         } else {
@@ -173,7 +173,7 @@ int main(int argc, char* argv[])
     }
 
     if (network_ready)
-        bridge_health_network_exit();
+        gateway_health_network_exit();
 
     if (ac_ready)
         acExit();

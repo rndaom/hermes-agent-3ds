@@ -26,7 +26,7 @@ typedef void (*AppHomeRenderFn)(
     const HermesAppConfig* config,
     SettingsField selected_field,
     bool settings_dirty,
-    const BridgeHealthResult* health_result,
+    const GatewayHealthResult* health_result,
     const BridgeChatResult* chat_result,
     const char* last_message,
     size_t reply_page,
@@ -39,7 +39,7 @@ typedef struct AppHomeContext {
     AppConversationState* conversation_state;
     SettingsField selected_field;
     bool settings_dirty;
-    BridgeHealthResult* health_result;
+    GatewayHealthResult* health_result;
     BridgeChatResult* chat_result;
     char* last_message;
     size_t last_message_size;

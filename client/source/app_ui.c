@@ -12,7 +12,7 @@
 #define HOME_HISTORY_MAX 6
 #define HOME_HISTORY_CARD_LINES 8
 #define HOME_REPLY_LINES_PER_PAGE 6
-#define HOME_REPLY_MAX_WIDTH 348.0f
+#define HOME_REPLY_MAX_WIDTH 326.0f
 #define HOME_REPLY_SCALE 0.32f
 
 typedef struct AppUiHomeHistoryEntry {
@@ -389,11 +389,6 @@ static void format_active_conversation_label(
         snprintf(out_label, out_size, "%s", config->active_conversation_id);
 }
 
-#undef HOME_REPLY_MAX_WIDTH
-#undef HOME_REPLY_SCALE
-#define HOME_REPLY_MAX_WIDTH 326.0f
-#define HOME_REPLY_SCALE 0.28f
-
 #define UI_COLOR32(r, g, b, a) ((u32)(r) | ((u32)(g) << 8) | ((u32)(b) << 16) | ((u32)(a) << 24))
 #define UI_BG UI_COLOR32(0xEF, 0xEF, 0xE9, 0xFF)
 #define UI_PAPER UI_COLOR32(0xFB, 0xFB, 0xF6, 0xFF)
@@ -464,7 +459,7 @@ static const AppUiTheme* author_theme(AppUiMessageAuthor author)
     return author == APP_UI_MESSAGE_USER ? &g_ui_room_themes[1] : &g_ui_room_themes[4];
 }
 
-static const AppUiTheme* relay_theme(const BridgeHealthResult* health_result, const BridgeChatResult* chat_result)
+static const AppUiTheme* relay_theme(const GatewayHealthResult* health_result, const BridgeChatResult* chat_result)
 {
     if (health_result != NULL && health_result->success)
         return &g_ui_room_themes[3];
@@ -676,7 +671,7 @@ static void draw_message_card(
     draw_chip(x + 10.0f, y + 8.0f, chip_width, label, theme->accent, theme->accent_text, theme->accent_dark);
     if (page_label != NULL && page_label[0] != '\0')
         draw_chip(x + w - 44.0f, y + 8.0f, 34.0f, page_label, UI_PAPER_ALT, UI_TEXT, theme->accent_dark);
-    draw_text_lines(x + 30.0f, y + 34.0f, 9.0f, w - 40.0f, text_scale, text_scale, UI_TEXT, g_home_card_lines, total_lines, start_line, max_lines);
+    draw_text_lines(x + 30.0f, y + 34.0f, 10.0f, w - 40.0f, text_scale, text_scale, UI_TEXT, g_home_card_lines, total_lines, start_line, max_lines);
 }
 
 static const char* home_command_label_for_selection(size_t command_selection)
@@ -721,7 +716,7 @@ static const char* home_command_detail_for_selection(size_t command_selection)
 
 static void render_home_graphical(
     const HermesAppConfig* config,
-    const BridgeHealthResult* health_result,
+    const GatewayHealthResult* health_result,
     const BridgeChatResult* chat_result,
     const char* last_message,
     size_t reply_page,
@@ -805,7 +800,7 @@ static void render_home_graphical(
             "Press Write Note below to start a relay room.",
             0,
             5,
-            0.28f,
+            0.30f,
             "",
             &g_ui_room_themes[4]
         );
@@ -817,7 +812,7 @@ static void render_home_graphical(
             bool latest_reply = latest && entry->author == APP_UI_MESSAGE_HERMES;
             float card_height = latest_reply ? 90.0f : 32.0f;
             size_t max_lines = latest_reply ? HOME_REPLY_LINES_PER_PAGE : 1;
-            float text_scale = latest_reply ? HOME_REPLY_SCALE : 0.25f;
+            float text_scale = latest_reply ? HOME_REPLY_SCALE : 0.28f;
 
             if (card_y + card_height > 224.0f)
                 break;
@@ -848,7 +843,7 @@ static void render_home_graphical(
                 status_line != NULL && status_line[0] != '\0' ? status_line : "Waiting for Hermes...",
                 0,
                 2,
-                0.25f,
+                0.27f,
                 "",
                 status_theme
             );
@@ -1098,7 +1093,7 @@ void hermes_app_ui_render(
     const HermesAppConfig* config,
     SettingsField selected_field,
     bool settings_dirty,
-    const BridgeHealthResult* health_result,
+    const GatewayHealthResult* health_result,
     const BridgeChatResult* chat_result,
     const char* last_message,
     size_t reply_page,

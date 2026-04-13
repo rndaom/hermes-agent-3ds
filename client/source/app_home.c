@@ -31,36 +31,6 @@ static void render_home_screen(const HermesAppConfig* config, const AppHomeConte
     render_screen(APP_SCREEN_HOME, config, context);
 }
 
-static void format_health_status_line(char* out, size_t out_size, const BridgeHealthResult* result)
-{
-    if (out == NULL || out_size == 0 || result == NULL)
-        return;
-
-    if (result->error[0] == '\0') {
-        snprintf(out, out_size, "Relay check failed.");
-        return;
-    }
-
-    if (result->socket_stage[0] != '\0') {
-        snprintf(
-            out,
-            out_size,
-            "%s [%s/%d]",
-            result->error,
-            result->socket_stage,
-            result->socket_errno
-        );
-        return;
-    }
-
-    if (result->http_status != 0) {
-        snprintf(out, out_size, "%s [http %lu]", result->error, (unsigned long)result->http_status);
-        return;
-    }
-
-    snprintf(out, out_size, "%s", result->error);
-}
-
 static void handle_home_health_check(const HermesAppConfig* config, bool network_ready, AppHomeContext* context)
 {
     char health_url[HERMES_APP_HEALTH_URL_MAX];
@@ -70,7 +40,7 @@ static void handle_home_health_check(const HermesAppConfig* config, bool network
         return;
     }
 
-    bridge_health_result_reset(context->health_result);
+    gateway_health_result_reset(context->health_result);
     *context->request_rc = 0;
     *context->reply_page = 0;
 
@@ -90,13 +60,13 @@ static void handle_home_health_check(const HermesAppConfig* config, bool network
     render_home_screen(config, context);
     gspWaitForVBlank();
 
-    *context->request_rc = bridge_health_check_run(health_url, context->health_result);
+    *context->request_rc = gateway_health_check_run(health_url, context->health_result);
     if (R_SUCCEEDED(*context->request_rc) && context->health_result->success)
         snprintf(context->status_line, context->status_line_size, "Hermes relay OK.");
     else if (context->health_result->error[0] == '\0')
         snprintf(context->status_line, context->status_line_size, "Relay check failed: 0x%08lX", (unsigned long)*context->request_rc);
     else
-        format_health_status_line(context->status_line, context->status_line_size, context->health_result);
+        snprintf(context->status_line, context->status_line_size, "%s", context->health_result->error);
 
     render_home_screen(config, context);
 }
@@ -158,7 +128,7 @@ static void execute_selected_home_command(
             );
             break;
         case HOME_COMMAND_CLEAR:
-            bridge_health_result_reset(context->health_result);
+            gateway_health_result_reset(context->health_result);
             bridge_chat_result_reset(context->chat_result);
             hermes_app_ui_home_history_reset();
             context->last_message[0] = '\0';

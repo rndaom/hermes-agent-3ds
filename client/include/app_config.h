@@ -6,8 +6,8 @@
 
 #define HERMES_APP_CONFIG_DIR "sdmc:/3ds/hermes-agent-3ds"
 #define HERMES_APP_CONFIG_PATH "sdmc:/3ds/hermes-agent-3ds/config.ini"
-#define DEFAULT_BRIDGE_HOST "10.75.76.156"
-#define DEFAULT_BRIDGE_PORT 8787
+#define DEFAULT_GATEWAY_HOST "10.75.76.156"
+#define DEFAULT_GATEWAY_PORT 8787
 #define DEFAULT_CONVERSATION_ID "main"
 #define HERMES_APP_CONFIG_HOST_MAX 64
 #define HERMES_APP_CONFIG_TOKEN_MAX 128

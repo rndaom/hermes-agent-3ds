@@ -222,8 +222,8 @@ void hermes_app_config_set_defaults(HermesAppConfig* config)
         return;
 
     memset(config, 0, sizeof(*config));
-    copy_string(config->host, sizeof(config->host), DEFAULT_BRIDGE_HOST);
-    config->port = DEFAULT_BRIDGE_PORT;
+    copy_string(config->host, sizeof(config->host), DEFAULT_GATEWAY_HOST);
+    config->port = DEFAULT_GATEWAY_PORT;
     config->token[0] = '\0';
     config->device_id[0] = '\0';
     copy_string(config->active_conversation_id, sizeof(config->active_conversation_id), DEFAULT_CONVERSATION_ID);
@@ -282,9 +282,9 @@ HermesAppConfigLoadStatus hermes_app_config_load(HermesAppConfig* config)
     fclose(file);
 
     if (config->host[0] == '\0')
-        copy_string(config->host, sizeof(config->host), DEFAULT_BRIDGE_HOST);
+        copy_string(config->host, sizeof(config->host), DEFAULT_GATEWAY_HOST);
     if (config->port == 0)
-        config->port = DEFAULT_BRIDGE_PORT;
+        config->port = DEFAULT_GATEWAY_PORT;
 
     ensure_conversation_defaults(config);
     hermes_app_config_touch_recent_conversation(config, config->active_conversation_id);

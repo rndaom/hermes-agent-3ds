@@ -33,7 +33,7 @@ void hermes_app_ui_render(
     const HermesAppConfig* config,
     SettingsField selected_field,
     bool settings_dirty,
-    const BridgeHealthResult* health_result,
+    const GatewayHealthResult* health_result,
     const BridgeChatResult* chat_result,
     const char* last_message,
     size_t reply_page,

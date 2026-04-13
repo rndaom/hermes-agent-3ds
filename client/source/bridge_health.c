@@ -26,7 +26,7 @@
 static u32* g_soc_buffer = NULL;
 static bool g_soc_ready = false;
 
-static void set_error(BridgeHealthResult* result, const char* message)
+static void set_error(GatewayHealthResult* result, const char* message)
 {
     if (result == NULL)
         return;
@@ -35,7 +35,7 @@ static void set_error(BridgeHealthResult* result, const char* message)
     snprintf(result->error, sizeof(result->error), "%s", message);
 }
 
-static void set_socket_debug(BridgeHealthResult* result, const char* stage, int socket_errno)
+static void set_socket_debug(GatewayHealthResult* result, const char* stage, int socket_errno)
 {
     if (result == NULL)
         return;
@@ -213,7 +213,7 @@ static Result wait_for_socket(int socket_fd, bool want_write, int timeout_second
     return 0;
 }
 
-static Result connect_with_timeout(int socket_fd, const struct sockaddr_in* address, BridgeHealthResult* result)
+static Result connect_with_timeout(int socket_fd, const struct sockaddr_in* address, GatewayHealthResult* result)
 {
     int flags;
     int connect_rc;
@@ -359,7 +359,7 @@ static bool response_complete(const char* response, size_t response_used)
     return (response_used - header_bytes) >= content_length;
 }
 
-void bridge_health_result_reset(BridgeHealthResult* result)
+void gateway_health_result_reset(GatewayHealthResult* result)
 {
     if (result == NULL)
         return;
@@ -367,7 +367,7 @@ void bridge_health_result_reset(BridgeHealthResult* result)
     memset(result, 0, sizeof(*result));
 }
 
-Result bridge_health_network_init(void)
+Result gateway_health_network_init(void)
 {
     Result rc;
 
@@ -389,7 +389,7 @@ Result bridge_health_network_init(void)
     return 0;
 }
 
-void bridge_health_network_exit(void)
+void gateway_health_network_exit(void)
 {
     if (!g_soc_ready)
         return;
@@ -400,7 +400,7 @@ void bridge_health_network_exit(void)
     g_soc_ready = false;
 }
 
-Result bridge_health_check_run(const char* url, BridgeHealthResult* result)
+Result gateway_health_check_run(const char* url, GatewayHealthResult* result)
 {
     Result wifi_rc;
     Result rc;
@@ -419,7 +419,7 @@ Result bridge_health_check_run(const char* url, BridgeHealthResult* result)
     if (result == NULL)
         return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_POINTER);
 
-    bridge_health_result_reset(result);
+    gateway_health_result_reset(result);
 
     wifi_rc = ACU_GetWifiStatus(&wifi_status);
     if (R_FAILED(wifi_rc)) {

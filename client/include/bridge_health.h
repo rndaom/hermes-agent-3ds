@@ -4,14 +4,14 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#ifndef DEFAULT_BRIDGE_HEALTH_URL
-#define DEFAULT_BRIDGE_HEALTH_URL "http://10.75.76.156:8787/api/v2/health"
+#ifndef DEFAULT_GATEWAY_HEALTH_URL
+#define DEFAULT_GATEWAY_HEALTH_URL "http://10.75.76.156:8787/api/v2/health"
 #endif
 
 #define BRIDGE_HEALTH_TEXT_MAX 96
 #define BRIDGE_HEALTH_ERROR_MAX 128
 
-typedef struct BridgeHealthResult {
+typedef struct GatewayHealthResult {
     bool success;
     u32 http_status;
     int socket_errno;
@@ -23,9 +23,9 @@ typedef struct BridgeHealthResult {
     u32 context_tokens;
     u32 context_percent;
     char error[BRIDGE_HEALTH_ERROR_MAX];
-} BridgeHealthResult;
+} GatewayHealthResult;
 
-void bridge_health_result_reset(BridgeHealthResult* result);
-Result bridge_health_network_init(void);
-void bridge_health_network_exit(void);
-Result bridge_health_check_run(const char* url, BridgeHealthResult* result);
+void gateway_health_result_reset(GatewayHealthResult* result);
+Result gateway_health_network_init(void);
+void gateway_health_network_exit(void);
+Result gateway_health_check_run(const char* url, GatewayHealthResult* result);

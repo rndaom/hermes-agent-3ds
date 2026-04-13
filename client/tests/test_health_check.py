@@ -9,12 +9,12 @@ def test_bridge_health_check_source_files_exist():
     assert (CLIENT_DIR / "source" / "bridge_health.c").exists()
 
 
-def test_bridge_health_defaults_target_the_native_v2_health_endpoint():
+def test_gateway_health_defaults_target_the_native_v2_health_endpoint():
     header = (CLIENT_DIR / "include" / "bridge_health.h").read_text()
     app_config_header = (CLIENT_DIR / "include" / "app_config.h").read_text()
     app_config_source = (CLIENT_DIR / "source" / "app_config.c").read_text()
 
-    assert "DEFAULT_BRIDGE_HEALTH_URL" in header
+    assert "DEFAULT_GATEWAY_HEALTH_URL" in header
     assert "/api/v2/health" in header
     assert "/api/v1/health" not in header
     assert "hermes_app_config_build_health_url" in app_config_header
@@ -52,11 +52,9 @@ def test_main_c_offers_a_button_driven_native_v2_gateway_health_check_ui():
     assert "TOOL TRAY" in ui_c
     assert "AppHomeContext" in home_h
     assert "Checking Hermes relay..." in home_c
-    assert "format_health_status_line" in home_c
-    assert '"%s [%s/%d]"' in home_c
     assert "Reply note received over native v2." in request_c
     assert "KEY_A" in home_c
-    assert "bridge_health_check_run" in home_c
+    assert "gateway_health_check_run" in home_c
     assert "model_name" in health_h
     assert "context_length" in health_h
     assert "context_tokens" in health_h

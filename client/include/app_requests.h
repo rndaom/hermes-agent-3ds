@@ -17,7 +17,7 @@ typedef void (*AppRequestRenderFn)(
     const HermesAppConfig* config,
     SettingsField selected_field,
     bool settings_dirty,
-    const BridgeHealthResult* health_result,
+    const GatewayHealthResult* health_result,
     const BridgeChatResult* chat_result,
     const char* last_message,
     size_t reply_page,
@@ -29,7 +29,7 @@ typedef void (*AppRequestRenderFn)(
 typedef struct AppRequestUiContext {
     SettingsField selected_field;
     bool settings_dirty;
-    const BridgeHealthResult* health_result;
+    const GatewayHealthResult* health_result;
     size_t command_selection;
     AppRequestRenderFn render;
 } AppRequestUiContext;
