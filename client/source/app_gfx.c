@@ -127,7 +127,7 @@ bool app_gfx_init(void)
     g_measure_buf = C2D_TextBufNew(4096);
     g_ui_font = C2D_FontLoadFromMem(nintendo_ds_bios_font_bin, nintendo_ds_bios_font_bin_size);
     if (g_ui_font != NULL)
-        C2D_FontSetFilter(g_ui_font, GPU_NEAREST, GPU_NEAREST);
+        C2D_FontSetFilter(g_ui_font, GPU_NEAREST, GPU_LINEAR);
     app_gfx_refresh_scale_adjust();
 
     return g_top_target != NULL && g_bottom_target != NULL && g_text_buf != NULL && g_measure_buf != NULL;
