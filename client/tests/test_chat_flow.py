@@ -74,6 +74,7 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
         "getpeername(socket_fd" in (CLIENT_DIR / "source" / "bridge_v2.c").read_text()
     )
     assert (CLIENT_DIR / "nintendo_ds_bios_ascii.txt").exists()
+    assert (CLIENT_DIR / "data" / "nintendo_ds_bios_body_font.bin").exists()
     assert "config->active_conversation_id" in request_c
     assert "message_buffer" in request_c
     assert "bridge_v2_list_conversations" in conv_c
