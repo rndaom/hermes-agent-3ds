@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "app_theme.h"
+
 #define HERMES_APP_CONFIG_DIR "sdmc:/3ds/hermes-agent-3ds"
 #define HERMES_APP_CONFIG_PATH "sdmc:/3ds/hermes-agent-3ds/config.ini"
 #define DEFAULT_GATEWAY_HOST "10.75.76.156"
@@ -29,6 +31,8 @@ typedef struct HermesAppConfig {
     char active_conversation_id[HERMES_APP_CONVERSATION_ID_MAX];
     size_t recent_conversation_count;
     char recent_conversations[HERMES_APP_RECENT_CONVERSATIONS_MAX][HERMES_APP_CONVERSATION_ID_MAX];
+    PictochatThemeColor theme_color;
+    bool dark_mode;
 } HermesAppConfig;
 
 typedef enum HermesAppConfigLoadStatus {

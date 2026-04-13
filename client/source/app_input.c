@@ -35,6 +35,10 @@ const char* settings_field_label(SettingsField field)
             return "Token";
         case SETTINGS_FIELD_DEVICE_ID:
             return "Device ID";
+        case SETTINGS_FIELD_THEME:
+            return "Theme";
+        case SETTINGS_FIELD_MODE:
+            return "Mode";
         default:
             return "Unknown";
     }
@@ -127,6 +131,16 @@ bool edit_selected_setting(HermesAppConfig* config, SettingsField field, char* s
 
             copy_bounded_string(config->device_id, sizeof(config->device_id), edit_buffer);
             snprintf(status_line, status_line_size, "Device ID updated.");
+            return true;
+
+        case SETTINGS_FIELD_THEME:
+            config->theme_color = pictochat_theme_next(config->theme_color);
+            snprintf(status_line, status_line_size, "Theme set to %s.", pictochat_theme_get_name(config->theme_color));
+            return true;
+
+        case SETTINGS_FIELD_MODE:
+            config->dark_mode = !config->dark_mode;
+            snprintf(status_line, status_line_size, "%s mode enabled.", config->dark_mode ? "Dark" : "Light");
             return true;
 
         default:

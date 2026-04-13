@@ -230,6 +230,8 @@ void hermes_app_config_set_defaults(HermesAppConfig* config)
     clear_recent_conversations(config);
     copy_string(config->recent_conversations[0], sizeof(config->recent_conversations[0]), DEFAULT_CONVERSATION_ID);
     config->recent_conversation_count = 1;
+    config->theme_color = PICTOCHAT_THEME_DEFAULT;
+    config->dark_mode = false;
 }
 
 HermesAppConfigLoadStatus hermes_app_config_load(HermesAppConfig* config)
@@ -276,6 +278,18 @@ HermesAppConfigLoadStatus hermes_app_config_load(HermesAppConfig* config)
                 copy_string(config->active_conversation_id, sizeof(config->active_conversation_id), conversation_id);
         } else if (strncmp(value, "recent_conversations=", 21) == 0) {
             parse_recent_conversations(config, lstrip(value + 21));
+        } else if (strncmp(value, "theme_color=", 12) == 0) {
+            char* theme_text = lstrip(value + 12);
+            char* end_ptr = NULL;
+            long theme_value = strtol(theme_text, &end_ptr, 10);
+            if (end_ptr != theme_text && *lstrip(end_ptr) == '\0' && theme_value >= 0 && theme_value < PICTOCHAT_THEME_COUNT)
+                config->theme_color = (PictochatThemeColor)theme_value;
+        } else if (strncmp(value, "dark_mode=", 10) == 0) {
+            char* dark_text = lstrip(value + 10);
+            if (strcmp(dark_text, "1") == 0 || strcmp(dark_text, "true") == 0)
+                config->dark_mode = true;
+            else
+                config->dark_mode = false;
         }
     }
 
@@ -312,6 +326,8 @@ bool hermes_app_config_save(const HermesAppConfig* config)
         fprintf(file, "token=%s\n", config->token) < 0 ||
         fprintf(file, "device_id=%s\n", config->device_id) < 0 ||
         fprintf(file, "active_conversation_id=%s\n", config->active_conversation_id) < 0 ||
+        fprintf(file, "theme_color=%d\n", (int)config->theme_color) < 0 ||
+        fprintf(file, "dark_mode=%d\n", config->dark_mode ? 1 : 0) < 0 ||
         fprintf(file, "recent_conversations=") < 0) {
         fclose(file);
         return false;

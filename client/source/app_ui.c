@@ -1,6 +1,7 @@
 #include "app_ui.h"
 #include "app_gfx.h"
 #include "app_home.h"
+#include "app_theme.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -389,83 +390,12 @@ static void format_active_conversation_label(
         snprintf(out_label, out_size, "%s", config->active_conversation_id);
 }
 
-#define UI_COLOR32(r, g, b, a) ((u32)(r) | ((u32)(g) << 8) | ((u32)(b) << 16) | ((u32)(a) << 24))
-#define UI_BG UI_COLOR32(0xEF, 0xEF, 0xE9, 0xFF)
-#define UI_PAPER UI_COLOR32(0xFB, 0xFB, 0xF6, 0xFF)
-#define UI_PAPER_ALT UI_COLOR32(0xF3, 0xF3, 0xED, 0xFF)
-#define UI_PAPER_SHADOW UI_COLOR32(0xE2, 0xE2, 0xDA, 0xFF)
-#define UI_RULE UI_COLOR32(0xD4, 0xD4, 0xCC, 0xFF)
-#define UI_RULE_STRONG UI_COLOR32(0xC2, 0xC2, 0xBA, 0xFF)
-#define UI_BORDER UI_COLOR32(0x90, 0x91, 0x8B, 0xFF)
-#define UI_BORDER_DARK UI_COLOR32(0x62, 0x63, 0x60, 0xFF)
-#define UI_TEXT UI_COLOR32(0x28, 0x2A, 0x2E, 0xFF)
-#define UI_MUTED UI_COLOR32(0x55, 0x57, 0x5E, 0xFF)
-#define UI_META UI_COLOR32(0x77, 0x79, 0x80, 0xFF)
-#define UI_ALERT_BG UI_COLOR32(0x1B, 0x1B, 0x1D, 0xFF)
-#define UI_ALERT_LINE UI_COLOR32(0x3A, 0x3A, 0x3D, 0xFF)
-#define UI_ALERT_BORDER UI_COLOR32(0xFF, 0x8C, 0x1C, 0xFF)
-
-typedef struct AppUiTheme {
-    u32 rail_top;
-    u32 rail_mid;
-    u32 rail_bottom;
-    u32 accent_light;
-    u32 accent;
-    u32 accent_dark;
-    u32 accent_text;
-} AppUiTheme;
-
-static const AppUiTheme g_ui_room_themes[] = {
-    {UI_COLOR32(0xB7, 0xEA, 0xFF, 0xFF), UI_COLOR32(0x72, 0xD5, 0xFF, 0xFF), UI_COLOR32(0x39, 0xBD, 0xFF, 0xFF), UI_COLOR32(0xD8, 0xF4, 0xFF, 0xFF), UI_COLOR32(0x60, 0xCB, 0xFF, 0xFF), UI_COLOR32(0x11, 0x74, 0xCB, 0xFF), UI_TEXT},
-    {UI_COLOR32(0xFF, 0xD0, 0x92, 0xFF), UI_COLOR32(0xFF, 0xA9, 0x4D, 0xFF), UI_COLOR32(0xF1, 0x7E, 0x0C, 0xFF), UI_COLOR32(0xFF, 0xE4, 0xBF, 0xFF), UI_COLOR32(0xFF, 0xA0, 0x31, 0xFF), UI_COLOR32(0xC8, 0x5E, 0x00, 0xFF), UI_TEXT},
-    {UI_COLOR32(0xE0, 0xFB, 0xA8, 0xFF), UI_COLOR32(0xC5, 0xF2, 0x57, 0xFF), UI_COLOR32(0xA0, 0xD6, 0x11, 0xFF), UI_COLOR32(0xED, 0xFD, 0xC5, 0xFF), UI_COLOR32(0xBE, 0xEE, 0x4E, 0xFF), UI_COLOR32(0x6F, 0xA9, 0x00, 0xFF), UI_TEXT},
-    {UI_COLOR32(0xC4, 0xF4, 0xBF, 0xFF), UI_COLOR32(0x86, 0xE8, 0x7E, 0xFF), UI_COLOR32(0x33, 0xC4, 0x49, 0xFF), UI_COLOR32(0xD8, 0xF9, 0xD3, 0xFF), UI_COLOR32(0x69, 0xDA, 0x6F, 0xFF), UI_COLOR32(0x0D, 0x99, 0x30, 0xFF), UI_TEXT},
-    {UI_COLOR32(0xC6, 0xD9, 0xFF, 0xFF), UI_COLOR32(0x83, 0xB7, 0xFF, 0xFF), UI_COLOR32(0x35, 0x7C, 0xF5, 0xFF), UI_COLOR32(0xDE, 0xE8, 0xFF, 0xFF), UI_COLOR32(0x61, 0x9C, 0xFF, 0xFF), UI_COLOR32(0x1A, 0x52, 0xD8, 0xFF), UI_TEXT},
-    {UI_COLOR32(0xF2, 0xC4, 0xFF, 0xFF), UI_COLOR32(0xE7, 0x87, 0xFF, 0xFF), UI_COLOR32(0xD8, 0x3A, 0xFA, 0xFF), UI_COLOR32(0xF7, 0xD8, 0xFF, 0xFF), UI_COLOR32(0xEC, 0x73, 0xFF, 0xFF), UI_COLOR32(0xB0, 0x1C, 0xDA, 0xFF), UI_TEXT},
-};
-
-#define UI_THEME_COUNT (sizeof(g_ui_room_themes) / sizeof(g_ui_room_themes[0]))
-
-static size_t theme_index_for_text(const char* text)
+/* Global theme accessor - uses config settings */
+static const PictochatTheme* get_global_theme(const HermesAppConfig* config)
 {
-    unsigned long hash = 5381UL;
-
-    if (text == NULL || text[0] == '\0')
-        return 0;
-
-    while (*text != '\0') {
-        hash = ((hash << 5) + hash) + (unsigned char)*text;
-        text++;
-    }
-
-    return (size_t)(hash % UI_THEME_COUNT);
-}
-
-static const AppUiTheme* theme_for_conversation_id(const char* conversation_id)
-{
-    return &g_ui_room_themes[theme_index_for_text(conversation_id)];
-}
-
-static const AppUiTheme* active_room_theme(const HermesAppConfig* config)
-{
-    if (config == NULL || config->active_conversation_id[0] == '\0')
-        return &g_ui_room_themes[0];
-
-    return theme_for_conversation_id(config->active_conversation_id);
-}
-
-static const AppUiTheme* author_theme(AppUiMessageAuthor author)
-{
-    return author == APP_UI_MESSAGE_USER ? &g_ui_room_themes[1] : &g_ui_room_themes[4];
-}
-
-static const AppUiTheme* relay_theme(const GatewayHealthResult* health_result, const BridgeChatResult* chat_result)
-{
-    if (health_result != NULL && health_result->success)
-        return &g_ui_room_themes[3];
-    if (chat_result != NULL && chat_result->success)
-        return &g_ui_room_themes[4];
-    return &g_ui_room_themes[0];
+    if (config == NULL)
+        return pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
+    return pictochat_theme_get(config->theme_color, config->dark_mode);
 }
 
 bool hermes_app_ui_init(void)
@@ -478,53 +408,59 @@ void hermes_app_ui_exit(void)
     app_gfx_fini();
 }
 
-static void draw_system_bar(float x, float y, float w, float h, const AppUiTheme* theme)
+static void draw_system_bar(float x, float y, float w, float h, const PictochatTheme* theme)
 {
     float band_height = (h - 4.0f) / 3.0f;
 
     if (theme == NULL)
-        theme = &g_ui_room_themes[0];
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
 
-    app_gfx_panel(x, y, w, h, UI_PAPER, UI_BORDER_DARK);
-    app_gfx_highlight_bar(x + 2.0f, y + 2.0f, w - 4.0f, band_height, theme->rail_top);
-    app_gfx_highlight_bar(x + 2.0f, y + 2.0f + band_height, w - 4.0f, band_height, theme->rail_mid);
-    app_gfx_highlight_bar(x + 2.0f, y + 2.0f + band_height * 2.0f, w - 4.0f, h - 4.0f - band_height * 2.0f, theme->rail_bottom);
-    app_gfx_highlight_bar(x + 2.0f, y + h - 3.0f, w - 4.0f, 1.0f, theme->accent_dark);
+    app_gfx_panel(x, y, w, h, theme->paper, theme->border_dark);
+    app_gfx_highlight_bar(x + 2.0f, y + 2.0f, w - 4.0f, band_height, theme->accent.gradient_top);
+    app_gfx_highlight_bar(x + 2.0f, y + 2.0f + band_height, w - 4.0f, band_height, theme->accent.gradient_mid);
+    app_gfx_highlight_bar(x + 2.0f, y + 2.0f + band_height * 2.0f, w - 4.0f, h - 4.0f - band_height * 2.0f, theme->accent.gradient_bottom);
+    app_gfx_highlight_bar(x + 2.0f, y + h - 3.0f, w - 4.0f, 1.0f, theme->accent.primary_dark);
 }
 
-static void draw_top_header(const AppUiTheme* theme, const char* subtitle)
+static void draw_top_header(const PictochatTheme* theme, const char* subtitle)
 {
     draw_system_bar(8.0f, 8.0f, 384.0f, 20.0f, theme);
-    app_gfx_text(16.0f, 12.0f, 0.50f, 0.50f, UI_TEXT, "PICTOCHAT H");
-    app_gfx_text_right(384.0f, 13.0f, 0.30f, 0.30f, UI_TEXT, subtitle);
+    app_gfx_text(16.0f, 12.0f, 0.50f, 0.50f, theme->text, "PICTOCHAT H");
+    app_gfx_text_right(384.0f, 13.0f, 0.30f, 0.30f, theme->text, subtitle);
 }
 
-static void draw_bottom_header(const AppUiTheme* theme, const char* title)
+static void draw_bottom_header(const PictochatTheme* theme, const char* title)
 {
     draw_system_bar(8.0f, 10.0f, 304.0f, 18.0f, theme);
-    app_gfx_text(16.0f, 13.0f, 0.40f, 0.40f, UI_TEXT, title);
+    app_gfx_text(16.0f, 13.0f, 0.40f, 0.40f, theme->text, title);
 }
 
-static void draw_ruled_paper(float x, float y, float w, float h, u32 fill)
+static void draw_ruled_paper(float x, float y, float w, float h, u32 fill, const PictochatTheme* theme)
 {
     int row;
     int column;
 
-    app_gfx_panel(x, y, w, h, fill, UI_BORDER);
+    if (theme == NULL)
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
+
+    app_gfx_panel(x, y, w, h, fill, theme->border);
     for (row = 10; y + (float)row < y + h - 4.0f; row += 8)
-        app_gfx_highlight_bar(x + 4.0f, y + (float)row, w - 8.0f, 1.0f, UI_RULE);
+        app_gfx_highlight_bar(x + 4.0f, y + (float)row, w - 8.0f, 1.0f, theme->rule);
     for (column = 44; x + (float)column < x + w - 4.0f; column += 48)
-        app_gfx_highlight_bar(x + (float)column, y + 4.0f, 1.0f, h - 8.0f, UI_RULE_STRONG);
+        app_gfx_highlight_bar(x + (float)column, y + 4.0f, 1.0f, h - 8.0f, theme->rule_strong);
 }
 
-static void draw_alert_banner(float x, float y, float w, float h, const char* text)
+static void draw_alert_banner(float x, float y, float w, float h, const char* text, const PictochatTheme* theme)
 {
     int row;
 
-    app_gfx_panel(x, y, w, h, UI_ALERT_BG, UI_ALERT_BORDER);
+    if (theme == NULL)
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
+
+    app_gfx_panel(x, y, w, h, theme->alert_bg, theme->alert_border);
     for (row = 4; y + (float)row < y + h - 3.0f; row += 4)
-        app_gfx_highlight_bar(x + 4.0f, y + (float)row, w - 8.0f, 1.0f, UI_ALERT_LINE);
-    app_gfx_text_fit(x + 8.0f, y + 7.0f, w - 16.0f, 0.28f, 0.28f, UI_PAPER, text);
+        app_gfx_highlight_bar(x + 4.0f, y + (float)row, w - 8.0f, 1.0f, theme->alert_line);
+    app_gfx_text_fit(x + 8.0f, y + 7.0f, w - 16.0f, 0.28f, 0.28f, theme->paper, text);
 }
 
 static void draw_chip(float x, float y, float w, const char* label, u32 fill, u32 text_color, u32 border)
@@ -550,12 +486,15 @@ static float chip_width_for_label(const char* label)
     return width;
 }
 
-static void draw_note_lines(float x, float y, float w, size_t count)
+static void draw_note_lines(float x, float y, float w, size_t count, const PictochatTheme* theme)
 {
     size_t index;
 
+    if (theme == NULL)
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
+
     for (index = 0; index < count; index++)
-        app_gfx_highlight_bar(x, y + (float)index * 9.0f, w, 1.0f, UI_RULE);
+        app_gfx_highlight_bar(x, y + (float)index * 9.0f, w, 1.0f, theme->rule);
 }
 
 static void draw_text_lines(
@@ -578,38 +517,38 @@ static void draw_text_lines(
         app_gfx_text_fit(x, y + (float)index * line_height, max_width, scale_x, scale_y, color, lines[start + index]);
 }
 
-static void draw_menu_row(float x, float y, float w, const char* label, const AppUiTheme* theme)
+static void draw_menu_row(float x, float y, float w, const char* label, const PictochatTheme* theme)
 {
     if (theme == NULL)
-        theme = &g_ui_room_themes[0];
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
 
-    app_gfx_panel(x, y, w, 18.0f, UI_PAPER, UI_BORDER);
-    app_gfx_highlight_bar(x + 2.0f, y + 2.0f, 16.0f, 14.0f, theme->accent_light);
-    app_gfx_highlight_bar(x + 2.0f, y + 2.0f, 4.0f, 14.0f, theme->accent);
-    app_gfx_text_fit(x + 24.0f, y + 4.0f, w - 30.0f, 0.30f, 0.30f, UI_TEXT, label);
+    app_gfx_panel(x, y, w, 18.0f, theme->paper, theme->border);
+    app_gfx_highlight_bar(x + 2.0f, y + 2.0f, 16.0f, 14.0f, theme->accent.primary_light);
+    app_gfx_highlight_bar(x + 2.0f, y + 2.0f, 4.0f, 14.0f, theme->accent.primary);
+    app_gfx_text_fit(x + 24.0f, y + 4.0f, w - 30.0f, 0.30f, 0.30f, theme->text, label);
 }
 
-static void draw_action_button(float x, float y, float w, float h, const char* label, const AppUiTheme* theme, bool selected)
+static void draw_action_button(float x, float y, float w, float h, const char* label, const PictochatTheme* theme, bool selected)
 {
     if (theme == NULL)
-        theme = &g_ui_room_themes[0];
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
 
-    app_gfx_panel(x, y, w, h, selected ? UI_PAPER_ALT : UI_PAPER, selected ? theme->accent_dark : UI_BORDER_DARK);
-    app_gfx_highlight_bar(x + 2.0f, y + 2.0f, w - 4.0f, 3.0f, selected ? theme->accent_light : UI_PAPER_SHADOW);
-    app_gfx_highlight_bar(x + 7.0f, y + 6.0f, 18.0f, h - 12.0f, selected ? theme->accent : theme->accent_light);
-    app_gfx_highlight_bar(x + 10.0f, y + 9.0f, 12.0f, 2.0f, theme->accent_dark);
-    app_gfx_highlight_bar(x + 10.0f, y + 14.0f, 12.0f, 2.0f, theme->accent_dark);
-    app_gfx_text_fit(x + 32.0f, y + 10.0f, w - 42.0f, 0.32f, 0.32f, UI_TEXT, label);
+    app_gfx_panel(x, y, w, h, selected ? theme->paper_alt : theme->paper, selected ? theme->accent.primary_dark : theme->border_dark);
+    app_gfx_highlight_bar(x + 2.0f, y + 2.0f, w - 4.0f, 3.0f, selected ? theme->accent.primary_light : theme->paper_shadow);
+    app_gfx_highlight_bar(x + 7.0f, y + 6.0f, 18.0f, h - 12.0f, selected ? theme->accent.primary : theme->accent.primary_light);
+    app_gfx_highlight_bar(x + 10.0f, y + 9.0f, 12.0f, 2.0f, theme->accent.primary_dark);
+    app_gfx_highlight_bar(x + 10.0f, y + 14.0f, 12.0f, 2.0f, theme->accent.primary_dark);
+    app_gfx_text_fit(x + 32.0f, y + 10.0f, w - 42.0f, 0.32f, 0.32f, theme->text, label);
 }
 
-static void draw_hint_button(float x, float y, float w, const char* label, const AppUiTheme* theme)
+static void draw_hint_button(float x, float y, float w, const char* label, const PictochatTheme* theme)
 {
     if (theme == NULL)
-        theme = &g_ui_room_themes[0];
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
 
-    app_gfx_panel(x, y, w, 16.0f, UI_PAPER, UI_BORDER);
-    app_gfx_highlight_bar(x + 2.0f, y + 2.0f, 14.0f, 12.0f, theme->accent_light);
-    app_gfx_text_fit(x + 20.0f, y + 4.0f, w - 24.0f, 0.26f, 0.26f, UI_TEXT, label);
+    app_gfx_panel(x, y, w, 16.0f, theme->paper, theme->border);
+    app_gfx_highlight_bar(x + 2.0f, y + 2.0f, 14.0f, 12.0f, theme->accent.primary_light);
+    app_gfx_text_fit(x + 20.0f, y + 4.0f, w - 24.0f, 0.26f, 0.26f, theme->text, label);
 }
 
 static void draw_info_card(
@@ -618,7 +557,7 @@ static void draw_info_card(
     float w,
     float h,
     const char* label,
-    const AppUiTheme* theme,
+    const PictochatTheme* theme,
     char lines[][HOME_WRAP_LINE_MAX],
     size_t line_count,
     float max_width,
@@ -626,11 +565,11 @@ static void draw_info_card(
 )
 {
     if (theme == NULL)
-        theme = &g_ui_room_themes[0];
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
 
-    draw_ruled_paper(x, y, w, h, UI_PAPER);
-    draw_chip(x + 8.0f, y + 6.0f, chip_width_for_label(label), label, theme->accent, theme->accent_text, theme->accent_dark);
-    draw_text_lines(x + 70.0f, y + 8.0f, 10.0f, max_width, 0.28f, 0.28f, UI_TEXT, lines, line_count, 0, max_lines);
+    draw_ruled_paper(x, y, w, h, theme->paper, theme);
+    draw_chip(x + 8.0f, y + 6.0f, chip_width_for_label(label), label, theme->accent.primary, theme->text, theme->accent.primary_dark);
+    draw_text_lines(x + 70.0f, y + 8.0f, 10.0f, max_width, 0.28f, 0.28f, theme->text, lines, line_count, 0, max_lines);
 }
 
 static size_t wrap_message_card_text(const char* text, float max_width, float scale)
@@ -649,29 +588,29 @@ static void draw_message_card(
     size_t max_lines,
     float text_scale,
     const char* page_label,
-    const AppUiTheme* theme
+    const PictochatTheme* theme
 )
 {
     size_t total_lines;
     float chip_width;
 
     if (theme == NULL)
-        theme = &g_ui_room_themes[0];
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
 
     total_lines = wrap_message_card_text(text, w - 42.0f, text_scale);
     if (start_line >= total_lines)
         start_line = 0;
 
-    app_gfx_panel(x, y, w, h, UI_PAPER, theme->accent_dark);
-    app_gfx_highlight_bar(x + 2.0f, y + 2.0f, w - 4.0f, 4.0f, theme->accent_light);
-    app_gfx_highlight_bar(x + 24.0f, y + 28.0f, 1.0f, h - 36.0f, theme->accent_light);
-    draw_note_lines(x + 10.0f, y + 32.0f, w - 20.0f, max_lines + 1);
+    app_gfx_panel(x, y, w, h, theme->paper, theme->accent.primary_dark);
+    app_gfx_highlight_bar(x + 2.0f, y + 2.0f, w - 4.0f, 4.0f, theme->accent.primary_light);
+    app_gfx_highlight_bar(x + 24.0f, y + 28.0f, 1.0f, h - 36.0f, theme->accent.primary_light);
+    draw_note_lines(x + 10.0f, y + 32.0f, w - 20.0f, max_lines + 1, theme);
 
     chip_width = chip_width_for_label(label);
-    draw_chip(x + 10.0f, y + 8.0f, chip_width, label, theme->accent, theme->accent_text, theme->accent_dark);
+    draw_chip(x + 10.0f, y + 8.0f, chip_width, label, theme->accent.primary, theme->text, theme->accent.primary_dark);
     if (page_label != NULL && page_label[0] != '\0')
-        draw_chip(x + w - 44.0f, y + 8.0f, 34.0f, page_label, UI_PAPER_ALT, UI_TEXT, theme->accent_dark);
-    draw_text_lines(x + 30.0f, y + 34.0f, 10.0f, w - 40.0f, text_scale, text_scale, UI_TEXT, g_home_card_lines, total_lines, start_line, max_lines);
+        draw_chip(x + w - 44.0f, y + 8.0f, 34.0f, page_label, theme->paper_alt, theme->text, theme->accent.primary_dark);
+    draw_text_lines(x + 30.0f, y + 34.0f, 10.0f, w - 40.0f, text_scale, text_scale, theme->text, g_home_card_lines, total_lines, start_line, max_lines);
 }
 
 static const char* home_command_label_for_selection(size_t command_selection)
@@ -725,8 +664,7 @@ static void render_home_graphical(
     const BridgeV2ConversationListResult* conversation_list
 )
 {
-    const AppUiTheme* room_theme;
-    const AppUiTheme* status_theme;
+    const PictochatTheme* theme = get_global_theme(config);
     char conversation_label[HERMES_APP_CONVERSATION_ID_MAX];
     char page_label[24];
     size_t room_line_count;
@@ -742,9 +680,9 @@ static void render_home_graphical(
     float card_y = 72.0f;
 
     (void)last_message;
+    (void)health_result;
+    (void)chat_result;
 
-    room_theme = active_room_theme(config);
-    status_theme = relay_theme(health_result, chat_result);
     format_active_conversation_label(config, conversation_list, conversation_label, sizeof(conversation_label));
     if (g_home_history_count > 0 && g_home_history[g_home_history_count - 1].author == APP_UI_MESSAGE_HERMES)
         latest_reply_text = g_home_history[g_home_history_count - 1].text;
@@ -783,12 +721,12 @@ static void render_home_graphical(
         2
     );
 
-    app_gfx_begin_top(UI_BG);
-    app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, UI_PAPER_SHADOW, UI_BORDER_DARK);
-    draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, UI_PAPER);
-    draw_top_header(room_theme, "ROOM BOARD");
-    draw_info_card(16.0f, 36.0f, 176.0f, 28.0f, "ROOM", room_theme, g_home_room_lines, room_line_count, 110.0f, 2);
-    draw_info_card(208.0f, 36.0f, 176.0f, 28.0f, "RELAY", status_theme, g_home_status_lines, status_line_count, 104.0f, 2);
+    app_gfx_begin_top(theme->background);
+    app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, theme->paper_shadow, theme->border_dark);
+    draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, theme->paper, theme);
+    draw_top_header(theme, "ROOM BOARD");
+    draw_info_card(16.0f, 36.0f, 176.0f, 28.0f, "ROOM", theme, g_home_room_lines, room_line_count, 110.0f, 2);
+    draw_info_card(208.0f, 36.0f, 176.0f, 28.0f, "RELAY", theme, g_home_status_lines, status_line_count, 104.0f, 2);
 
     if (g_home_history_count == 0) {
         draw_message_card(
@@ -802,7 +740,7 @@ static void render_home_graphical(
             5,
             0.30f,
             "",
-            &g_ui_room_themes[4]
+            theme
         );
     } else {
         history_start = g_home_history_count > 3 ? g_home_history_count - 3 : 0;
@@ -828,7 +766,7 @@ static void render_home_graphical(
                 max_lines,
                 text_scale,
                 latest_reply ? page_label : "",
-                author_theme(entry->author)
+                theme
             );
             card_y += card_height + 6.0f;
         }
@@ -845,34 +783,33 @@ static void render_home_graphical(
                 2,
                 0.27f,
                 "",
-                status_theme
+                theme
             );
         }
     }
 
-    app_gfx_begin_bottom(UI_BG);
-    app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, UI_PAPER_SHADOW, UI_BORDER_DARK);
-    draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, UI_PAPER);
-    draw_bottom_header(room_theme, "TOOL TRAY");
-    draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Write Note", room_theme, selected_command == (size_t)HOME_COMMAND_ASK);
-    draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Check Relay", room_theme, selected_command == (size_t)HOME_COMMAND_CHECK);
-    draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Rooms", room_theme, selected_command == (size_t)HOME_COMMAND_THREADS);
-    draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Setup", room_theme, selected_command == (size_t)HOME_COMMAND_CONFIG);
-    draw_action_button(16.0f, 116.0f, 136.0f, 28.0f, "Mic Note", room_theme, selected_command == (size_t)HOME_COMMAND_MIC);
-    draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Clear Board", room_theme, selected_command == (size_t)HOME_COMMAND_CLEAR);
+    app_gfx_begin_bottom(theme->background);
+    app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, theme->paper_shadow, theme->border_dark);
+    draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, theme->paper, theme);
+    draw_bottom_header(theme, "TOOL TRAY");
+    draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Write Note", theme, selected_command == (size_t)HOME_COMMAND_ASK);
+    draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Check Relay", theme, selected_command == (size_t)HOME_COMMAND_CHECK);
+    draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Rooms", theme, selected_command == (size_t)HOME_COMMAND_THREADS);
+    draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Setup", theme, selected_command == (size_t)HOME_COMMAND_CONFIG);
+    draw_action_button(16.0f, 116.0f, 136.0f, 28.0f, "Mic Note", theme, selected_command == (size_t)HOME_COMMAND_MIC);
+    draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Clear Board", theme, selected_command == (size_t)HOME_COMMAND_CLEAR);
 
-    draw_ruled_paper(8.0f, 156.0f, 304.0f, 52.0f, UI_PAPER);
-    app_gfx_text(18.0f, 164.0f, 0.28f, 0.28f, room_theme->accent_dark, "TOOL");
-    app_gfx_text_fit(56.0f, 164.0f, 152.0f, 0.30f, 0.30f, UI_TEXT, home_command_label_for_selection(selected_command));
-    draw_text_lines(18.0f, 178.0f, 10.0f, 184.0f, 0.27f, 0.27f, UI_MUTED, g_home_detail_lines, detail_line_count, 0, 2);
-    app_gfx_text(224.0f, 164.0f, 0.28f, 0.28f, room_theme->accent_dark, "PAGE");
-    app_gfx_text_right(300.0f, 164.0f, 0.30f, 0.30f, UI_TEXT, page_label);
-    app_gfx_text_fit(224.0f, 178.0f, 76.0f, 0.27f, 0.27f, UI_MUTED, page_count > 1 ? "L/R flips notes" : "Ready to send");
-    draw_hint_button(16.0f, 214.0f, 90.0f, "A Select", room_theme);
-    draw_hint_button(112.0f, 214.0f, 90.0f, "Touch OK", room_theme);
-    draw_hint_button(208.0f, 214.0f, 96.0f, "START Exit", room_theme);
+    draw_ruled_paper(8.0f, 156.0f, 304.0f, 52.0f, theme->paper, theme);
+    app_gfx_text(18.0f, 164.0f, 0.28f, 0.28f, theme->accent.primary_dark, "TOOL");
+    app_gfx_text_fit(56.0f, 164.0f, 152.0f, 0.30f, 0.30f, theme->text, home_command_label_for_selection(selected_command));
+    draw_text_lines(18.0f, 178.0f, 10.0f, 184.0f, 0.27f, 0.27f, theme->text_muted, g_home_detail_lines, detail_line_count, 0, 2);
+    app_gfx_text(224.0f, 164.0f, 0.28f, 0.28f, theme->accent.primary_dark, "PAGE");
+    app_gfx_text_right(300.0f, 164.0f, 0.30f, 0.30f, theme->text, page_label);
+    app_gfx_text_fit(224.0f, 178.0f, 76.0f, 0.27f, 0.27f, theme->text_muted, page_count > 1 ? "L/R flips notes" : "Ready to send");
+    draw_hint_button(16.0f, 214.0f, 90.0f, "A Select", theme);
+    draw_hint_button(112.0f, 214.0f, 90.0f, "Touch OK", theme);
+    draw_hint_button(208.0f, 214.0f, 96.0f, "START Exit", theme);
 }
-
 
 static void render_settings_graphical(
     const HermesAppConfig* config,
@@ -882,65 +819,83 @@ static void render_settings_graphical(
     Result last_rc
 )
 {
-    const AppUiTheme* theme = active_room_theme(config);
+    const PictochatTheme* theme = get_global_theme(config);
     char token_summary[48];
-    float row_y = 74.0f;
+    float row_y = 60.0f;
     char port_line[16];
+    const char* theme_name = pictochat_theme_get_name(config->theme_color);
+    const char* mode_name = config->dark_mode ? "Dark" : "Light";
+    const float row_height = 22.0f;
+    const float row_step = 24.0f;
 
     (void)last_rc;
 
     format_token_summary(config, token_summary, sizeof(token_summary));
     snprintf(port_line, sizeof(port_line), "%u", (unsigned int)config->port);
 
-    app_gfx_begin_top(UI_BG);
-    app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, UI_PAPER_SHADOW, UI_BORDER_DARK);
-    draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, UI_PAPER);
+    app_gfx_begin_top(theme->background);
+    app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, theme->paper_shadow, theme->border_dark);
+    draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, theme->paper, theme);
     draw_top_header(theme, "SETUP SHEET");
-    draw_chip(24.0f, 42.0f, 60.0f, "SETUP", theme->accent, theme->accent_text, theme->accent_dark);
-    draw_chip(306.0f, 42.0f, 70.0f, settings_dirty ? "UNSAVED" : "SAVED", theme->accent_light, UI_TEXT, theme->accent_dark);
+    draw_chip(24.0f, 42.0f, 60.0f, "SETUP", theme->accent.primary, theme->text, theme->accent.primary_dark);
+    draw_chip(306.0f, 42.0f, 70.0f, settings_dirty ? "UNSAVED" : "SAVED", theme->accent.primary_light, theme->text, theme->accent.primary_dark);
 
-    app_gfx_panel(20.0f, row_y, 164.0f, 28.0f, selected_field == SETTINGS_FIELD_HOST ? UI_PAPER_ALT : UI_PAPER, selected_field == SETTINGS_FIELD_HOST ? theme->accent_dark : UI_BORDER);
-    app_gfx_highlight_bar(22.0f, row_y + 2.0f, 18.0f, 24.0f, selected_field == SETTINGS_FIELD_HOST ? theme->accent : theme->accent_light);
-    app_gfx_text_fit(48.0f, row_y + 8.0f, 130.0f, 0.34f, 0.34f, UI_TEXT, "Host");
-    app_gfx_panel(196.0f, row_y, 180.0f, 28.0f, selected_field == SETTINGS_FIELD_HOST ? UI_PAPER_ALT : UI_PAPER, selected_field == SETTINGS_FIELD_HOST ? theme->accent_dark : UI_BORDER);
-    app_gfx_text_fit(204.0f, row_y + 8.0f, 164.0f, 0.32f, 0.32f, UI_TEXT, config->host);
+    app_gfx_panel(20.0f, row_y, 164.0f, row_height, selected_field == SETTINGS_FIELD_HOST ? theme->paper_alt : theme->paper, selected_field == SETTINGS_FIELD_HOST ? theme->accent.primary_dark : theme->border);
+    app_gfx_highlight_bar(22.0f, row_y + 2.0f, 18.0f, row_height - 4.0f, selected_field == SETTINGS_FIELD_HOST ? theme->accent.primary : theme->accent.primary_light);
+    app_gfx_text_fit(48.0f, row_y + 5.0f, 130.0f, 0.32f, 0.32f, theme->text, "Host");
+    app_gfx_panel(196.0f, row_y, 180.0f, row_height, selected_field == SETTINGS_FIELD_HOST ? theme->paper_alt : theme->paper, selected_field == SETTINGS_FIELD_HOST ? theme->accent.primary_dark : theme->border);
+    app_gfx_text_fit(204.0f, row_y + 5.0f, 164.0f, 0.30f, 0.30f, theme->text, config->host);
 
-    row_y += 34.0f;
-    app_gfx_panel(20.0f, row_y, 164.0f, 28.0f, selected_field == SETTINGS_FIELD_PORT ? UI_PAPER_ALT : UI_PAPER, selected_field == SETTINGS_FIELD_PORT ? theme->accent_dark : UI_BORDER);
-    app_gfx_highlight_bar(22.0f, row_y + 2.0f, 18.0f, 24.0f, selected_field == SETTINGS_FIELD_PORT ? theme->accent : theme->accent_light);
-    app_gfx_text_fit(48.0f, row_y + 8.0f, 130.0f, 0.34f, 0.34f, UI_TEXT, "Port");
-    app_gfx_panel(196.0f, row_y, 180.0f, 28.0f, selected_field == SETTINGS_FIELD_PORT ? UI_PAPER_ALT : UI_PAPER, selected_field == SETTINGS_FIELD_PORT ? theme->accent_dark : UI_BORDER);
-    app_gfx_text_fit(204.0f, row_y + 8.0f, 164.0f, 0.32f, 0.32f, UI_TEXT, port_line);
+    row_y += row_step;
+    app_gfx_panel(20.0f, row_y, 164.0f, row_height, selected_field == SETTINGS_FIELD_PORT ? theme->paper_alt : theme->paper, selected_field == SETTINGS_FIELD_PORT ? theme->accent.primary_dark : theme->border);
+    app_gfx_highlight_bar(22.0f, row_y + 2.0f, 18.0f, row_height - 4.0f, selected_field == SETTINGS_FIELD_PORT ? theme->accent.primary : theme->accent.primary_light);
+    app_gfx_text_fit(48.0f, row_y + 5.0f, 130.0f, 0.32f, 0.32f, theme->text, "Port");
+    app_gfx_panel(196.0f, row_y, 180.0f, row_height, selected_field == SETTINGS_FIELD_PORT ? theme->paper_alt : theme->paper, selected_field == SETTINGS_FIELD_PORT ? theme->accent.primary_dark : theme->border);
+    app_gfx_text_fit(204.0f, row_y + 5.0f, 164.0f, 0.30f, 0.30f, theme->text, port_line);
 
-    row_y += 34.0f;
-    app_gfx_panel(20.0f, row_y, 164.0f, 28.0f, selected_field == SETTINGS_FIELD_TOKEN ? UI_PAPER_ALT : UI_PAPER, selected_field == SETTINGS_FIELD_TOKEN ? theme->accent_dark : UI_BORDER);
-    app_gfx_highlight_bar(22.0f, row_y + 2.0f, 18.0f, 24.0f, selected_field == SETTINGS_FIELD_TOKEN ? theme->accent : theme->accent_light);
-    app_gfx_text_fit(48.0f, row_y + 8.0f, 130.0f, 0.34f, 0.34f, UI_TEXT, "Token");
-    app_gfx_panel(196.0f, row_y, 180.0f, 28.0f, selected_field == SETTINGS_FIELD_TOKEN ? UI_PAPER_ALT : UI_PAPER, selected_field == SETTINGS_FIELD_TOKEN ? theme->accent_dark : UI_BORDER);
-    app_gfx_text_fit(204.0f, row_y + 8.0f, 164.0f, 0.30f, 0.30f, UI_TEXT, token_summary);
+    row_y += row_step;
+    app_gfx_panel(20.0f, row_y, 164.0f, row_height, selected_field == SETTINGS_FIELD_TOKEN ? theme->paper_alt : theme->paper, selected_field == SETTINGS_FIELD_TOKEN ? theme->accent.primary_dark : theme->border);
+    app_gfx_highlight_bar(22.0f, row_y + 2.0f, 18.0f, row_height - 4.0f, selected_field == SETTINGS_FIELD_TOKEN ? theme->accent.primary : theme->accent.primary_light);
+    app_gfx_text_fit(48.0f, row_y + 5.0f, 130.0f, 0.32f, 0.32f, theme->text, "Token");
+    app_gfx_panel(196.0f, row_y, 180.0f, row_height, selected_field == SETTINGS_FIELD_TOKEN ? theme->paper_alt : theme->paper, selected_field == SETTINGS_FIELD_TOKEN ? theme->accent.primary_dark : theme->border);
+    app_gfx_text_fit(204.0f, row_y + 5.0f, 164.0f, 0.28f, 0.28f, theme->text, token_summary);
 
-    row_y += 34.0f;
-    app_gfx_panel(20.0f, row_y, 164.0f, 28.0f, selected_field == SETTINGS_FIELD_DEVICE_ID ? UI_PAPER_ALT : UI_PAPER, selected_field == SETTINGS_FIELD_DEVICE_ID ? theme->accent_dark : UI_BORDER);
-    app_gfx_highlight_bar(22.0f, row_y + 2.0f, 18.0f, 24.0f, selected_field == SETTINGS_FIELD_DEVICE_ID ? theme->accent : theme->accent_light);
-    app_gfx_text_fit(48.0f, row_y + 8.0f, 130.0f, 0.34f, 0.34f, UI_TEXT, "Device ID");
-    app_gfx_panel(196.0f, row_y, 180.0f, 28.0f, selected_field == SETTINGS_FIELD_DEVICE_ID ? UI_PAPER_ALT : UI_PAPER, selected_field == SETTINGS_FIELD_DEVICE_ID ? theme->accent_dark : UI_BORDER);
-    app_gfx_text_fit(204.0f, row_y + 8.0f, 164.0f, 0.30f, 0.30f, UI_TEXT, config->device_id[0] != '\0' ? config->device_id : "<empty>");
+    row_y += row_step;
+    app_gfx_panel(20.0f, row_y, 164.0f, row_height, selected_field == SETTINGS_FIELD_DEVICE_ID ? theme->paper_alt : theme->paper, selected_field == SETTINGS_FIELD_DEVICE_ID ? theme->accent.primary_dark : theme->border);
+    app_gfx_highlight_bar(22.0f, row_y + 2.0f, 18.0f, row_height - 4.0f, selected_field == SETTINGS_FIELD_DEVICE_ID ? theme->accent.primary : theme->accent.primary_light);
+    app_gfx_text_fit(48.0f, row_y + 5.0f, 130.0f, 0.32f, 0.32f, theme->text, "Device ID");
+    app_gfx_panel(196.0f, row_y, 180.0f, row_height, selected_field == SETTINGS_FIELD_DEVICE_ID ? theme->paper_alt : theme->paper, selected_field == SETTINGS_FIELD_DEVICE_ID ? theme->accent.primary_dark : theme->border);
+    app_gfx_text_fit(204.0f, row_y + 5.0f, 164.0f, 0.28f, 0.28f, theme->text, config->device_id[0] != '\0' ? config->device_id : "<empty>");
 
-    draw_ruled_paper(20.0f, 210.0f, 356.0f, 14.0f, UI_PAPER_ALT);
-    app_gfx_text_fit(26.0f, 212.0f, 344.0f, 0.24f, 0.24f, UI_MUTED, status_line);
+    row_y += row_step;
+    app_gfx_panel(20.0f, row_y, 164.0f, row_height, selected_field == SETTINGS_FIELD_THEME ? theme->paper_alt : theme->paper, selected_field == SETTINGS_FIELD_THEME ? theme->accent.primary_dark : theme->border);
+    app_gfx_highlight_bar(22.0f, row_y + 2.0f, 18.0f, row_height - 4.0f, selected_field == SETTINGS_FIELD_THEME ? theme->accent.primary : theme->accent.primary_light);
+    app_gfx_text_fit(48.0f, row_y + 5.0f, 130.0f, 0.32f, 0.32f, theme->text, "Theme");
+    app_gfx_panel(196.0f, row_y, 180.0f, row_height, selected_field == SETTINGS_FIELD_THEME ? theme->paper_alt : theme->paper, selected_field == SETTINGS_FIELD_THEME ? theme->accent.primary_dark : theme->border);
+    app_gfx_text_fit(204.0f, row_y + 5.0f, 164.0f, 0.30f, 0.30f, theme->text, theme_name);
 
-    app_gfx_begin_bottom(UI_BG);
-    app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, UI_PAPER_SHADOW, UI_BORDER_DARK);
-    draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, UI_PAPER);
+    row_y += row_step;
+    app_gfx_panel(20.0f, row_y, 164.0f, row_height, selected_field == SETTINGS_FIELD_MODE ? theme->paper_alt : theme->paper, selected_field == SETTINGS_FIELD_MODE ? theme->accent.primary_dark : theme->border);
+    app_gfx_highlight_bar(22.0f, row_y + 2.0f, 18.0f, row_height - 4.0f, selected_field == SETTINGS_FIELD_MODE ? theme->accent.primary : theme->accent.primary_light);
+    app_gfx_text_fit(48.0f, row_y + 5.0f, 130.0f, 0.32f, 0.32f, theme->text, "Mode");
+    app_gfx_panel(196.0f, row_y, 180.0f, row_height, selected_field == SETTINGS_FIELD_MODE ? theme->paper_alt : theme->paper, selected_field == SETTINGS_FIELD_MODE ? theme->accent.primary_dark : theme->border);
+    app_gfx_text_fit(204.0f, row_y + 5.0f, 164.0f, 0.30f, 0.30f, theme->text, mode_name);
+
+    draw_ruled_paper(20.0f, 206.0f, 356.0f, 18.0f, theme->paper_alt, theme);
+    app_gfx_text_fit(26.0f, 211.0f, 344.0f, 0.22f, 0.22f, theme->text_muted, status_line);
+
+    app_gfx_begin_bottom(theme->background);
+    app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, theme->paper_shadow, theme->border_dark);
+    draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, theme->paper, theme);
     draw_bottom_header(theme, "SETUP KEYS");
-    draw_ruled_paper(8.0f, 44.0f, 304.0f, 138.0f, UI_PAPER);
-    draw_menu_row(16.0f, 56.0f, 288.0f, "A Edit field", theme);
+    draw_ruled_paper(8.0f, 44.0f, 304.0f, 138.0f, theme->paper, theme);
+    draw_menu_row(16.0f, 56.0f, 288.0f, "A Edit / cycle", theme);
     draw_menu_row(16.0f, 78.0f, 288.0f, "X Save card", theme);
     draw_menu_row(16.0f, 100.0f, 288.0f, "Y Restore defaults", theme);
     draw_menu_row(16.0f, 122.0f, 288.0f, "B Return to board", theme);
     draw_menu_row(16.0f, 144.0f, 288.0f, "START Exit app", theme);
-    draw_ruled_paper(8.0f, 190.0f, 304.0f, 30.0f, UI_PAPER_ALT);
-    app_gfx_text_fit(16.0f, 198.0f, 288.0f, 0.24f, 0.24f, UI_MUTED, "Setup is stored on sdmc:/3ds/hermes-agent-3ds/config.ini");
+    draw_ruled_paper(8.0f, 190.0f, 304.0f, 30.0f, theme->paper_alt, theme);
+    app_gfx_text_fit(16.0f, 198.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "Theme and mode save with the rest of config.ini.");
 }
 
 static void render_conversations_graphical(
@@ -951,7 +906,7 @@ static void render_conversations_graphical(
     size_t conversation_selection
 )
 {
-    const AppUiTheme* theme = active_room_theme(config);
+    const PictochatTheme* theme = get_global_theme(config);
     size_t visible = 4;
     size_t start = 0;
     size_t end;
@@ -959,9 +914,9 @@ static void render_conversations_graphical(
 
     (void)last_rc;
 
-    app_gfx_begin_top(UI_BG);
-    app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, UI_PAPER_SHADOW, UI_BORDER_DARK);
-    draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, UI_PAPER);
+    app_gfx_begin_top(theme->background);
+    app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, theme->paper_shadow, theme->border_dark);
+    draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, theme->paper, theme);
     draw_top_header(theme, "ROOM BOOK");
     draw_info_card(16.0f, 36.0f, 368.0f, 28.0f, "STATUS", theme, g_home_status_lines,
         wrap_text_for_pixels(status_line, 300.0f, 0.27f, 0.27f, g_home_status_lines, 2), 298.0f, 2);
@@ -978,36 +933,35 @@ static void render_conversations_graphical(
         for (index = start; index < end; index++) {
             const BridgeV2ConversationInfo* info = find_synced_conversation(conversation_list, config->recent_conversations[index]);
             const char* title = (info != NULL && info->title[0] != '\0') ? info->title : config->recent_conversations[index];
-            const AppUiTheme* row_theme = theme_for_conversation_id(config->recent_conversations[index]);
             float row_y = 78.0f + (float)(index - start) * 34.0f;
             bool selected = index == conversation_selection;
 
-            app_gfx_panel(16.0f, row_y, 368.0f, 28.0f, selected ? UI_PAPER_ALT : UI_PAPER, selected ? row_theme->accent_dark : UI_BORDER);
-            app_gfx_highlight_bar(18.0f, row_y + 2.0f, 18.0f, 24.0f, selected ? row_theme->accent : row_theme->accent_light);
-            draw_chip(42.0f, row_y + 6.0f, 48.0f, "ROOM", row_theme->accent, row_theme->accent_text, row_theme->accent_dark);
-            app_gfx_text_fit(96.0f, row_y + 5.0f, 280.0f, 0.30f, 0.30f, UI_TEXT, title);
-            app_gfx_text_fit(96.0f, row_y + 15.0f, 280.0f, 0.24f, 0.24f, UI_MUTED,
+            app_gfx_panel(16.0f, row_y, 368.0f, 28.0f, selected ? theme->paper_alt : theme->paper, selected ? theme->accent.primary_dark : theme->border);
+            app_gfx_highlight_bar(18.0f, row_y + 2.0f, 18.0f, 24.0f, selected ? theme->accent.primary : theme->accent.primary_light);
+            draw_chip(42.0f, row_y + 6.0f, 48.0f, "ROOM", theme->accent.primary, theme->text, theme->accent.primary_dark);
+            app_gfx_text_fit(96.0f, row_y + 5.0f, 280.0f, 0.30f, 0.30f, theme->text, title);
+            app_gfx_text_fit(96.0f, row_y + 15.0f, 280.0f, 0.24f, 0.24f, theme->text_muted,
                 info != NULL && info->preview[0] != '\0' ? info->preview : config->recent_conversations[index]);
         }
     }
 
-    app_gfx_begin_bottom(UI_BG);
-    app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, UI_PAPER_SHADOW, UI_BORDER_DARK);
-    draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, UI_PAPER);
+    app_gfx_begin_bottom(theme->background);
+    app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, theme->paper_shadow, theme->border_dark);
+    draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, theme->paper, theme);
     draw_bottom_header(theme, "ROOM KEYS");
-    draw_ruled_paper(8.0f, 44.0f, 304.0f, 138.0f, UI_PAPER);
+    draw_ruled_paper(8.0f, 44.0f, 304.0f, 138.0f, theme->paper, theme);
     draw_menu_row(16.0f, 56.0f, 288.0f, "A Use room", theme);
     draw_menu_row(16.0f, 78.0f, 288.0f, "X New room", theme);
     draw_menu_row(16.0f, 100.0f, 288.0f, "Y Sync rooms", theme);
     draw_menu_row(16.0f, 122.0f, 288.0f, "B Return to board", theme);
     draw_menu_row(16.0f, 144.0f, 288.0f, "START Exit app", theme);
-    draw_ruled_paper(8.0f, 190.0f, 304.0f, 30.0f, UI_PAPER_ALT);
-    app_gfx_text_fit(16.0f, 198.0f, 288.0f, 0.24f, 0.24f, UI_MUTED, "Rooms are Hermes conversation IDs with a PictoChat shell.");
+    draw_ruled_paper(8.0f, 190.0f, 304.0f, 30.0f, theme->paper_alt, theme);
+    app_gfx_text_fit(16.0f, 198.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "Rooms are Hermes conversation IDs with a PictoChat shell.");
 }
 
 void hermes_app_ui_render_approval_prompt(const char* request_id)
 {
-    const AppUiTheme* theme = &g_ui_room_themes[0];
+    const PictochatTheme* theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
     char request_line[96];
 
     if (request_id != NULL && request_id[0] != '\0')
@@ -1017,28 +971,28 @@ void hermes_app_ui_render_approval_prompt(const char* request_id)
 
     app_gfx_begin_frame();
 
-    app_gfx_begin_top(UI_BG);
-    app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, UI_PAPER_SHADOW, UI_BORDER_DARK);
-    draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, UI_PAPER);
+    app_gfx_begin_top(theme->background);
+    app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, theme->paper_shadow, theme->border_dark);
+    draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, theme->paper, theme);
     draw_top_header(theme, "APPROVAL");
-    draw_alert_banner(34.0f, 46.0f, 332.0f, 24.0f, "Relay approval needed");
-    draw_ruled_paper(24.0f, 80.0f, 352.0f, 132.0f, UI_PAPER);
-    app_gfx_text(36.0f, 94.0f, 0.34f, 0.34f, UI_TEXT, "Hermes is waiting for permission.");
-    app_gfx_text_fit(36.0f, 112.0f, 328.0f, 0.28f, 0.28f, UI_MUTED, request_line);
-    app_gfx_text_fit(36.0f, 140.0f, 328.0f, 0.28f, 0.28f, UI_TEXT, "Choose how long to allow this action, or deny it.");
-    app_gfx_text_fit(36.0f, 166.0f, 328.0f, 0.26f, 0.26f, UI_MUTED, "A and X allow the action. Y keeps allowing it. B denies it.");
+    draw_alert_banner(34.0f, 46.0f, 332.0f, 24.0f, "Relay approval needed", theme);
+    draw_ruled_paper(24.0f, 80.0f, 352.0f, 132.0f, theme->paper, theme);
+    app_gfx_text(36.0f, 94.0f, 0.34f, 0.34f, theme->text, "Hermes is waiting for permission.");
+    app_gfx_text_fit(36.0f, 112.0f, 328.0f, 0.28f, 0.28f, theme->text_muted, request_line);
+    app_gfx_text_fit(36.0f, 140.0f, 328.0f, 0.28f, 0.28f, theme->text, "Choose how long to allow this action, or deny it.");
+    app_gfx_text_fit(36.0f, 166.0f, 328.0f, 0.26f, 0.26f, theme->text_muted, "A and X allow the action. Y keeps allowing it. B denies it.");
 
-    app_gfx_begin_bottom(UI_BG);
-    app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, UI_PAPER_SHADOW, UI_BORDER_DARK);
-    draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, UI_PAPER);
+    app_gfx_begin_bottom(theme->background);
+    app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, theme->paper_shadow, theme->border_dark);
+    draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, theme->paper, theme);
     draw_bottom_header(theme, "APPROVAL KEYS");
-    draw_action_button(16.0f, 48.0f, 136.0f, 28.0f, "A Once", &g_ui_room_themes[0], false);
-    draw_action_button(168.0f, 48.0f, 136.0f, 28.0f, "X Session", &g_ui_room_themes[4], false);
-    draw_action_button(16.0f, 84.0f, 136.0f, 28.0f, "Y Always", &g_ui_room_themes[3], false);
-    draw_action_button(168.0f, 84.0f, 136.0f, 28.0f, "B Deny", &g_ui_room_themes[1], false);
-    draw_ruled_paper(8.0f, 128.0f, 304.0f, 54.0f, UI_PAPER_ALT);
-    app_gfx_text_fit(16.0f, 138.0f, 288.0f, 0.26f, 0.26f, UI_TEXT, "This is a Hermes gateway approval, styled like a DS system alert.");
-    app_gfx_text_fit(16.0f, 156.0f, 288.0f, 0.24f, 0.24f, UI_MUTED, "Press START to cancel without answering.");
+    draw_action_button(16.0f, 48.0f, 136.0f, 28.0f, "A Once", theme, false);
+    draw_action_button(168.0f, 48.0f, 136.0f, 28.0f, "X Session", theme, false);
+    draw_action_button(16.0f, 84.0f, 136.0f, 28.0f, "Y Always", theme, false);
+    draw_action_button(168.0f, 84.0f, 136.0f, 28.0f, "B Deny", theme, false);
+    draw_ruled_paper(8.0f, 128.0f, 304.0f, 54.0f, theme->paper_alt, theme);
+    app_gfx_text_fit(16.0f, 138.0f, 288.0f, 0.26f, 0.26f, theme->text, "This is a Hermes gateway approval, styled like a DS system alert.");
+    app_gfx_text_fit(16.0f, 156.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "Press START to cancel without answering.");
     draw_hint_button(82.0f, 208.0f, 156.0f, "START Cancel", theme);
 
     app_gfx_end_frame();
@@ -1046,7 +1000,7 @@ void hermes_app_ui_render_approval_prompt(const char* request_id)
 
 void hermes_app_ui_render_voice_recording(unsigned long tenths, size_t pcm_size, const char* status_line, bool waiting_for_up_release)
 {
-    const AppUiTheme* theme = &g_ui_room_themes[1];
+    const PictochatTheme* theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
     char time_line[32];
     char audio_line[48];
     const char* capture_state = waiting_for_up_release ? "Release upward input to arm stop." : "Move upward to stop and send.";
@@ -1056,33 +1010,33 @@ void hermes_app_ui_render_voice_recording(unsigned long tenths, size_t pcm_size,
 
     app_gfx_begin_frame();
 
-    app_gfx_begin_top(UI_BG);
-    app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, UI_PAPER_SHADOW, UI_BORDER_DARK);
-    draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, UI_PAPER);
+    app_gfx_begin_top(theme->background);
+    app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, theme->paper_shadow, theme->border_dark);
+    draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, theme->paper, theme);
     draw_top_header(theme, "MIC NOTE");
-    draw_alert_banner(32.0f, 44.0f, 336.0f, 24.0f, waiting_for_up_release ? "Release UP to arm send" : "Recording microphone note");
-    draw_ruled_paper(20.0f, 76.0f, 360.0f, 136.0f, UI_PAPER);
-    draw_chip(32.0f, 88.0f, 44.0f, "TIME", theme->accent, theme->accent_text, theme->accent_dark);
-    app_gfx_panel(86.0f, 84.0f, 110.0f, 24.0f, UI_PAPER_ALT, UI_BORDER);
-    app_gfx_text_fit(96.0f, 92.0f, 90.0f, 0.30f, 0.30f, UI_TEXT, time_line);
-    draw_chip(224.0f, 88.0f, 52.0f, "AUDIO", theme->accent, theme->accent_text, theme->accent_dark);
-    app_gfx_panel(284.0f, 84.0f, 76.0f, 24.0f, UI_PAPER_ALT, UI_BORDER);
-    app_gfx_text_fit(292.0f, 92.0f, 60.0f, 0.26f, 0.26f, UI_TEXT, audio_line);
-    app_gfx_text_fit(32.0f, 128.0f, 316.0f, 0.28f, 0.28f, UI_TEXT, status_line != NULL && status_line[0] != '\0' ? status_line : "Mic is recording now.");
-    app_gfx_text_fit(32.0f, 154.0f, 316.0f, 0.26f, 0.26f, UI_MUTED, capture_state);
-    app_gfx_text_fit(32.0f, 176.0f, 316.0f, 0.24f, 0.24f, UI_MUTED, "Voice notes keep the PictoChat shell and route through Hermes speech-to-text.");
+    draw_alert_banner(32.0f, 44.0f, 336.0f, 24.0f, waiting_for_up_release ? "Release UP to arm send" : "Recording microphone note", theme);
+    draw_ruled_paper(20.0f, 76.0f, 360.0f, 136.0f, theme->paper, theme);
+    draw_chip(32.0f, 88.0f, 44.0f, "TIME", theme->accent.primary, theme->text, theme->accent.primary_dark);
+    app_gfx_panel(86.0f, 84.0f, 110.0f, 24.0f, theme->paper_alt, theme->border);
+    app_gfx_text_fit(96.0f, 92.0f, 90.0f, 0.30f, 0.30f, theme->text, time_line);
+    draw_chip(224.0f, 88.0f, 52.0f, "AUDIO", theme->accent.primary, theme->text, theme->accent.primary_dark);
+    app_gfx_panel(284.0f, 84.0f, 76.0f, 24.0f, theme->paper_alt, theme->border);
+    app_gfx_text_fit(292.0f, 92.0f, 60.0f, 0.26f, 0.26f, theme->text, audio_line);
+    app_gfx_text_fit(32.0f, 128.0f, 316.0f, 0.28f, 0.28f, theme->text, status_line != NULL && status_line[0] != '\0' ? status_line : "Mic is recording now.");
+    app_gfx_text_fit(32.0f, 154.0f, 316.0f, 0.26f, 0.26f, theme->text_muted, capture_state);
+    app_gfx_text_fit(32.0f, 176.0f, 316.0f, 0.24f, 0.24f, theme->text_muted, "Voice notes keep the PictoChat shell and route through Hermes speech-to-text.");
 
-    app_gfx_begin_bottom(UI_BG);
-    app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, UI_PAPER_SHADOW, UI_BORDER_DARK);
-    draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, UI_PAPER);
+    app_gfx_begin_bottom(theme->background);
+    app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, theme->paper_shadow, theme->border_dark);
+    draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, theme->paper, theme);
     draw_bottom_header(theme, "MIC KEYS");
     draw_action_button(16.0f, 48.0f, 88.0f, 28.0f, "UP Send", theme, !waiting_for_up_release);
-    draw_action_button(116.0f, 48.0f, 88.0f, 28.0f, "B Cancel", &g_ui_room_themes[5], false);
-    draw_action_button(216.0f, 48.0f, 88.0f, 28.0f, "START Abort", &g_ui_room_themes[4], false);
-    draw_ruled_paper(8.0f, 92.0f, 304.0f, 116.0f, UI_PAPER_ALT);
-    app_gfx_text_fit(16.0f, 104.0f, 288.0f, 0.28f, 0.28f, UI_TEXT, capture_state);
-    app_gfx_text_fit(16.0f, 126.0f, 288.0f, 0.24f, 0.24f, UI_MUTED, "The session stops after five minutes or when the audio buffer fills.");
-    app_gfx_text_fit(16.0f, 148.0f, 288.0f, 0.24f, 0.24f, UI_MUTED, "If UP is already held, release it once before trying to send.");
+    draw_action_button(116.0f, 48.0f, 88.0f, 28.0f, "B Cancel", theme, false);
+    draw_action_button(216.0f, 48.0f, 88.0f, 28.0f, "START Abort", theme, false);
+    draw_ruled_paper(8.0f, 92.0f, 304.0f, 116.0f, theme->paper_alt, theme);
+    app_gfx_text_fit(16.0f, 104.0f, 288.0f, 0.28f, 0.28f, theme->text, capture_state);
+    app_gfx_text_fit(16.0f, 126.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "The session stops after five minutes or when the audio buffer fills.");
+    app_gfx_text_fit(16.0f, 148.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "If UP is already held, release it once before trying to send.");
     draw_hint_button(82.0f, 214.0f, 156.0f, "Return after send", theme);
 
     app_gfx_end_frame();

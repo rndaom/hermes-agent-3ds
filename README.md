@@ -82,6 +82,8 @@ Open **Hermes Agent 3DS** in Homebrew Launcher.
 - set `Port`
 - set `Token`
 - set `Device ID`
+- set `Theme`
+- set `Mode`
 - press `X` again to save
 - press `B` to return home
 
@@ -111,7 +113,7 @@ Open **Hermes Agent 3DS** in Homebrew Launcher.
 
 ### Setup
 - UP/DOWN or Circle Pad UP/DOWN — select field
-- A — edit field
+- A — edit field, cycle theme, or toggle light/dark mode
 - X — save settings
 - Y — restore defaults
 - B — return home

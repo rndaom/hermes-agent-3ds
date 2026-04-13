@@ -107,12 +107,13 @@ Borrow directly from `Frame Gradients.png` and `Navigation & Calibration.png`:
 - soft rectangular control surfaces
 - tiny utility chips and footer hint buttons
 
-### 3. Color-coded room identity
+### 3. User-selected DS theme identity
 Borrow directly from `Pictochat Elements.png`, `Buttons.png`, and `Theme Tokens.png`:
-- bright room accents
+- one global shell accent chosen by the user
 - colored sender chips
-- active room theming in rails and focus rings
+- the chosen DS theme appears in rails, focus rings, and controls
 - neutral paper surfaces under the accent colors
+- rooms do not get their own colors by default
 
 ## Platform constraints
 
@@ -198,11 +199,13 @@ The setup screen should feel like a configuration sheet, not a dark control pane
 
 Required structure:
 - header rail with PictoChat shell title
-- four ruled config rows:
+- six ruled config rows:
   - host
   - port
   - token
   - device ID
+  - theme
+  - mode
 - clear selected-row highlight
 - status strip for save / validation feedback
 - lower-screen legend for `A`, `X`, `Y`, `B`, and `START`
@@ -212,8 +215,8 @@ Required structure:
 The old conversation picker becomes the `Room Book`.
 
 Required structure:
-- recent rooms rendered as color-coded rows on ruled paper
-- active selection highlight tied to the room accent
+- recent rooms rendered as consistent ruled rows on paper
+- active selection highlight tied to the current global theme
 - preview text if Hermes supplied it
 - lower-screen legend for:
   - `A Use room`
@@ -255,12 +258,27 @@ Required structure:
 - dark charcoal text
 
 ### Accent family
-Accent colors should come from the DS / PictoChat palette references, especially:
-- sky blue
-- royal blue
+Accent colors should come from the DS theme picker palette references. Support the full 16-color set from `Theme Select.png`:
+- blue
+- brown
+- red
+- pink
 - orange
-- lime / green
+- yellow
+- lime
+- green
+- forest
+- teal
+- sky
+- royal
+- navy
+- purple
 - magenta
+- fuchsia
+
+Mode support:
+- each theme needs light and dark variants
+- dark mode is a user-selected shell mode, not a separate visual direction
 
 Usage rule:
 - accents belong on rails, chips, highlights, and active controls
@@ -282,7 +300,7 @@ Usage rule:
 
 ### Keep room state obvious
 - the active room should always be visible
-- the room accent should be visible in the shell
+- the active global theme should be visible in the shell
 - room changes should clear stale visible message history, as the current app already does
 
 ## Implementation guidance

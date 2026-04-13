@@ -11,7 +11,9 @@ typedef enum SettingsField {
     SETTINGS_FIELD_PORT = 1,
     SETTINGS_FIELD_TOKEN = 2,
     SETTINGS_FIELD_DEVICE_ID = 3,
-    SETTINGS_FIELD_COUNT = 4,
+    SETTINGS_FIELD_THEME = 4,
+    SETTINGS_FIELD_MODE = 5,
+    SETTINGS_FIELD_COUNT = 6,
 } SettingsField;
 
 const char* settings_field_label(SettingsField field);
