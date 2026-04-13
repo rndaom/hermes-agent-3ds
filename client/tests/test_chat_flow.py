@@ -139,11 +139,12 @@ def test_ui_wraps_truncated_lines_on_utf8_boundaries_before_graphical_fit():
     assert "append_truncation_ellipsis" in ui_c
 
 
-def test_voice_input_waits_for_up_release_before_allowing_stop():
+def test_voice_input_waits_for_a_release_before_allowing_stop():
     voice_input_c = (CLIENT_DIR / "source" / "voice_input.c").read_text()
 
-    assert "hidKeysHeld() & KEY_UP" in voice_input_c
-    assert "waiting_for_up_release" in voice_input_c
+    assert "hidKeysHeld() & KEY_A" in voice_input_c
+    assert "waiting_for_a_release" in voice_input_c
+    assert "KEY_UP" not in voice_input_c
 
 
 def test_voice_input_uses_graphical_recording_render_helpers_without_console_printf():

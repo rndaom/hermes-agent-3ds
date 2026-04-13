@@ -49,7 +49,7 @@ Current controls:
 - `B` — return home
 
 ### Mic Session
-- `UP` — stop recording and send the captured audio
+- `A` — stop recording and send the captured audio
 - `B` — cancel the recording
 - `START` — abort the recording
 

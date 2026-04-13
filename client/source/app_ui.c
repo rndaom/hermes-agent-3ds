@@ -9,7 +9,6 @@
 #define HOME_WRAP_MAX_LINES 128
 #define HOME_WRAP_LINE_MAX 192
 #define HOME_SUMMARY_WRAP_MAX_LINES 4
-#define HOME_INFO_WRAP_MAX_LINES 8
 #define HOME_HISTORY_MAX 6
 #define HOME_HISTORY_CARD_LINES 8
 #define HOME_REPLY_LINES_PER_PAGE 6
@@ -24,7 +23,6 @@ typedef struct AppUiHomeHistoryEntry {
 static char g_reply_page_lines[HOME_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
 static char g_home_room_lines[HOME_SUMMARY_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
 static char g_home_status_lines[HOME_SUMMARY_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
-static char g_home_detail_lines[HOME_INFO_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
 static char g_home_card_lines[HOME_HISTORY_CARD_LINES][HOME_WRAP_LINE_MAX];
 static AppUiHomeHistoryEntry g_home_history[HOME_HISTORY_MAX];
 static size_t g_home_history_count = 0;
@@ -424,9 +422,9 @@ static void draw_system_bar(float x, float y, float w, float h, const PictochatT
 
 static void draw_top_header(const PictochatTheme* theme, const char* subtitle)
 {
-    draw_system_bar(8.0f, 8.0f, 384.0f, 20.0f, theme);
-    app_gfx_text(16.0f, 12.0f, 0.50f, 0.50f, theme->text, "PICTOCHAT H");
-    app_gfx_text_right(384.0f, 13.0f, 0.30f, 0.30f, theme->text, subtitle);
+    draw_system_bar(8.0f, 8.0f, 384.0f, 22.0f, theme);
+    app_gfx_text(16.0f, 12.0f, 0.42f, 0.42f, theme->text, "PICTOCHAT");
+    app_gfx_text_right(382.0f, 14.0f, 0.28f, 0.28f, theme->text, subtitle);
 }
 
 static void draw_bottom_header(const PictochatTheme* theme, const char* title)
@@ -486,7 +484,7 @@ static float chip_width_for_label(const char* label)
     return width;
 }
 
-static void draw_note_lines(float x, float y, float w, size_t count, const PictochatTheme* theme)
+static void draw_note_lines(float x, float y, float w, size_t count, float step, const PictochatTheme* theme)
 {
     size_t index;
 
@@ -494,7 +492,7 @@ static void draw_note_lines(float x, float y, float w, size_t count, const Picto
         theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
 
     for (index = 0; index < count; index++)
-        app_gfx_highlight_bar(x, y + (float)index * 9.0f, w, 1.0f, theme->rule);
+        app_gfx_highlight_bar(x, y + (float)index * step, w, 1.0f, theme->rule);
 }
 
 static void draw_text_lines(
@@ -593,6 +591,11 @@ static void draw_message_card(
 {
     size_t total_lines;
     float chip_width;
+    float page_chip_width;
+    bool compact_layout;
+    float text_x;
+    float text_y;
+    float text_width;
 
     if (theme == NULL)
         theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
@@ -600,57 +603,28 @@ static void draw_message_card(
     total_lines = wrap_message_card_text(text, w - 42.0f, text_scale);
     if (start_line >= total_lines)
         start_line = 0;
+    compact_layout = max_lines <= 1 || h <= 40.0f;
 
     app_gfx_panel(x, y, w, h, theme->paper, theme->accent.primary_dark);
     app_gfx_highlight_bar(x + 2.0f, y + 2.0f, w - 4.0f, 4.0f, theme->accent.primary_light);
-    app_gfx_highlight_bar(x + 24.0f, y + 28.0f, 1.0f, h - 36.0f, theme->accent.primary_light);
-    draw_note_lines(x + 10.0f, y + 32.0f, w - 20.0f, max_lines + 1, theme);
 
     chip_width = chip_width_for_label(label);
     draw_chip(x + 10.0f, y + 8.0f, chip_width, label, theme->accent.primary, theme->text, theme->accent.primary_dark);
-    if (page_label != NULL && page_label[0] != '\0')
-        draw_chip(x + w - 44.0f, y + 8.0f, 34.0f, page_label, theme->paper_alt, theme->text, theme->accent.primary_dark);
-    draw_text_lines(x + 30.0f, y + 34.0f, 10.0f, w - 40.0f, text_scale, text_scale, theme->text, g_home_card_lines, total_lines, start_line, max_lines);
-}
-
-static const char* home_command_label_for_selection(size_t command_selection)
-{
-    switch ((HomeCommand)command_selection) {
-        case HOME_COMMAND_CHECK:
-            return "Check Relay";
-        case HOME_COMMAND_THREADS:
-            return "Rooms";
-        case HOME_COMMAND_CONFIG:
-            return "Setup";
-        case HOME_COMMAND_MIC:
-            return "Mic Note";
-        case HOME_COMMAND_CLEAR:
-            return "Clear Board";
-        case HOME_COMMAND_NONE:
-        case HOME_COMMAND_ASK:
-        default:
-            return "Write Note";
+    if (page_label != NULL && page_label[0] != '\0') {
+        page_chip_width = chip_width_for_label(page_label);
+        draw_chip(x + w - 10.0f - page_chip_width, y + 8.0f, page_chip_width, page_label, theme->paper_alt, theme->text, theme->accent.primary_dark);
     }
-}
 
-static const char* home_command_detail_for_selection(size_t command_selection)
-{
-    switch ((HomeCommand)command_selection) {
-        case HOME_COMMAND_CHECK:
-            return "Check the Hermes relay and refresh the current room status.";
-        case HOME_COMMAND_THREADS:
-            return "Open the room book to switch rooms, create one, or sync recent entries.";
-        case HOME_COMMAND_CONFIG:
-            return "Open the setup sheet to edit host, port, token, and device ID.";
-        case HOME_COMMAND_MIC:
-            return "Record a short microphone note and send it through Hermes speech-to-text.";
-        case HOME_COMMAND_CLEAR:
-            return "Clear the visible board, relay state, and request status so the room starts clean again.";
-        case HOME_COMMAND_NONE:
-        case HOME_COMMAND_ASK:
-        default:
-            return "Open the keyboard and send a text note into the active Hermes room.";
+    if (compact_layout) {
+        text_x = x + 10.0f + chip_width + 10.0f;
+        text_y = y + 11.0f;
+        text_width = (x + w - 12.0f) - text_x;
+        draw_text_lines(text_x, text_y, 10.0f, text_width, text_scale, text_scale, theme->text, g_home_card_lines, total_lines, start_line, 1);
+        return;
     }
+
+    draw_note_lines(x + 12.0f, y + 37.0f, w - 24.0f, max_lines, 10.0f, theme);
+    draw_text_lines(x + 18.0f, y + 29.0f, 10.0f, w - 36.0f, text_scale, text_scale, theme->text, g_home_card_lines, total_lines, start_line, max_lines);
 }
 
 static void render_home_graphical(
@@ -669,7 +643,6 @@ static void render_home_graphical(
     char page_label[24];
     size_t room_line_count;
     size_t status_line_count;
-    size_t detail_line_count;
     size_t page_count = 1;
     size_t reply_start = 0;
     bool has_selection = command_selection <= (size_t)HOME_COMMAND_CLEAR;
@@ -694,7 +667,9 @@ static void render_home_graphical(
     if (reply_page >= page_count)
         reply_page = page_count - 1;
     reply_start = reply_page * HOME_REPLY_LINES_PER_PAGE;
-    snprintf(page_label, sizeof(page_label), "%lu/%lu", (unsigned long)(reply_page + 1), (unsigned long)page_count);
+    page_label[0] = '\0';
+    if (page_count > 1)
+        snprintf(page_label, sizeof(page_label), "%lu/%lu", (unsigned long)(reply_page + 1), (unsigned long)page_count);
 
     room_line_count = wrap_text_for_pixels(
         conversation_label,
@@ -712,15 +687,6 @@ static void render_home_graphical(
         g_home_status_lines,
         2
     );
-    detail_line_count = wrap_text_for_pixels(
-        home_command_detail_for_selection(selected_command),
-        176.0f,
-        0.27f,
-        0.27f,
-        g_home_detail_lines,
-        2
-    );
-
     app_gfx_begin_top(theme->background);
     app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, theme->paper_shadow, theme->border_dark);
     draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, theme->paper, theme);
@@ -799,16 +765,8 @@ static void render_home_graphical(
     draw_action_button(16.0f, 116.0f, 136.0f, 28.0f, "Mic Note", theme, selected_command == (size_t)HOME_COMMAND_MIC);
     draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Clear Board", theme, selected_command == (size_t)HOME_COMMAND_CLEAR);
 
-    draw_ruled_paper(8.0f, 156.0f, 304.0f, 52.0f, theme->paper, theme);
-    app_gfx_text(18.0f, 164.0f, 0.28f, 0.28f, theme->accent.primary_dark, "TOOL");
-    app_gfx_text_fit(56.0f, 164.0f, 152.0f, 0.30f, 0.30f, theme->text, home_command_label_for_selection(selected_command));
-    draw_text_lines(18.0f, 178.0f, 10.0f, 184.0f, 0.27f, 0.27f, theme->text_muted, g_home_detail_lines, detail_line_count, 0, 2);
-    app_gfx_text(224.0f, 164.0f, 0.28f, 0.28f, theme->accent.primary_dark, "PAGE");
-    app_gfx_text_right(300.0f, 164.0f, 0.30f, 0.30f, theme->text, page_label);
-    app_gfx_text_fit(224.0f, 178.0f, 76.0f, 0.27f, 0.27f, theme->text_muted, page_count > 1 ? "L/R flips notes" : "Ready to send");
-    draw_hint_button(16.0f, 214.0f, 90.0f, "A Select", theme);
-    draw_hint_button(112.0f, 214.0f, 90.0f, "Touch OK", theme);
-    draw_hint_button(208.0f, 214.0f, 96.0f, "START Exit", theme);
+    draw_hint_button(16.0f, 214.0f, 132.0f, "A Select", theme);
+    draw_hint_button(172.0f, 214.0f, 132.0f, "START Exit", theme);
 }
 
 static void render_settings_graphical(
@@ -959,9 +917,9 @@ static void render_conversations_graphical(
     app_gfx_text_fit(16.0f, 198.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "Rooms are Hermes conversation IDs with a PictoChat shell.");
 }
 
-void hermes_app_ui_render_approval_prompt(const char* request_id)
+void hermes_app_ui_render_approval_prompt(const HermesAppConfig* config, const char* request_id)
 {
-    const PictochatTheme* theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
+    const PictochatTheme* theme = get_global_theme(config);
     char request_line[96];
 
     if (request_id != NULL && request_id[0] != '\0')
@@ -998,12 +956,18 @@ void hermes_app_ui_render_approval_prompt(const char* request_id)
     app_gfx_end_frame();
 }
 
-void hermes_app_ui_render_voice_recording(unsigned long tenths, size_t pcm_size, const char* status_line, bool waiting_for_up_release)
+void hermes_app_ui_render_voice_recording(
+    const HermesAppConfig* config,
+    unsigned long tenths,
+    size_t pcm_size,
+    const char* status_line,
+    bool waiting_for_a_release
+)
 {
-    const PictochatTheme* theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
+    const PictochatTheme* theme = get_global_theme(config);
     char time_line[32];
     char audio_line[48];
-    const char* capture_state = waiting_for_up_release ? "Release upward input to arm stop." : "Move upward to stop and send.";
+    const char* capture_state = waiting_for_a_release ? "Release A once to arm send." : "Press A again to stop and send.";
 
     snprintf(time_line, sizeof(time_line), "%lu.%lus", tenths / 10, tenths % 10);
     snprintf(audio_line, sizeof(audio_line), "%lu bytes", (unsigned long)pcm_size);
@@ -1014,7 +978,7 @@ void hermes_app_ui_render_voice_recording(unsigned long tenths, size_t pcm_size,
     app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, theme->paper_shadow, theme->border_dark);
     draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, theme->paper, theme);
     draw_top_header(theme, "MIC NOTE");
-    draw_alert_banner(32.0f, 44.0f, 336.0f, 24.0f, waiting_for_up_release ? "Release UP to arm send" : "Recording microphone note", theme);
+    draw_alert_banner(32.0f, 44.0f, 336.0f, 24.0f, waiting_for_a_release ? "Release A to arm send" : "Recording microphone note", theme);
     draw_ruled_paper(20.0f, 76.0f, 360.0f, 136.0f, theme->paper, theme);
     draw_chip(32.0f, 88.0f, 44.0f, "TIME", theme->accent.primary, theme->text, theme->accent.primary_dark);
     app_gfx_panel(86.0f, 84.0f, 110.0f, 24.0f, theme->paper_alt, theme->border);
@@ -1030,13 +994,13 @@ void hermes_app_ui_render_voice_recording(unsigned long tenths, size_t pcm_size,
     app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, theme->paper_shadow, theme->border_dark);
     draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, theme->paper, theme);
     draw_bottom_header(theme, "MIC KEYS");
-    draw_action_button(16.0f, 48.0f, 88.0f, 28.0f, "UP Send", theme, !waiting_for_up_release);
+    draw_action_button(16.0f, 48.0f, 88.0f, 28.0f, "A Send", theme, !waiting_for_a_release);
     draw_action_button(116.0f, 48.0f, 88.0f, 28.0f, "B Cancel", theme, false);
     draw_action_button(216.0f, 48.0f, 88.0f, 28.0f, "START Abort", theme, false);
     draw_ruled_paper(8.0f, 92.0f, 304.0f, 116.0f, theme->paper_alt, theme);
     app_gfx_text_fit(16.0f, 104.0f, 288.0f, 0.28f, 0.28f, theme->text, capture_state);
     app_gfx_text_fit(16.0f, 126.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "The session stops after five minutes or when the audio buffer fills.");
-    app_gfx_text_fit(16.0f, 148.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "If UP is already held, release it once before trying to send.");
+    app_gfx_text_fit(16.0f, 148.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "If A is already held when recording opens, release it once before trying to send.");
     draw_hint_button(82.0f, 214.0f, 156.0f, "Return after send", theme);
 
     app_gfx_end_frame();

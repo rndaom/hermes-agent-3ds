@@ -165,7 +165,7 @@ static void render_home_request_ui(
     );
 }
 
-static bool prompt_v2_approval_choice(const char* request_id, char* out_choice, size_t out_size)
+static bool prompt_v2_approval_choice(const HermesAppConfig* config, const char* request_id, char* out_choice, size_t out_size)
 {
     if (out_choice == NULL || out_size == 0)
         return false;
@@ -175,7 +175,7 @@ static bool prompt_v2_approval_choice(const char* request_id, char* out_choice, 
     while (aptMainLoop()) {
         u32 kDown;
 
-        hermes_app_ui_render_approval_prompt(request_id);
+        hermes_app_ui_render_approval_prompt(config, request_id);
         gspWaitForVBlank();
         hidScanInput();
         kDown = hidKeysDown();
@@ -255,7 +255,7 @@ static Result complete_v2_roundtrip(
             set_chat_result_error(chat_result, "Approval URL could not be built.");
             goto done;
         }
-        if (!prompt_v2_approval_choice(event_result.request_id, approval_choice, sizeof(approval_choice))) {
+        if (!prompt_v2_approval_choice(config, event_result.request_id, approval_choice, sizeof(approval_choice))) {
             set_chat_result_error(chat_result, "Approval canceled.");
             goto done;
         }
@@ -435,7 +435,7 @@ void hermes_app_requests_handle_voice(
         return;
     }
 
-    if (!voice_input_record_prompt(&wav_data, &wav_size, status_line, status_line_size)) {
+    if (!voice_input_record_prompt(config, &wav_data, &wav_size, status_line, status_line_size)) {
         render_home_request_ui(config, ui, chat_result, last_message, *reply_page, status_line, *request_rc);
         return;
     }

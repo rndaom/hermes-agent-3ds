@@ -14,7 +14,9 @@ def test_home_bottom_screen_uses_tool_tray_and_room_relay_summary():
     assert '"TOOL TRAY"' in ui_c
     assert '"ROOM"' in ui_c
     assert '"RELAY"' in ui_c
-    assert 'draw_hint_button(16.0f, 214.0f, 90.0f, "A Select"' in ui_c
+    assert 'draw_hint_button(16.0f, 214.0f, 132.0f, "A Select"' in ui_c
+    assert '"Touch OK"' not in ui_c
+    assert '"Ready to send"' not in ui_c
 
 
 def test_makefile_supports_packaged_release_zip_output():

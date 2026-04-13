@@ -24,8 +24,9 @@ def test_app_ui_has_phase3_message_log_home_layout():
     assert "render_home_graphical" in ui_c
     assert "draw_message_card" in ui_c
     assert "draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f" in ui_c
-    assert "draw_ruled_paper(8.0f, 156.0f, 304.0f, 52.0f" in ui_c
+    assert "draw_ruled_paper(8.0f, 156.0f, 304.0f, 52.0f" not in ui_c
     assert 'draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Write Note"' in ui_c
+    assert '"Touch OK"' not in ui_c
     assert '"ACTIVE THREAD"' not in ui_c
 
 
@@ -37,4 +38,5 @@ def test_phase3_followup_keeps_explicit_graphical_panel_layout():
     assert "app_gfx_begin_bottom" in ui_c
     assert "draw_top_header(" in ui_c
     assert "draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f" in ui_c
-    assert "draw_ruled_paper(8.0f, 156.0f, 304.0f, 52.0f" in ui_c
+    assert "draw_ruled_paper(8.0f, 156.0f, 304.0f, 52.0f" not in ui_c
+    assert 'draw_hint_button(16.0f, 214.0f, 132.0f, "A Select"' in ui_c

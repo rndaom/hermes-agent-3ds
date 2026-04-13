@@ -4,12 +4,15 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "app_config.h"
+
 #define VOICE_INPUT_MAX_SECONDS 300
 #define VOICE_INPUT_SAMPLE_RATE_HZ 16360
 #define VOICE_INPUT_BITS_PER_SAMPLE 16
 #define VOICE_INPUT_CHANNELS 1
 
 bool voice_input_record_prompt(
+    const HermesAppConfig* config,
     u8** out_wav_data,
     size_t* out_wav_size,
     char* status_line,

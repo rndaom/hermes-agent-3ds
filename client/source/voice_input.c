@@ -77,12 +77,19 @@ static unsigned long recording_tenths_elapsed(u64 start_ms)
     return (unsigned long)((osGetTime() - start_ms) / 100ULL);
 }
 
-static void render_recording_status(unsigned long tenths, size_t pcm_size, const char* status_line, bool waiting_for_up_release)
+static void render_recording_status(
+    const HermesAppConfig* config,
+    unsigned long tenths,
+    size_t pcm_size,
+    const char* status_line,
+    bool waiting_for_a_release
+)
 {
-    hermes_app_ui_render_voice_recording(tenths, pcm_size, status_line, waiting_for_up_release);
+    hermes_app_ui_render_voice_recording(config, tenths, pcm_size, status_line, waiting_for_a_release);
 }
 
 bool voice_input_record_prompt(
+    const HermesAppConfig* config,
     u8** out_wav_data,
     size_t* out_wav_size,
     char* status_line,
@@ -98,8 +105,8 @@ bool voice_input_record_prompt(
     bool sampling_started = false;
     bool canceled = false;
     bool success = false;
-    bool waiting_for_up_release = true;
-    bool last_waiting_for_up_release = true;
+    bool waiting_for_a_release = (hidKeysHeld() & KEY_A) != 0;
+    bool last_waiting_for_a_release;
     u64 start_ms = 0;
     unsigned long last_render_tenths = ULONG_MAX;
 
@@ -135,9 +142,10 @@ bool voice_input_record_prompt(
     }
     sampling_started = true;
     start_ms = osGetTime();
+    last_waiting_for_a_release = waiting_for_a_release;
 
     set_status(status_line, status_line_size, "Mic is recording now.");
-    render_recording_status(0, pcm_size, status_line, waiting_for_up_release);
+    render_recording_status(config, 0, pcm_size, status_line, waiting_for_a_release);
     last_render_tenths = 0;
 
     while (aptMainLoop()) {
@@ -150,10 +158,10 @@ bool voice_input_record_prompt(
 
         copy_ring_audio(mic_buffer, mic_data_size, &mic_pos, pcm_buffer, &pcm_size);
         current_tenths = recording_tenths_elapsed(start_ms);
-        if (current_tenths != last_render_tenths || waiting_for_up_release != last_waiting_for_up_release) {
-            render_recording_status(current_tenths, pcm_size, status_line, waiting_for_up_release);
+        if (current_tenths != last_render_tenths || waiting_for_a_release != last_waiting_for_a_release) {
+            render_recording_status(config, current_tenths, pcm_size, status_line, waiting_for_a_release);
             last_render_tenths = current_tenths;
-            last_waiting_for_up_release = waiting_for_up_release;
+            last_waiting_for_a_release = waiting_for_a_release;
         }
 
         if ((kDown & KEY_START) != 0) {
@@ -167,15 +175,15 @@ bool voice_input_record_prompt(
             break;
         }
 
-        if (waiting_for_up_release) {
-            if ((hidKeysHeld() & KEY_UP) == 0) {
-                waiting_for_up_release = false;
+        if (waiting_for_a_release) {
+            if ((hidKeysHeld() & KEY_A) == 0) {
+                waiting_for_a_release = false;
                 set_status(status_line, status_line_size, "Mic is recording now.");
             }
             continue;
         }
 
-        if ((kDown & KEY_UP) != 0) {
+        if ((kDown & KEY_A) != 0) {
             set_status(status_line, status_line_size, "Mic captured. Sending to Hermes...");
             break;
         }

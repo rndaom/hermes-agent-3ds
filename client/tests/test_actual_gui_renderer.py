@@ -80,7 +80,10 @@ def test_graphical_ui_bounds_variable_length_fields_and_uses_touch_sized_action_
     assert "HOME_REPLY_MAX_WIDTH" in ui_c
     assert 'draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Write Note"' in ui_c
     assert 'draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Setup"' in ui_c
-    assert "draw_ruled_paper(8.0f, 156.0f, 304.0f, 52.0f" in ui_c
+    assert "draw_ruled_paper(8.0f, 156.0f, 304.0f, 52.0f" not in ui_c
+    assert 'draw_hint_button(16.0f, 214.0f, 132.0f, "A Select"' in ui_c
+    assert 'draw_hint_button(172.0f, 214.0f, 132.0f, "START Exit"' in ui_c
+    assert '"Touch OK"' not in ui_c
     assert '"B Ask Hermes"' not in ui_c
     assert '"A Check Link"' not in ui_c
 

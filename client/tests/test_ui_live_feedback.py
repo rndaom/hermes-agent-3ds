@@ -14,9 +14,11 @@ def test_home_ui_cleanup_removes_telemetry_strip_and_moves_thread_status_to_bott
     assert "home_telemetry" not in ui_c
     assert "home_telemetry" not in main_c
     assert "draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f" in ui_c
-    assert "draw_ruled_paper(8.0f, 156.0f, 304.0f, 52.0f" in ui_c
+    assert "draw_ruled_paper(8.0f, 156.0f, 304.0f, 52.0f" not in ui_c
     assert '"ROOM BOARD"' in ui_c
     assert '"TOOL TRAY"' in ui_c
+    assert '"PAGE"' not in ui_c
+    assert '"Touch OK"' not in ui_c
     assert '"ACTIVE THREAD"' not in ui_c
     assert '"MODEL"' not in ui_c
     assert '"CONTEXT"' not in ui_c
@@ -59,6 +61,7 @@ def test_home_command_menu_has_touch_support_and_reply_paging_on_pad_circle_and_
     assert 'draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Setup"' in ui_c
     assert 'draw_action_button(16.0f, 116.0f, 136.0f, 28.0f, "Mic Note"' in ui_c
     assert 'draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Clear Board"' in ui_c
+    assert 'draw_hint_button(172.0f, 214.0f, 132.0f, "START Exit"' in ui_c
     assert '"B Ask Hermes"' not in ui_c
     assert '"A Check Link"' not in ui_c
     assert '"SELECT Threads"' not in ui_c
