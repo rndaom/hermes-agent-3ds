@@ -6,7 +6,7 @@
 
 static void render_screen(AppScreen screen, const HermesAppConfig* config, const AppHomeContext* context)
 {
-    if (context == NULL || context->render == NULL || context->reply_page == NULL ||
+    if (context == NULL || context->render == NULL || context->history_scroll == NULL ||
         context->command_selection == NULL || context->status_line == NULL || context->request_rc == NULL) {
         return;
     }
@@ -19,7 +19,7 @@ static void render_screen(AppScreen screen, const HermesAppConfig* config, const
         context->health_result,
         context->chat_result,
         context->last_message,
-        *context->reply_page,
+        *context->history_scroll,
         (size_t)*context->command_selection,
         context->status_line,
         *context->request_rc
@@ -36,13 +36,13 @@ static void handle_home_health_check(const HermesAppConfig* config, bool network
     char health_url[HERMES_APP_HEALTH_URL_MAX];
 
     if (context == NULL || context->health_result == NULL || context->status_line == NULL ||
-        context->request_rc == NULL || context->reply_page == NULL) {
+        context->request_rc == NULL || context->history_scroll == NULL) {
         return;
     }
 
     gateway_health_result_reset(context->health_result);
     *context->request_rc = 0;
-    *context->reply_page = 0;
+    *context->history_scroll = 0;
 
     if (!network_ready) {
         snprintf(context->status_line, context->status_line_size, "Networking services failed to start.");
@@ -87,7 +87,7 @@ static void execute_selected_home_command(
     switch (*context->command_selection) {
         case HOME_COMMAND_NONE:
             break;
-        case HOME_COMMAND_ASK:
+        case HOME_COMMAND_TEXT:
             hermes_app_requests_handle_text(
                 config,
                 network_ready,
@@ -95,7 +95,7 @@ static void execute_selected_home_command(
                 context->chat_result,
                 context->last_message,
                 context->last_message_size,
-                context->reply_page,
+                context->history_scroll,
                 context->status_line,
                 context->status_line_size,
                 context->request_rc
@@ -104,16 +104,16 @@ static void execute_selected_home_command(
         case HOME_COMMAND_CHECK:
             handle_home_health_check(config, network_ready, context);
             break;
-        case HOME_COMMAND_THREADS:
+        case HOME_COMMAND_SESSIONS:
             hermes_app_conversations_open_picker(context->conversation_state, config, screen, context->status_line, context->status_line_size);
             render_screen(*screen, config, context);
             break;
-        case HOME_COMMAND_CONFIG:
+        case HOME_COMMAND_SETTINGS:
             *screen = APP_SCREEN_SETTINGS;
-            snprintf(context->status_line, context->status_line_size, "Setup sheet opened.");
+            snprintf(context->status_line, context->status_line_size, "Settings opened.");
             render_screen(*screen, config, context);
             break;
-        case HOME_COMMAND_MIC:
+        case HOME_COMMAND_AUDIO:
             hermes_app_requests_handle_voice(
                 config,
                 network_ready,
@@ -121,21 +121,11 @@ static void execute_selected_home_command(
                 context->chat_result,
                 context->last_message,
                 context->last_message_size,
-                context->reply_page,
+                context->history_scroll,
                 context->status_line,
                 context->status_line_size,
                 context->request_rc
             );
-            break;
-        case HOME_COMMAND_CLEAR:
-            gateway_health_result_reset(context->health_result);
-            bridge_chat_result_reset(context->chat_result);
-            hermes_app_ui_home_history_reset();
-            context->last_message[0] = '\0';
-            *context->reply_page = 0;
-            *context->request_rc = 0;
-            snprintf(context->status_line, context->status_line_size, "Board cleared. Ready for a new note.");
-            render_home_screen(config, context);
             break;
     }
 }
@@ -143,17 +133,18 @@ static void execute_selected_home_command(
 static void move_home_command_selection(AppHomeContext* context, int direction)
 {
     int selection;
+    const int last_command = (int)HOME_COMMAND_AUDIO;
 
     if (context == NULL || context->command_selection == NULL || direction == 0)
         return;
 
     selection = context->command_selection != NULL && *context->command_selection == HOME_COMMAND_NONE
-        ? (direction > 0 ? (int)HOME_COMMAND_ASK : (int)HOME_COMMAND_CLEAR)
+        ? (direction > 0 ? (int)HOME_COMMAND_TEXT : last_command)
         : (int)*context->command_selection + direction;
-    if (selection < (int)HOME_COMMAND_ASK)
-        selection = (int)HOME_COMMAND_CLEAR;
-    else if (selection > (int)HOME_COMMAND_CLEAR)
-        selection = (int)HOME_COMMAND_ASK;
+    if (selection < (int)HOME_COMMAND_TEXT)
+        selection = last_command;
+    else if (selection > last_command)
+        selection = (int)HOME_COMMAND_TEXT;
 
     *context->command_selection = (HomeCommand)selection;
 }
@@ -161,17 +152,15 @@ static void move_home_command_selection(AppHomeContext* context, int direction)
 static HomeCommand home_command_from_touch(int px, int py)
 {
     if (px >= 16 && px < 152 && py >= 44 && py < 72)
-        return HOME_COMMAND_ASK;
+        return HOME_COMMAND_TEXT;
     if (px >= 168 && px < 304 && py >= 44 && py < 72)
         return HOME_COMMAND_CHECK;
     if (px >= 16 && px < 152 && py >= 80 && py < 108)
-        return HOME_COMMAND_THREADS;
+        return HOME_COMMAND_SESSIONS;
     if (px >= 168 && px < 304 && py >= 80 && py < 108)
-        return HOME_COMMAND_CONFIG;
-    if (px >= 16 && px < 152 && py >= 116 && py < 144)
-        return HOME_COMMAND_MIC;
-    if (px >= 168 && px < 304 && py >= 116 && py < 144)
-        return HOME_COMMAND_CLEAR;
+        return HOME_COMMAND_SETTINGS;
+    if (px >= 92 && px < 228 && py >= 116 && py < 144)
+        return HOME_COMMAND_AUDIO;
     return HOME_COMMAND_NONE;
 }
 
@@ -185,13 +174,14 @@ bool hermes_app_home_handle_input(
 {
     AppRequestUiContext request_ui;
     touchPosition touch;
-    bool nav_down;
-    bool nav_up;
-    bool nav_left;
-    bool nav_right;
+    bool dpad_down;
+    bool dpad_up;
+    bool cpad_down;
+    bool cpad_up;
+    size_t max_scroll;
 
     if (config == NULL || screen == NULL || context == NULL || context->conversation_state == NULL ||
-        context->chat_result == NULL || context->last_message == NULL || context->reply_page == NULL ||
+        context->chat_result == NULL || context->last_message == NULL || context->history_scroll == NULL ||
         context->command_selection == NULL || context->status_line == NULL || context->request_rc == NULL) {
         return false;
     }
@@ -202,33 +192,37 @@ bool hermes_app_home_handle_input(
     request_ui.command_selection = (size_t)*context->command_selection;
     request_ui.render = context->render;
 
-    nav_down = (kDown & (KEY_DOWN | KEY_CPAD_DOWN)) != 0;
-    nav_up = (kDown & (KEY_UP | KEY_CPAD_UP)) != 0;
-    nav_left = (kDown & (KEY_LEFT | KEY_CPAD_LEFT | KEY_L)) != 0;
-    nav_right = (kDown & (KEY_RIGHT | KEY_CPAD_RIGHT | KEY_R)) != 0;
+    dpad_down = (kDown & KEY_DOWN) != 0;
+    dpad_up = (kDown & KEY_UP) != 0;
+    cpad_down = (kDown & KEY_CPAD_DOWN) != 0;
+    cpad_up = (kDown & KEY_CPAD_UP) != 0;
 
-    if (nav_down) {
+    if (dpad_down) {
         move_home_command_selection(context, 1);
         render_home_screen(config, context);
         return true;
     }
 
-    if (nav_up) {
+    if (dpad_up) {
         move_home_command_selection(context, -1);
         render_home_screen(config, context);
         return true;
     }
 
-    if (nav_left && context->chat_result->success && *context->reply_page > 0) {
-        (*context->reply_page)--;
+    max_scroll = hermes_app_ui_home_history_max_scroll(context->status_line);
+    if (cpad_up && *context->history_scroll < max_scroll) {
+        *context->history_scroll += 20;
+        if (*context->history_scroll > max_scroll)
+            *context->history_scroll = max_scroll;
         render_home_screen(config, context);
         return true;
     }
 
-    if (nav_right && context->chat_result->success) {
-        size_t page_count = hermes_app_ui_reply_page_count(context->chat_result->reply);
-        if (*context->reply_page + 1 < page_count)
-            (*context->reply_page)++;
+    if (cpad_down && *context->history_scroll > 0) {
+        if (*context->history_scroll > 20)
+            *context->history_scroll -= 20;
+        else
+            *context->history_scroll = 0;
         render_home_screen(config, context);
         return true;
     }
@@ -245,7 +239,7 @@ bool hermes_app_home_handle_input(
 
     if ((kDown & KEY_A) != 0) {
         if (*context->command_selection == HOME_COMMAND_NONE)
-            *context->command_selection = HOME_COMMAND_ASK;
+            *context->command_selection = HOME_COMMAND_TEXT;
         request_ui.command_selection = (size_t)*context->command_selection;
         execute_selected_home_command(config, network_ready, screen, context, &request_ui);
         return true;

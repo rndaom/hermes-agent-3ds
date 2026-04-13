@@ -23,25 +23,25 @@ Current design work is now driven by:
 - `docs/hermes-pictochat-clone-spec.md`
 - `docs/plans/2026-04-13-hermes-pictochat-clone-ui.md`
 
-The current UI target is a PictoChat-clone handheld shell for Hermes, using ruled paper, DS gradient rails, and room-colored note cards instead of the previous dark-mode direction.
+The current UI target is a PictoChat-clone handheld shell for Hermes, using ruled paper, DS gradient rails, and an orange dark-mode default theme.
 
 Current controls:
 
 ### Home
-- `UP/DOWN` or Circle Pad `UP/DOWN` — move through the home action list
-- `LEFT/RIGHT` or Circle Pad `LEFT/RIGHT` — page long replies
+- `UP/DOWN` — move through the home action list
+- Circle Pad `UP/DOWN` — scroll the message transcript
 - `A` — run the selected action
 - touch the bottom-screen action buttons — select and run that action
 - `START` — exit back to Homebrew Launcher
 
-### Rooms
+### Sessions
 - `UP/DOWN` or Circle Pad `UP/DOWN` — select a conversation slot
 - `A` — activate the highlighted conversation
 - `X` — create a new conversation ID
 - `Y` — sync recent conversation slots from Hermes
 - `B` — return home
 
-### Setup
+### Settings
 - `UP/DOWN` or Circle Pad `UP/DOWN` — select host / port / token / device ID
 - `A` — edit selected field
 - `X` — save settings to SD

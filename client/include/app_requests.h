@@ -20,7 +20,7 @@ typedef void (*AppRequestRenderFn)(
     const GatewayHealthResult* health_result,
     const BridgeChatResult* chat_result,
     const char* last_message,
-    size_t reply_page,
+    size_t history_scroll,
     size_t command_selection,
     const char* status_line,
     Result last_rc
@@ -41,7 +41,7 @@ void hermes_app_requests_handle_text(
     BridgeChatResult* chat_result,
     char* last_message,
     size_t last_message_size,
-    size_t* reply_page,
+    size_t* history_scroll,
     char* status_line,
     size_t status_line_size,
     Result* request_rc
@@ -54,7 +54,7 @@ void hermes_app_requests_handle_voice(
     BridgeChatResult* chat_result,
     char* last_message,
     size_t last_message_size,
-    size_t* reply_page,
+    size_t* history_scroll,
     char* status_line,
     size_t status_line_size,
     Result* request_rc

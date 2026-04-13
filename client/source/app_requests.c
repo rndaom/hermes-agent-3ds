@@ -7,6 +7,9 @@
 #include "app_input.h"
 #include "voice_input.h"
 
+#define APP_REQUEST_EVENT_POLL_WAIT_MS 5000U
+#define APP_REQUEST_REPLY_WAIT_TIMEOUT_MS (60ULL * 60ULL * 1000ULL)
+
 static void copy_bounded_string(char* dest, size_t dest_size, const char* src)
 {
     size_t length;
@@ -36,7 +39,17 @@ static void set_chat_result_error(BridgeChatResult* chat_result, const char* err
     snprintf(chat_result->error, sizeof(chat_result->error), "%s", error_message != NULL ? error_message : "Unknown error.");
 }
 
-static void reset_chat_request_state(BridgeChatResult* chat_result, BridgeV2MessageResult* message_result, Result* request_rc, size_t* reply_page)
+static void render_home_request_ui(
+    const HermesAppConfig* config,
+    const AppRequestUiContext* ui,
+    const BridgeChatResult* chat_result,
+    const char* last_message,
+    size_t history_scroll,
+    const char* status_line,
+    Result request_rc
+);
+
+static void reset_chat_request_state(BridgeChatResult* chat_result, BridgeV2MessageResult* message_result, Result* request_rc, size_t* history_scroll)
 {
     if (chat_result != NULL)
         bridge_chat_result_reset(chat_result);
@@ -44,8 +57,8 @@ static void reset_chat_request_state(BridgeChatResult* chat_result, BridgeV2Mess
         bridge_v2_message_result_reset(message_result);
     if (request_rc != NULL)
         *request_rc = 0;
-    if (reply_page != NULL)
-        *reply_page = 0;
+    if (history_scroll != NULL)
+        *history_scroll = 0;
 }
 
 static const char* conversation_id_for_message(const HermesAppConfig* config, const BridgeV2MessageResult* message_result)
@@ -57,22 +70,52 @@ static const char* conversation_id_for_message(const HermesAppConfig* config, co
     return DEFAULT_CONVERSATION_ID;
 }
 
+static bool event_is_matching_reply(const BridgeV2EventPollResult* event_result, const BridgeV2MessageResult* message_result)
+{
+    return event_result != NULL && message_result != NULL &&
+        event_result->reply_text[0] != '\0' &&
+        strcmp(event_result->reply_to_message_id, message_result->message_id) == 0;
+}
+
+static bool event_is_final_reply(const BridgeV2EventPollResult* event_result)
+{
+    return event_result != NULL && strcmp(event_result->event_type, "message.created") == 0;
+}
+
+static void set_chat_result_reply_text(BridgeChatResult* chat_result, const char* reply_text)
+{
+    if (chat_result == NULL)
+        return;
+
+    bridge_chat_result_reset(chat_result);
+    if (reply_text == NULL || reply_text[0] == '\0')
+        return;
+
+    chat_result->success = true;
+    snprintf(chat_result->reply, sizeof(chat_result->reply), "%s", reply_text);
+}
+
 static Result poll_for_v2_reply(
     const HermesAppConfig* config,
+    const AppRequestUiContext* ui,
     const char* events_url,
     const BridgeV2MessageResult* message_result,
     u32* event_cursor,
     BridgeV2EventPollResult* event_result,
     BridgeV2EventPollResult* matched_event_result,
-    bool* matched_reply
+    bool* matched_reply,
+    BridgeChatResult* chat_result,
+    const char* last_message,
+    char* status_line,
+    size_t status_line_size
 )
 {
     const char* conversation_id;
-    int poll_attempt;
     Result request_rc = 0;
+    u64 started_at_ms;
 
-    if (config == NULL || events_url == NULL || message_result == NULL || event_cursor == NULL ||
-        event_result == NULL || matched_event_result == NULL || matched_reply == NULL) {
+    if (config == NULL || ui == NULL || events_url == NULL || message_result == NULL || event_cursor == NULL ||
+        event_result == NULL || matched_event_result == NULL || matched_reply == NULL || chat_result == NULL) {
         return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_POINTER);
     }
 
@@ -80,15 +123,16 @@ static Result poll_for_v2_reply(
     bridge_v2_event_poll_result_reset(event_result);
     bridge_v2_event_poll_result_reset(matched_event_result);
     *matched_reply = false;
+    started_at_ms = osGetTime();
 
-    for (poll_attempt = 0; poll_attempt < 6; poll_attempt++) {
+    while (aptMainLoop() && (osGetTime() - started_at_ms) < APP_REQUEST_REPLY_WAIT_TIMEOUT_MS) {
         request_rc = bridge_v2_poll_events(
             events_url,
             config->token,
             config->device_id,
             conversation_id,
             *event_cursor,
-            5000,
+            APP_REQUEST_EVENT_POLL_WAIT_MS,
             event_result
         );
         if (R_FAILED(request_rc))
@@ -100,12 +144,27 @@ static Result poll_for_v2_reply(
         if (event_result->approval_required)
             break;
 
-        if (event_result->reply_text[0] != '\0' &&
-            strcmp(event_result->reply_to_message_id, message_result->message_id) == 0) {
+        if (event_is_matching_reply(event_result, message_result)) {
             *matched_event_result = *event_result;
-            *matched_reply = true;
-            break;
+            if (strcmp(event_result->event_type, "message.updated") == 0) {
+                *matched_reply = false;
+                set_chat_result_reply_text(chat_result, event_result->reply_text);
+                hermes_app_ui_home_history_upsert(APP_UI_MESSAGE_HERMES, event_result->reply_text);
+                if (status_line != NULL && status_line_size > 0)
+                    snprintf(status_line, status_line_size, "Hermes is replying...");
+                render_home_request_ui(config, ui, chat_result, last_message, 0, status_line, 0);
+                continue;
+            }
+
+            *matched_reply = event_is_final_reply(event_result);
+            if (*matched_reply)
+                break;
         }
+    }
+
+    if (R_SUCCEEDED(request_rc) && !*matched_reply && !event_result->approval_required) {
+        event_result->success = false;
+        snprintf(event_result->error, sizeof(event_result->error), "Timed out waiting for Hermes reply.");
     }
 
     return request_rc;
@@ -142,7 +201,7 @@ static void render_home_request_ui(
     const AppRequestUiContext* ui,
     const BridgeChatResult* chat_result,
     const char* last_message,
-    size_t reply_page,
+    size_t history_scroll,
     const char* status_line,
     Result request_rc
 )
@@ -158,7 +217,7 @@ static void render_home_request_ui(
         ui->health_result,
         chat_result,
         last_message,
-        reply_page,
+        history_scroll,
         ui->command_selection,
         status_line,
         request_rc
@@ -209,6 +268,9 @@ static Result complete_v2_roundtrip(
     const char* events_url,
     const BridgeV2MessageResult* message_result,
     BridgeChatResult* chat_result,
+    const char* last_message,
+    char* status_line,
+    size_t status_line_size,
     bool* missed_events_out
 )
 {
@@ -231,12 +293,17 @@ static Result complete_v2_roundtrip(
     event_cursor = message_result->cursor;
     request_rc = poll_for_v2_reply(
         config,
+        ui,
         events_url,
         message_result,
         &event_cursor,
         &event_result,
         &matched_event_result,
-        &matched_reply
+        &matched_reply,
+        chat_result,
+        last_message,
+        status_line,
+        status_line_size
     );
     if (R_FAILED(request_rc)) {
         if (event_result.error[0] != '\0')
@@ -276,12 +343,17 @@ static Result complete_v2_roundtrip(
 
         request_rc = poll_for_v2_reply(
             config,
+            ui,
             events_url,
             message_result,
             &event_cursor,
             &event_result,
             &matched_event_result,
-            &matched_reply
+            &matched_reply,
+            chat_result,
+            last_message,
+            status_line,
+            status_line_size
         );
         if (R_FAILED(request_rc)) {
             if (event_result.error[0] != '\0')
@@ -331,7 +403,7 @@ void hermes_app_requests_handle_text(
     BridgeChatResult* chat_result,
     char* last_message,
     size_t last_message_size,
-    size_t* reply_page,
+    size_t* history_scroll,
     char* status_line,
     size_t status_line_size,
     Result* request_rc
@@ -343,7 +415,7 @@ void hermes_app_requests_handle_text(
     BridgeV2MessageResult message_result;
     bool missed_events = false;
 
-    if (config == NULL || ui == NULL || chat_result == NULL || last_message == NULL || reply_page == NULL ||
+    if (config == NULL || ui == NULL || chat_result == NULL || last_message == NULL || history_scroll == NULL ||
         status_line == NULL || status_line_size == 0 || request_rc == NULL) {
         return;
     }
@@ -351,30 +423,40 @@ void hermes_app_requests_handle_text(
     message_buffer[0] = '\0';
     if (!prompt_message_input(message_buffer, sizeof(message_buffer))) {
         snprintf(status_line, status_line_size, "Write note canceled.");
-        render_home_request_ui(config, ui, chat_result, last_message, *reply_page, status_line, *request_rc);
+        render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
         return;
     }
 
     copy_bounded_string(last_message, last_message_size, message_buffer);
     hermes_app_ui_home_history_push(APP_UI_MESSAGE_USER, message_buffer);
-    reset_chat_request_state(chat_result, &message_result, request_rc, reply_page);
+    reset_chat_request_state(chat_result, &message_result, request_rc, history_scroll);
 
     if (!hermes_app_config_build_messages_url(config, messages_url, sizeof(messages_url)) ||
         !hermes_app_config_build_events_url(config, events_url, sizeof(events_url)) ||
         config->device_id[0] == '\0') {
         snprintf(status_line, status_line_size, "V2 config is incomplete. Set device_id.");
-        render_home_request_ui(config, ui, chat_result, last_message, *reply_page, status_line, *request_rc);
+        render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
         return;
     }
 
     snprintf(status_line, status_line_size, "Sending note to Hermes...");
-    render_home_request_ui(config, ui, chat_result, last_message, *reply_page, status_line, *request_rc);
+    render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
     gspWaitForVBlank();
 
     if (network_ready) {
         *request_rc = bridge_v2_send_message(messages_url, config->token, config->device_id, config->active_conversation_id, message_buffer, &message_result);
         if (R_SUCCEEDED(*request_rc) && message_result.success) {
-            *request_rc = complete_v2_roundtrip(config, ui, events_url, &message_result, chat_result, &missed_events);
+            *request_rc = complete_v2_roundtrip(
+                config,
+                ui,
+                events_url,
+                &message_result,
+                chat_result,
+                last_message,
+                status_line,
+                status_line_size,
+                &missed_events
+            );
             if (R_SUCCEEDED(*request_rc)) {
                 if (chat_result->success)
                     hermes_app_ui_home_history_push(APP_UI_MESSAGE_HERMES, chat_result->reply);
@@ -393,7 +475,7 @@ void hermes_app_requests_handle_text(
         snprintf(status_line, status_line_size, "Networking services failed to start.");
     }
 
-    render_home_request_ui(config, ui, chat_result, last_message, *reply_page, status_line, *request_rc);
+    render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
 }
 
 void hermes_app_requests_handle_voice(
@@ -403,7 +485,7 @@ void hermes_app_requests_handle_voice(
     BridgeChatResult* chat_result,
     char* last_message,
     size_t last_message_size,
-    size_t* reply_page,
+    size_t* history_scroll,
     char* status_line,
     size_t status_line_size,
     Result* request_rc
@@ -416,14 +498,14 @@ void hermes_app_requests_handle_voice(
     BridgeV2MessageResult message_result;
     bool missed_events = false;
 
-    if (config == NULL || ui == NULL || chat_result == NULL || last_message == NULL || reply_page == NULL ||
+    if (config == NULL || ui == NULL || chat_result == NULL || last_message == NULL || history_scroll == NULL ||
         status_line == NULL || status_line_size == 0 || request_rc == NULL) {
         return;
     }
 
     if (!network_ready) {
         snprintf(status_line, status_line_size, "Networking services failed to start.");
-        render_home_request_ui(config, ui, chat_result, last_message, *reply_page, status_line, *request_rc);
+        render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
         return;
     }
 
@@ -431,21 +513,21 @@ void hermes_app_requests_handle_voice(
         !hermes_app_config_build_events_url(config, events_url, sizeof(events_url)) ||
         config->device_id[0] == '\0') {
         snprintf(status_line, status_line_size, "V2 config is incomplete. Set device_id.");
-        render_home_request_ui(config, ui, chat_result, last_message, *reply_page, status_line, *request_rc);
+        render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
         return;
     }
 
     if (!voice_input_record_prompt(config, &wav_data, &wav_size, status_line, status_line_size)) {
-        render_home_request_ui(config, ui, chat_result, last_message, *reply_page, status_line, *request_rc);
+        render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
         return;
     }
 
     copy_bounded_string(last_message, last_message_size, "[mic] voice input");
     hermes_app_ui_home_history_push(APP_UI_MESSAGE_USER, "[mic] voice input");
-    reset_chat_request_state(chat_result, &message_result, request_rc, reply_page);
+    reset_chat_request_state(chat_result, &message_result, request_rc, history_scroll);
 
     snprintf(status_line, status_line_size, "Sending mic note to Hermes...");
-    render_home_request_ui(config, ui, chat_result, last_message, *reply_page, status_line, *request_rc);
+    render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
     gspWaitForVBlank();
 
     *request_rc = bridge_v2_send_voice_message(voice_url, config->token, config->device_id, config->active_conversation_id, wav_data, wav_size, &message_result);
@@ -453,7 +535,17 @@ void hermes_app_requests_handle_voice(
     wav_data = NULL;
 
     if (R_SUCCEEDED(*request_rc) && message_result.success) {
-        *request_rc = complete_v2_roundtrip(config, ui, events_url, &message_result, chat_result, &missed_events);
+        *request_rc = complete_v2_roundtrip(
+            config,
+            ui,
+            events_url,
+            &message_result,
+            chat_result,
+            last_message,
+            status_line,
+            status_line_size,
+            &missed_events
+        );
         if (R_SUCCEEDED(*request_rc)) {
             if (chat_result->success)
                 hermes_app_ui_home_history_push(APP_UI_MESSAGE_HERMES, chat_result->reply);
@@ -469,5 +561,5 @@ void hermes_app_requests_handle_voice(
         snprintf(status_line, status_line_size, "Voice upload failed: 0x%08lX", (unsigned long)*request_rc);
     }
 
-    render_home_request_ui(config, ui, chat_result, last_message, *reply_page, status_line, *request_rc);
+    render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
 }

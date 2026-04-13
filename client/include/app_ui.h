@@ -21,9 +21,10 @@ typedef enum AppUiMessageAuthor {
     APP_UI_MESSAGE_HERMES = 1,
 } AppUiMessageAuthor;
 
-size_t hermes_app_ui_reply_page_count(const char* reply_text);
+size_t hermes_app_ui_home_history_max_scroll(const char* status_line);
 void hermes_app_ui_home_history_reset(void);
 void hermes_app_ui_home_history_push(AppUiMessageAuthor author, const char* text);
+void hermes_app_ui_home_history_upsert(AppUiMessageAuthor author, const char* text);
 
 bool hermes_app_ui_init(void);
 void hermes_app_ui_exit(void);
@@ -36,7 +37,7 @@ void hermes_app_ui_render(
     const GatewayHealthResult* health_result,
     const BridgeChatResult* chat_result,
     const char* last_message,
-    size_t reply_page,
+    size_t history_scroll,
     size_t command_selection,
     const char* status_line,
     Result last_rc,

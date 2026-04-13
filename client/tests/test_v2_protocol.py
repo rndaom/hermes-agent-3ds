@@ -63,6 +63,7 @@ def test_bridge_v2_module_exists_for_native_gateway_protocol():
     assert "message.created" in source
     assert "message.updated" in source
     assert "reply_to" in source
+    assert '\\"event\\"' in source
 
 
 def test_bridge_v2_decodes_common_json_unicode_punctuation_for_3ds_console():

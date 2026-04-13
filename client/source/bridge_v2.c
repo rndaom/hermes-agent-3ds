@@ -1024,26 +1024,39 @@ Result bridge_v2_poll_events(const char* url, const char* token, const char* dev
     if (extract_json_u32(body, "missed_events", &missed))
         result->missed_events = missed > 0;
 
-    if (strstr(body, "\"approval.request\"") != NULL) {
+    extract_json_string_after(body, "\"event\"", "type", result->event_type, sizeof(result->event_type));
+
+    if (result->event_type[0] == '\0') {
+        if (strstr(body, "\"approval.request\"") != NULL)
+            snprintf(result->event_type, sizeof(result->event_type), "%s", "approval.request");
+        else if (strstr(body, "\"message.updated\"") != NULL)
+            snprintf(result->event_type, sizeof(result->event_type), "%s", "message.updated");
+        else if (strstr(body, "\"message.created\"") != NULL)
+            snprintf(result->event_type, sizeof(result->event_type), "%s", "message.created");
+    }
+
+    if (strcmp(result->event_type, "approval.request") == 0) {
         result->approval_required = true;
-        snprintf(result->event_type, sizeof(result->event_type), "%s", "approval.request");
-        extract_json_string_after(body, "\"approval.request\"", "request_id", result->request_id, sizeof(result->request_id));
+        if (!extract_json_string_after(body, "\"event\"", "request_id", result->request_id, sizeof(result->request_id)))
+            extract_json_string_after(body, "\"approval.request\"", "request_id", result->request_id, sizeof(result->request_id));
         result->success = true;
         return 0;
     }
 
-    if (strstr(body, "\"message.updated\"") != NULL) {
-        snprintf(result->event_type, sizeof(result->event_type), "%s", "message.updated");
-        extract_json_string_after(body, "\"message.updated\"", "text", result->reply_text, sizeof(result->reply_text));
-        extract_json_string_after(body, "\"message.updated\"", "reply_to", result->reply_to_message_id, sizeof(result->reply_to_message_id));
+    if (strcmp(result->event_type, "message.updated") == 0) {
+        if (!extract_json_string_after(body, "\"event\"", "text", result->reply_text, sizeof(result->reply_text)))
+            extract_json_string_after(body, "\"message.updated\"", "text", result->reply_text, sizeof(result->reply_text));
+        if (!extract_json_string_after(body, "\"event\"", "reply_to", result->reply_to_message_id, sizeof(result->reply_to_message_id)))
+            extract_json_string_after(body, "\"message.updated\"", "reply_to", result->reply_to_message_id, sizeof(result->reply_to_message_id));
         result->success = true;
         return 0;
     }
 
-    if (strstr(body, "\"message.created\"") != NULL) {
-        snprintf(result->event_type, sizeof(result->event_type), "%s", "message.created");
-        extract_json_string_after(body, "\"message.created\"", "text", result->reply_text, sizeof(result->reply_text));
-        extract_json_string_after(body, "\"message.created\"", "reply_to", result->reply_to_message_id, sizeof(result->reply_to_message_id));
+    if (strcmp(result->event_type, "message.created") == 0) {
+        if (!extract_json_string_after(body, "\"event\"", "text", result->reply_text, sizeof(result->reply_text)))
+            extract_json_string_after(body, "\"message.created\"", "text", result->reply_text, sizeof(result->reply_text));
+        if (!extract_json_string_after(body, "\"event\"", "reply_to", result->reply_to_message_id, sizeof(result->reply_to_message_id)))
+            extract_json_string_after(body, "\"message.created\"", "reply_to", result->reply_to_message_id, sizeof(result->reply_to_message_id));
         result->success = true;
         return 0;
     }

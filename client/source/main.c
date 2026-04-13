@@ -23,7 +23,7 @@ static void render_ui(
     const GatewayHealthResult* health_result,
     const BridgeChatResult* chat_result,
     const char* last_message,
-    size_t reply_page,
+    size_t history_scroll,
     size_t command_selection,
     const char* status_line,
     Result last_rc
@@ -37,7 +37,7 @@ static void render_ui(
         health_result,
         chat_result,
         last_message,
-        reply_page,
+        history_scroll,
         command_selection,
         status_line,
         last_rc,
@@ -55,14 +55,14 @@ int main(int argc, char* argv[])
     bool settings_dirty = false;
     AppScreen screen = APP_SCREEN_HOME;
     SettingsField selected_field = SETTINGS_FIELD_HOST;
-    HomeCommand command_selection = HOME_COMMAND_ASK;
+    HomeCommand command_selection = HOME_COMMAND_TEXT;
     HermesAppConfig config;
     HermesAppConfigLoadStatus load_status;
     GatewayHealthResult health_result;
     BridgeChatResult chat_result;
     char last_message[BRIDGE_CHAT_MESSAGE_MAX];
     char status_line[BRIDGE_CHAT_ERROR_MAX];
-    size_t reply_page = 0;
+    size_t history_scroll = 0;
 
     (void)argc;
     (void)argv;
@@ -104,7 +104,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, command_selection, status_line, init_rc);
+    render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, history_scroll, command_selection, status_line, init_rc);
 
     while (aptMainLoop())
     {
@@ -126,7 +126,7 @@ int main(int argc, char* argv[])
                 &chat_result,
                 last_message,
                 sizeof(last_message),
-                &reply_page,
+                &history_scroll,
                 &command_selection,
                 status_line,
                 sizeof(status_line),
@@ -145,12 +145,12 @@ int main(int argc, char* argv[])
                     &chat_result,
                     last_message,
                     sizeof(last_message),
-                    &reply_page,
+                    &history_scroll,
                     status_line,
                     sizeof(status_line),
                     &request_rc
                 )) {
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, command_selection, status_line, request_rc);
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, history_scroll, command_selection, status_line, request_rc);
             }
         } else {
             AppSettingsContext settings_context = {&g_conversation_state};
@@ -165,11 +165,11 @@ int main(int argc, char* argv[])
                     status_line,
                     sizeof(status_line)
                 )) {
-                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, command_selection, status_line, request_rc);
+                render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, history_scroll, command_selection, status_line, request_rc);
             }
         }
 
-        render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, reply_page, command_selection, status_line, request_rc);
+        render_ui(screen, &config, selected_field, settings_dirty, &health_result, &chat_result, last_message, history_scroll, command_selection, status_line, request_rc);
     }
 
     if (network_ready)

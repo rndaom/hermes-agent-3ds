@@ -33,7 +33,7 @@ bool hermes_app_conversations_handle_picker_input(
     BridgeChatResult* chat_result,
     char* last_message,
     size_t last_message_size,
-    size_t* reply_page,
+    size_t* history_scroll,
     char* status_line,
     size_t status_line_size,
     Result* request_rc

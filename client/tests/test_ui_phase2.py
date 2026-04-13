@@ -24,10 +24,9 @@ def test_app_ui_uses_phase2_message_cards_and_bottom_summary_language():
     assert "draw_ruled_paper" in ui_c
     assert '"YOU"' in ui_c
     assert '"HERMES"' in ui_c
-    assert '"ROOM"' in ui_c
-    assert '"RELAY"' in ui_c
-    assert "ROOM BOOK" in ui_c
-    assert "SETUP SHEET" in ui_c
+    assert '"SESSION"' in ui_c
+    assert "SESSIONS" in ui_c
+    assert "SETTINGS" in ui_c
     assert "relay crest" not in ui_c
 
 
@@ -35,7 +34,7 @@ def test_phase2_followup_uses_touch_sized_home_buttons_and_message_cards():
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
     assert "draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f" in ui_c
-    assert 'draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Write Note"' in ui_c
-    assert 'draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Clear Board"' in ui_c
+    assert 'draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Text Prompt"' in ui_c
+    assert 'draw_action_button(92.0f, 116.0f, 136.0f, 28.0f, "Audio Prompt"' in ui_c
     assert "draw_message_card(" in ui_c
     assert 'printf("Gateway:' not in ui_c

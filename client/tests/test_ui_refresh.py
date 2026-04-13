@@ -25,11 +25,10 @@ def test_app_ui_uses_message_focused_top_screen_and_bottom_action_deck():
     assert "TOOL TRAY" in ui_c
     assert '"YOU"' in ui_c
     assert '"HERMES"' in ui_c
-    assert '"ROOM"' in ui_c
-    assert '"RELAY"' in ui_c
-    assert "ROOM BOOK" in ui_c
-    assert "SETUP SHEET" in ui_c
+    assert '"SESSION"' in ui_c
+    assert "SESSIONS" in ui_c
+    assert "SETTINGS" in ui_c
     assert '"ACTIVE THREAD"' not in ui_c
     assert '"MODEL"' not in ui_c
     assert '"CONTEXT"' not in ui_c
-    assert '"SESSION"' not in ui_c
+    assert '"SESSION"' in ui_c

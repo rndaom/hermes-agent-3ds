@@ -84,14 +84,11 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "Approval required" in request_c
     assert "Command denied." in request_c
     assert "KEY_UP" in home_c
-    assert "KEY_LEFT" in home_c
-    assert "KEY_RIGHT" in home_c
-    assert "KEY_L" in home_c
-    assert "KEY_R" in home_c
     assert "KEY_TOUCH" in home_c
     assert "KEY_CPAD_UP" in home_c
-    assert "KEY_CPAD_LEFT" in home_c
-    assert "KEY_CPAD_RIGHT" in home_c
+    assert "KEY_CPAD_DOWN" in home_c
+    assert "history_scroll" in main_c
+    assert "hermes_app_ui_home_history_max_scroll" in home_c
     assert "KEY_DOWN" in conv_c
     assert "Write a note" in input_c
     assert "Record mic" in request_c or "mic" in request_c.lower()
@@ -109,26 +106,27 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "hermes_app_home_handle_input" in main_c
     assert "hermes_app_requests_handle_text" in home_c
     assert "hermes_app_requests_handle_voice" in home_c
+    assert "APP_REQUEST_REPLY_WAIT_TIMEOUT_MS" in request_c
+    assert "60ULL * 60ULL * 1000ULL" in request_c
+    assert "Timed out waiting for Hermes reply." in request_c
     assert "Sending note to Hermes..." in request_c
     assert "Sending mic note to Hermes..." in request_c
     assert '"/api/v1/chat"' not in main_c
 
 
-def test_main_c_wraps_and_pages_long_reply_text_for_small_screens():
+def test_main_c_wraps_and_scrolls_message_history_for_small_screens():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
     home_c = (CLIENT_DIR / "source" / "app_home.c").read_text()
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
-    assert "KEY_LEFT" in home_c
-    assert "KEY_RIGHT" in home_c
-    assert "KEY_L" in home_c
-    assert "KEY_R" in home_c
-    assert "reply_page" in main_c
-    assert "hermes_app_ui_reply_page_count" in home_c
+    assert "KEY_CPAD_UP" in home_c
+    assert "KEY_CPAD_DOWN" in home_c
+    assert "history_scroll" in main_c
+    assert "hermes_app_ui_home_history_max_scroll" in home_c
     assert "wrap_text_for_pixels" in ui_c
-    assert "page_count_for_lines" in ui_c
-    assert "#define HOME_REPLY_LINES_PER_PAGE 6" in ui_c
-    assert "reply_start = reply_page * HOME_REPLY_LINES_PER_PAGE" in ui_c
+    assert "HOME_LOG_VIEW_H" in ui_c
+    assert "home_history_content_height" in ui_c
+    assert "HOME_LOG_LINE_STEP" in ui_c
 
 
 def test_ui_wraps_truncated_lines_on_utf8_boundaries_before_graphical_fit():

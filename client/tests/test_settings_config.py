@@ -72,13 +72,8 @@ def test_main_c_has_settings_and_conversation_picker_navigation():
     assert "AppHomeContext" in home_header
     assert "hermes_app_home_handle_input" in home_header
     assert "KEY_UP" in home_c
-    assert "KEY_LEFT" in home_c
-    assert "KEY_RIGHT" in home_c
-    assert "KEY_L" in home_c
-    assert "KEY_R" in home_c
     assert "KEY_CPAD_UP" in home_c
-    assert "KEY_CPAD_LEFT" in home_c
-    assert "KEY_CPAD_RIGHT" in home_c
+    assert "KEY_CPAD_DOWN" in home_c
     assert "KEY_CPAD_UP" in conv_c
     assert "KEY_CPAD_DOWN" in conv_c
     assert "KEY_CPAD_UP" in settings_c
@@ -97,15 +92,15 @@ def test_main_c_has_settings_and_conversation_picker_navigation():
     assert "Port" in input_c
     assert "Token" in input_c
     assert "Device ID" in input_c
-    assert "Room book opened" in conv_c
+    assert "Session book opened" in conv_c
     assert "bridge_v2_list_conversations" in conv_c
     assert "active_conversation_id" in conv_c
-    assert "Setup sheet opened." in home_c
-    assert "Setup closed with unsaved changes." in settings_c
+    assert "Settings opened." in home_c
+    assert "Settings closed with unsaved changes." in settings_c
     assert "Defaults restored. Save setup to keep them." in settings_c
-    assert "Setup saved to SD card." in settings_c
+    assert "Settings saved to SD card." in settings_c
     assert "edit_selected_setting" in settings_c
     assert "settings_field_label" in settings_c
     assert "info != NULL && info->title[0] != '\\0'" in ui_c
-    assert "Rooms" in ui_c or "ROOM KEYS" in ui_c
-    assert "Save card" in ui_c or "SETUP KEYS" in ui_c
+    assert "Sessions" in ui_c or "SESSION KEYS" in ui_c
+    assert "Save settings" in ui_c or "SETTINGS KEYS" in ui_c

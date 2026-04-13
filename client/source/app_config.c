@@ -231,7 +231,7 @@ void hermes_app_config_set_defaults(HermesAppConfig* config)
     copy_string(config->recent_conversations[0], sizeof(config->recent_conversations[0]), DEFAULT_CONVERSATION_ID);
     config->recent_conversation_count = 1;
     config->theme_color = PICTOCHAT_THEME_DEFAULT;
-    config->dark_mode = false;
+    config->dark_mode = true;
 }
 
 HermesAppConfigLoadStatus hermes_app_config_load(HermesAppConfig* config)

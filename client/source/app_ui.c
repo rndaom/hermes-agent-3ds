@@ -9,21 +9,23 @@
 #define HOME_WRAP_MAX_LINES 128
 #define HOME_WRAP_LINE_MAX 192
 #define HOME_SUMMARY_WRAP_MAX_LINES 4
-#define HOME_HISTORY_MAX 6
-#define HOME_HISTORY_CARD_LINES 8
-#define HOME_REPLY_LINES_PER_PAGE 6
-#define HOME_REPLY_MAX_WIDTH 326.0f
-#define HOME_REPLY_SCALE 0.32f
+#define HOME_HISTORY_MAX 32
+#define HOME_LOG_VIEW_Y 38.0f
+#define HOME_LOG_VIEW_H 186.0f
+#define HOME_LOG_GAP 6.0f
+#define HOME_LOG_TEXT_SCALE 0.30f
+#define HOME_LOG_TEXT_WIDTH 332.0f
+#define HOME_LOG_TEXT_Y 30.0f
+#define HOME_LOG_RULE_Y 39.0f
+#define HOME_LOG_LINE_STEP 10.0f
 
 typedef struct AppUiHomeHistoryEntry {
     AppUiMessageAuthor author;
     char text[BRIDGE_CHAT_REPLY_MAX];
 } AppUiHomeHistoryEntry;
 
-static char g_reply_page_lines[HOME_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
-static char g_home_room_lines[HOME_SUMMARY_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
+static char g_message_wrap_lines[HOME_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
 static char g_home_status_lines[HOME_SUMMARY_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
-static char g_home_card_lines[HOME_HISTORY_CARD_LINES][HOME_WRAP_LINE_MAX];
 static AppUiHomeHistoryEntry g_home_history[HOME_HISTORY_MAX];
 static size_t g_home_history_count = 0;
 
@@ -294,25 +296,97 @@ static size_t wrap_text_for_pixels(
     return line_count;
 }
 
-static size_t page_count_for_lines(size_t total_lines, size_t lines_per_page)
+static size_t wrap_message_card_text(const char* text, float max_width, float scale)
 {
-    if (total_lines == 0 || lines_per_page == 0)
-        return 1;
-
-    return (total_lines + lines_per_page - 1) / lines_per_page;
+    return wrap_text_for_pixels(text, max_width, scale, scale, g_message_wrap_lines, HOME_WRAP_MAX_LINES);
 }
 
-size_t hermes_app_ui_reply_page_count(const char* reply_text)
+static float message_card_height_for_line_count(size_t line_count)
 {
-    size_t total_lines = wrap_text_for_pixels(
-        reply_text,
-        HOME_REPLY_MAX_WIDTH,
-        HOME_REPLY_SCALE,
-        HOME_REPLY_SCALE,
-        g_reply_page_lines,
-        HOME_WRAP_MAX_LINES
-    );
-    return page_count_for_lines(total_lines, HOME_REPLY_LINES_PER_PAGE);
+    float height = 36.0f + (float)line_count * HOME_LOG_LINE_STEP;
+
+    if (height < 46.0f)
+        height = 46.0f;
+    return height;
+}
+
+static float measure_message_card_height(const char* text)
+{
+    size_t line_count = wrap_message_card_text(text, HOME_LOG_TEXT_WIDTH, HOME_LOG_TEXT_SCALE);
+    return message_card_height_for_line_count(line_count);
+}
+
+static const char* home_notice_text(const char* status_line)
+{
+    return status_line != NULL && status_line[0] != '\0' ? status_line : "Waiting for Hermes...";
+}
+
+static bool home_has_status_notice(const char* status_line)
+{
+    return g_home_history_count > 0 &&
+        g_home_history[g_home_history_count - 1].author != APP_UI_MESSAGE_HERMES &&
+        home_notice_text(status_line)[0] != '\0';
+}
+
+static float home_history_content_height(const char* status_line)
+{
+    float total_height = 0.0f;
+    size_t index;
+
+    for (index = 0; index < g_home_history_count; index++)
+        total_height += measure_message_card_height(g_home_history[index].text) + HOME_LOG_GAP;
+
+    if (home_has_status_notice(status_line))
+        total_height += measure_message_card_height(home_notice_text(status_line)) + HOME_LOG_GAP;
+
+    if (total_height >= HOME_LOG_GAP)
+        total_height -= HOME_LOG_GAP;
+
+    return total_height;
+}
+
+size_t hermes_app_ui_home_history_max_scroll(const char* status_line)
+{
+    float total_height = home_history_content_height(status_line);
+
+    if (total_height <= HOME_LOG_VIEW_H)
+        return 0;
+    return (size_t)(total_height - HOME_LOG_VIEW_H);
+}
+
+static const char* home_status_summary(const char* status_line)
+{
+    if (status_line == NULL || status_line[0] == '\0')
+        return "READY";
+    if (strstr(status_line, "Checking") != NULL)
+        return "CHECKING";
+    if (strstr(status_line, "Sending") != NULL)
+        return "SENDING";
+    if (strstr(status_line, "recording") != NULL || strstr(status_line, "Recording") != NULL)
+        return "RECORDING";
+    if (strstr(status_line, "relay OK") != NULL)
+        return "RELAY OK";
+    if (strstr(status_line, "Reply") != NULL || strstr(status_line, "reply") != NULL)
+        return "REPLY READY";
+    if (strstr(status_line, "Synced") != NULL)
+        return "SYNCED";
+    if (strstr(status_line, "selected") != NULL || strstr(status_line, "created") != NULL)
+        return "SESSION SET";
+    if (strstr(status_line, "saved") != NULL || strstr(status_line, "Loaded") != NULL)
+        return "READY";
+    if (strstr(status_line, "defaults") != NULL)
+        return "DEFAULTS";
+    if (strstr(status_line, "Approval") != NULL)
+        return "APPROVAL";
+    if (strstr(status_line, "canceled") != NULL)
+        return "CANCELED";
+    if (strstr(status_line, "failed") != NULL ||
+        strstr(status_line, "Could not") != NULL ||
+        strstr(status_line, "incomplete") != NULL ||
+        strstr(status_line, "Networking") != NULL) {
+        return "OFFLINE";
+    }
+    return "READY";
 }
 
 void hermes_app_ui_home_history_reset(void)
@@ -343,6 +417,27 @@ void hermes_app_ui_home_history_push(AppUiMessageAuthor author, const char* text
 
     g_home_history[index].author = author;
     copy_bounded_string(g_home_history[index].text, sizeof(g_home_history[index].text), text);
+}
+
+void hermes_app_ui_home_history_upsert(AppUiMessageAuthor author, const char* text)
+{
+    AppUiHomeHistoryEntry* last;
+
+    if (text == NULL || text[0] == '\0')
+        return;
+
+    if (g_home_history_count == 0) {
+        hermes_app_ui_home_history_push(author, text);
+        return;
+    }
+
+    last = &g_home_history[g_home_history_count - 1];
+    if (last->author != author) {
+        hermes_app_ui_home_history_push(author, text);
+        return;
+    }
+
+    copy_bounded_string(last->text, sizeof(last->text), text);
 }
 
 static const BridgeV2ConversationInfo* find_synced_conversation(
@@ -392,7 +487,7 @@ static void format_active_conversation_label(
 static const PictochatTheme* get_global_theme(const HermesAppConfig* config)
 {
     if (config == NULL)
-        return pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
+        return pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, true);
     return pictochat_theme_get(config->theme_color, config->dark_mode);
 }
 
@@ -411,7 +506,7 @@ static void draw_system_bar(float x, float y, float w, float h, const PictochatT
     float band_height = (h - 4.0f) / 3.0f;
 
     if (theme == NULL)
-        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, true);
 
     app_gfx_panel(x, y, w, h, theme->paper, theme->border_dark);
     app_gfx_highlight_bar(x + 2.0f, y + 2.0f, w - 4.0f, band_height, theme->accent.gradient_top);
@@ -423,7 +518,7 @@ static void draw_system_bar(float x, float y, float w, float h, const PictochatT
 static void draw_top_header(const PictochatTheme* theme, const char* subtitle)
 {
     draw_system_bar(8.0f, 8.0f, 384.0f, 22.0f, theme);
-    app_gfx_text(16.0f, 12.0f, 0.42f, 0.42f, theme->text, "PICTOCHAT");
+    app_gfx_text(16.0f, 12.0f, 0.42f, 0.42f, theme->text, "HERMES");
     app_gfx_text_right(382.0f, 14.0f, 0.28f, 0.28f, theme->text, subtitle);
 }
 
@@ -433,13 +528,20 @@ static void draw_bottom_header(const PictochatTheme* theme, const char* title)
     app_gfx_text(16.0f, 13.0f, 0.40f, 0.40f, theme->text, title);
 }
 
+static void draw_bottom_header_detail(const PictochatTheme* theme, const char* title, const char* detail)
+{
+    draw_bottom_header(theme, title);
+    if (detail != NULL && detail[0] != '\0')
+        app_gfx_text_fit(98.0f, 13.0f, 206.0f, 0.30f, 0.30f, theme->text, detail);
+}
+
 static void draw_ruled_paper(float x, float y, float w, float h, u32 fill, const PictochatTheme* theme)
 {
     int row;
     int column;
 
     if (theme == NULL)
-        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, true);
 
     app_gfx_panel(x, y, w, h, fill, theme->border);
     for (row = 10; y + (float)row < y + h - 4.0f; row += 8)
@@ -453,7 +555,7 @@ static void draw_alert_banner(float x, float y, float w, float h, const char* te
     int row;
 
     if (theme == NULL)
-        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, true);
 
     app_gfx_panel(x, y, w, h, theme->alert_bg, theme->alert_border);
     for (row = 4; y + (float)row < y + h - 3.0f; row += 4)
@@ -489,7 +591,7 @@ static void draw_note_lines(float x, float y, float w, size_t count, float step,
     size_t index;
 
     if (theme == NULL)
-        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, true);
 
     for (index = 0; index < count; index++)
         app_gfx_highlight_bar(x, y + (float)index * step, w, 1.0f, theme->rule);
@@ -518,7 +620,7 @@ static void draw_text_lines(
 static void draw_menu_row(float x, float y, float w, const char* label, const PictochatTheme* theme)
 {
     if (theme == NULL)
-        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, true);
 
     app_gfx_panel(x, y, w, 18.0f, theme->paper, theme->border);
     app_gfx_highlight_bar(x + 2.0f, y + 2.0f, 16.0f, 14.0f, theme->accent.primary_light);
@@ -529,7 +631,7 @@ static void draw_menu_row(float x, float y, float w, const char* label, const Pi
 static void draw_action_button(float x, float y, float w, float h, const char* label, const PictochatTheme* theme, bool selected)
 {
     if (theme == NULL)
-        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, true);
 
     app_gfx_panel(x, y, w, h, selected ? theme->paper_alt : theme->paper, selected ? theme->accent.primary_dark : theme->border_dark);
     app_gfx_highlight_bar(x + 2.0f, y + 2.0f, w - 4.0f, 3.0f, selected ? theme->accent.primary_light : theme->paper_shadow);
@@ -542,7 +644,7 @@ static void draw_action_button(float x, float y, float w, float h, const char* l
 static void draw_hint_button(float x, float y, float w, const char* label, const PictochatTheme* theme)
 {
     if (theme == NULL)
-        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, true);
 
     app_gfx_panel(x, y, w, 16.0f, theme->paper, theme->border);
     app_gfx_highlight_bar(x + 2.0f, y + 2.0f, 14.0f, 12.0f, theme->accent.primary_light);
@@ -563,68 +665,41 @@ static void draw_info_card(
 )
 {
     if (theme == NULL)
-        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, true);
 
     draw_ruled_paper(x, y, w, h, theme->paper, theme);
     draw_chip(x + 8.0f, y + 6.0f, chip_width_for_label(label), label, theme->accent.primary, theme->text, theme->accent.primary_dark);
     draw_text_lines(x + 70.0f, y + 8.0f, 10.0f, max_width, 0.28f, 0.28f, theme->text, lines, line_count, 0, max_lines);
 }
 
-static size_t wrap_message_card_text(const char* text, float max_width, float scale)
-{
-    return wrap_text_for_pixels(text, max_width, scale, scale, g_home_card_lines, HOME_HISTORY_CARD_LINES);
-}
-
-static void draw_message_card(
+static float draw_message_card(
     float x,
     float y,
     float w,
-    float h,
     const char* label,
     const char* text,
-    size_t start_line,
-    size_t max_lines,
     float text_scale,
-    const char* page_label,
     const PictochatTheme* theme
 )
 {
     size_t total_lines;
     float chip_width;
-    float page_chip_width;
-    bool compact_layout;
-    float text_x;
-    float text_y;
-    float text_width;
+    float h;
 
     if (theme == NULL)
-        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, false);
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, true);
 
-    total_lines = wrap_message_card_text(text, w - 42.0f, text_scale);
-    if (start_line >= total_lines)
-        start_line = 0;
-    compact_layout = max_lines <= 1 || h <= 40.0f;
+    total_lines = wrap_message_card_text(text, w - 36.0f, text_scale);
+    h = message_card_height_for_line_count(total_lines);
 
     app_gfx_panel(x, y, w, h, theme->paper, theme->accent.primary_dark);
     app_gfx_highlight_bar(x + 2.0f, y + 2.0f, w - 4.0f, 4.0f, theme->accent.primary_light);
 
     chip_width = chip_width_for_label(label);
     draw_chip(x + 10.0f, y + 8.0f, chip_width, label, theme->accent.primary, theme->text, theme->accent.primary_dark);
-    if (page_label != NULL && page_label[0] != '\0') {
-        page_chip_width = chip_width_for_label(page_label);
-        draw_chip(x + w - 10.0f - page_chip_width, y + 8.0f, page_chip_width, page_label, theme->paper_alt, theme->text, theme->accent.primary_dark);
-    }
-
-    if (compact_layout) {
-        text_x = x + 10.0f + chip_width + 10.0f;
-        text_y = y + 11.0f;
-        text_width = (x + w - 12.0f) - text_x;
-        draw_text_lines(text_x, text_y, 10.0f, text_width, text_scale, text_scale, theme->text, g_home_card_lines, total_lines, start_line, 1);
-        return;
-    }
-
-    draw_note_lines(x + 12.0f, y + 37.0f, w - 24.0f, max_lines, 10.0f, theme);
-    draw_text_lines(x + 18.0f, y + 29.0f, 10.0f, w - 36.0f, text_scale, text_scale, theme->text, g_home_card_lines, total_lines, start_line, max_lines);
+    draw_note_lines(x + 18.0f, y + HOME_LOG_RULE_Y, w - 36.0f, total_lines, HOME_LOG_LINE_STEP, theme);
+    draw_text_lines(x + 18.0f, y + HOME_LOG_TEXT_Y, HOME_LOG_LINE_STEP, w - 36.0f, text_scale, text_scale, theme->text, g_message_wrap_lines, total_lines, 0, total_lines);
+    return h;
 }
 
 static void render_home_graphical(
@@ -632,7 +707,7 @@ static void render_home_graphical(
     const GatewayHealthResult* health_result,
     const BridgeChatResult* chat_result,
     const char* last_message,
-    size_t reply_page,
+    size_t history_scroll,
     size_t command_selection,
     const char* status_line,
     const BridgeV2ConversationListResult* conversation_list
@@ -640,133 +715,71 @@ static void render_home_graphical(
 {
     const PictochatTheme* theme = get_global_theme(config);
     char conversation_label[HERMES_APP_CONVERSATION_ID_MAX];
-    char page_label[24];
-    size_t room_line_count;
-    size_t status_line_count;
-    size_t page_count = 1;
-    size_t reply_start = 0;
-    bool has_selection = command_selection <= (size_t)HOME_COMMAND_CLEAR;
-    size_t selected_command = has_selection ? command_selection : (size_t)HOME_COMMAND_ASK;
-    const char* latest_reply_text = NULL;
-    size_t history_start;
+    bool has_selection = command_selection <= (size_t)HOME_COMMAND_AUDIO;
+    size_t selected_command = has_selection ? command_selection : (size_t)HOME_COMMAND_TEXT;
+    size_t max_scroll;
     size_t index;
-    float card_y = 72.0f;
+    float transcript_height;
+    float card_y;
 
     (void)last_message;
     (void)health_result;
     (void)chat_result;
 
     format_active_conversation_label(config, conversation_list, conversation_label, sizeof(conversation_label));
-    if (g_home_history_count > 0 && g_home_history[g_home_history_count - 1].author == APP_UI_MESSAGE_HERMES)
-        latest_reply_text = g_home_history[g_home_history_count - 1].text;
-    else if (chat_result != NULL && chat_result->success)
-        latest_reply_text = chat_result->reply;
+    max_scroll = hermes_app_ui_home_history_max_scroll(status_line);
+    if (history_scroll > max_scroll)
+        history_scroll = max_scroll;
 
-    if (latest_reply_text != NULL && latest_reply_text[0] != '\0')
-        page_count = hermes_app_ui_reply_page_count(latest_reply_text);
-    if (reply_page >= page_count)
-        reply_page = page_count - 1;
-    reply_start = reply_page * HOME_REPLY_LINES_PER_PAGE;
-    page_label[0] = '\0';
-    if (page_count > 1)
-        snprintf(page_label, sizeof(page_label), "%lu/%lu", (unsigned long)(reply_page + 1), (unsigned long)page_count);
-
-    room_line_count = wrap_text_for_pixels(
-        conversation_label,
-        110.0f,
-        0.28f,
-        0.28f,
-        g_home_room_lines,
-        2
-    );
-    status_line_count = wrap_text_for_pixels(
-        status_line,
-        104.0f,
-        0.27f,
-        0.27f,
-        g_home_status_lines,
-        2
-    );
     app_gfx_begin_top(theme->background);
     app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, theme->paper_shadow, theme->border_dark);
     draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, theme->paper, theme);
-    draw_top_header(theme, "ROOM BOARD");
-    draw_info_card(16.0f, 36.0f, 176.0f, 28.0f, "ROOM", theme, g_home_room_lines, room_line_count, 110.0f, 2);
-    draw_info_card(208.0f, 36.0f, 176.0f, 28.0f, "RELAY", theme, g_home_status_lines, status_line_count, 104.0f, 2);
+    draw_top_header(theme, home_status_summary(status_line));
 
     if (g_home_history_count == 0) {
         draw_message_card(
             16.0f,
-            76.0f,
+            54.0f,
             368.0f,
-            88.0f,
             "HERMES",
-            "Press Write Note below to start a relay room.",
-            0,
-            5,
-            0.30f,
-            "",
+            "Press Text Prompt below to start a Hermes session.",
+            HOME_LOG_TEXT_SCALE,
             theme
         );
     } else {
-        history_start = g_home_history_count > 3 ? g_home_history_count - 3 : 0;
-        for (index = history_start; index < g_home_history_count; index++) {
+        transcript_height = home_history_content_height(status_line);
+        card_y = HOME_LOG_VIEW_Y + HOME_LOG_VIEW_H - transcript_height + (float)history_scroll;
+
+        for (index = 0; index < g_home_history_count; index++) {
             const AppUiHomeHistoryEntry* entry = &g_home_history[index];
-            bool latest = index == g_home_history_count - 1;
-            bool latest_reply = latest && entry->author == APP_UI_MESSAGE_HERMES;
-            float card_height = latest_reply ? 90.0f : 32.0f;
-            size_t max_lines = latest_reply ? HOME_REPLY_LINES_PER_PAGE : 1;
-            float text_scale = latest_reply ? HOME_REPLY_SCALE : 0.28f;
+            float card_height = measure_message_card_height(entry->text);
 
-            if (card_y + card_height > 224.0f)
-                break;
-
-            draw_message_card(
-                16.0f,
-                card_y,
-                368.0f,
-                card_height,
-                entry->author == APP_UI_MESSAGE_USER ? "YOU" : "HERMES",
-                entry->text,
-                latest_reply ? reply_start : 0,
-                max_lines,
-                text_scale,
-                latest_reply ? page_label : "",
-                theme
-            );
-            card_y += card_height + 6.0f;
+            if (card_y + card_height >= HOME_LOG_VIEW_Y && card_y <= HOME_LOG_VIEW_Y + HOME_LOG_VIEW_H)
+                draw_message_card(16.0f, card_y, 368.0f, entry->author == APP_UI_MESSAGE_USER ? "YOU" : "HERMES", entry->text, HOME_LOG_TEXT_SCALE, theme);
+            card_y += card_height + HOME_LOG_GAP;
         }
 
-        if (g_home_history[g_home_history_count - 1].author != APP_UI_MESSAGE_HERMES && card_y + 46.0f <= 224.0f) {
-            draw_message_card(
-                16.0f,
-                card_y,
-                368.0f,
-                46.0f,
-                "NOTICE",
-                status_line != NULL && status_line[0] != '\0' ? status_line : "Waiting for Hermes...",
-                0,
-                2,
-                0.27f,
-                "",
-                theme
-            );
+        if (home_has_status_notice(status_line)) {
+            float card_height = measure_message_card_height(home_notice_text(status_line));
+
+            if (card_y + card_height >= HOME_LOG_VIEW_Y && card_y <= HOME_LOG_VIEW_Y + HOME_LOG_VIEW_H)
+                draw_message_card(16.0f, card_y, 368.0f, "STATUS", home_notice_text(status_line), 0.28f, theme);
         }
     }
 
     app_gfx_begin_bottom(theme->background);
     app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, theme->paper_shadow, theme->border_dark);
     draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, theme->paper, theme);
-    draw_bottom_header(theme, "TOOL TRAY");
-    draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Write Note", theme, selected_command == (size_t)HOME_COMMAND_ASK);
+    draw_bottom_header_detail(theme, "TOOL TRAY", conversation_label);
+    draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Text Prompt", theme, selected_command == (size_t)HOME_COMMAND_TEXT);
     draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Check Relay", theme, selected_command == (size_t)HOME_COMMAND_CHECK);
-    draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Rooms", theme, selected_command == (size_t)HOME_COMMAND_THREADS);
-    draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Setup", theme, selected_command == (size_t)HOME_COMMAND_CONFIG);
-    draw_action_button(16.0f, 116.0f, 136.0f, 28.0f, "Mic Note", theme, selected_command == (size_t)HOME_COMMAND_MIC);
-    draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Clear Board", theme, selected_command == (size_t)HOME_COMMAND_CLEAR);
+    draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Sessions", theme, selected_command == (size_t)HOME_COMMAND_SESSIONS);
+    draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Settings", theme, selected_command == (size_t)HOME_COMMAND_SETTINGS);
+    draw_action_button(92.0f, 116.0f, 136.0f, 28.0f, "Audio Prompt", theme, selected_command == (size_t)HOME_COMMAND_AUDIO);
 
-    draw_hint_button(16.0f, 214.0f, 132.0f, "A Select", theme);
-    draw_hint_button(172.0f, 214.0f, 132.0f, "START Exit", theme);
+    draw_hint_button(16.0f, 214.0f, 88.0f, "PAD Scroll", theme);
+    draw_hint_button(110.0f, 214.0f, 90.0f, "A Select", theme);
+    draw_hint_button(206.0f, 214.0f, 98.0f, "START Exit", theme);
 }
 
 static void render_settings_graphical(
@@ -794,8 +807,8 @@ static void render_settings_graphical(
     app_gfx_begin_top(theme->background);
     app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, theme->paper_shadow, theme->border_dark);
     draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, theme->paper, theme);
-    draw_top_header(theme, "SETUP SHEET");
-    draw_chip(24.0f, 42.0f, 60.0f, "SETUP", theme->accent.primary, theme->text, theme->accent.primary_dark);
+    draw_top_header(theme, "SETTINGS");
+    draw_chip(24.0f, 42.0f, 72.0f, "SETTINGS", theme->accent.primary, theme->text, theme->accent.primary_dark);
     draw_chip(306.0f, 42.0f, 70.0f, settings_dirty ? "UNSAVED" : "SAVED", theme->accent.primary_light, theme->text, theme->accent.primary_dark);
 
     app_gfx_panel(20.0f, row_y, 164.0f, row_height, selected_field == SETTINGS_FIELD_HOST ? theme->paper_alt : theme->paper, selected_field == SETTINGS_FIELD_HOST ? theme->accent.primary_dark : theme->border);
@@ -845,10 +858,10 @@ static void render_settings_graphical(
     app_gfx_begin_bottom(theme->background);
     app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, theme->paper_shadow, theme->border_dark);
     draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, theme->paper, theme);
-    draw_bottom_header(theme, "SETUP KEYS");
+    draw_bottom_header(theme, "SETTINGS KEYS");
     draw_ruled_paper(8.0f, 44.0f, 304.0f, 138.0f, theme->paper, theme);
     draw_menu_row(16.0f, 56.0f, 288.0f, "A Edit / cycle", theme);
-    draw_menu_row(16.0f, 78.0f, 288.0f, "X Save card", theme);
+    draw_menu_row(16.0f, 78.0f, 288.0f, "X Save settings", theme);
     draw_menu_row(16.0f, 100.0f, 288.0f, "Y Restore defaults", theme);
     draw_menu_row(16.0f, 122.0f, 288.0f, "B Return to board", theme);
     draw_menu_row(16.0f, 144.0f, 288.0f, "START Exit app", theme);
@@ -875,12 +888,12 @@ static void render_conversations_graphical(
     app_gfx_begin_top(theme->background);
     app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, theme->paper_shadow, theme->border_dark);
     draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, theme->paper, theme);
-    draw_top_header(theme, "ROOM BOOK");
+    draw_top_header(theme, "SESSIONS");
     draw_info_card(16.0f, 36.0f, 368.0f, 28.0f, "STATUS", theme, g_home_status_lines,
         wrap_text_for_pixels(status_line, 300.0f, 0.27f, 0.27f, g_home_status_lines, 2), 298.0f, 2);
 
     if (config == NULL || config->recent_conversation_count == 0) {
-        draw_message_card(16.0f, 78.0f, 368.0f, 72.0f, "NOTICE", "No rooms are saved yet. Create one from the lower keys.", 0, 4, 0.27f, "", theme);
+        draw_message_card(16.0f, 78.0f, 368.0f, "NOTICE", "No sessions are saved yet. Create one from the lower keys.", 0.27f, theme);
     } else {
         if (conversation_selection >= visible)
             start = conversation_selection - (visible - 1);
@@ -896,9 +909,9 @@ static void render_conversations_graphical(
 
             app_gfx_panel(16.0f, row_y, 368.0f, 28.0f, selected ? theme->paper_alt : theme->paper, selected ? theme->accent.primary_dark : theme->border);
             app_gfx_highlight_bar(18.0f, row_y + 2.0f, 18.0f, 24.0f, selected ? theme->accent.primary : theme->accent.primary_light);
-            draw_chip(42.0f, row_y + 6.0f, 48.0f, "ROOM", theme->accent.primary, theme->text, theme->accent.primary_dark);
-            app_gfx_text_fit(96.0f, row_y + 5.0f, 280.0f, 0.30f, 0.30f, theme->text, title);
-            app_gfx_text_fit(96.0f, row_y + 15.0f, 280.0f, 0.24f, 0.24f, theme->text_muted,
+            draw_chip(42.0f, row_y + 6.0f, 64.0f, "SESSION", theme->accent.primary, theme->text, theme->accent.primary_dark);
+            app_gfx_text_fit(112.0f, row_y + 5.0f, 264.0f, 0.30f, 0.30f, theme->text, title);
+            app_gfx_text_fit(112.0f, row_y + 15.0f, 264.0f, 0.24f, 0.24f, theme->text_muted,
                 info != NULL && info->preview[0] != '\0' ? info->preview : config->recent_conversations[index]);
         }
     }
@@ -906,15 +919,15 @@ static void render_conversations_graphical(
     app_gfx_begin_bottom(theme->background);
     app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, theme->paper_shadow, theme->border_dark);
     draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, theme->paper, theme);
-    draw_bottom_header(theme, "ROOM KEYS");
+    draw_bottom_header(theme, "SESSION KEYS");
     draw_ruled_paper(8.0f, 44.0f, 304.0f, 138.0f, theme->paper, theme);
-    draw_menu_row(16.0f, 56.0f, 288.0f, "A Use room", theme);
-    draw_menu_row(16.0f, 78.0f, 288.0f, "X New room", theme);
-    draw_menu_row(16.0f, 100.0f, 288.0f, "Y Sync rooms", theme);
+    draw_menu_row(16.0f, 56.0f, 288.0f, "A Use session", theme);
+    draw_menu_row(16.0f, 78.0f, 288.0f, "X New session", theme);
+    draw_menu_row(16.0f, 100.0f, 288.0f, "Y Sync sessions", theme);
     draw_menu_row(16.0f, 122.0f, 288.0f, "B Return to board", theme);
     draw_menu_row(16.0f, 144.0f, 288.0f, "START Exit app", theme);
     draw_ruled_paper(8.0f, 190.0f, 304.0f, 30.0f, theme->paper_alt, theme);
-    app_gfx_text_fit(16.0f, 198.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "Rooms are Hermes conversation IDs with a PictoChat shell.");
+    app_gfx_text_fit(16.0f, 198.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "Sessions are Hermes conversation IDs inside the handheld shell.");
 }
 
 void hermes_app_ui_render_approval_prompt(const HermesAppConfig* config, const char* request_id)
@@ -1014,7 +1027,7 @@ void hermes_app_ui_render(
     const GatewayHealthResult* health_result,
     const BridgeChatResult* chat_result,
     const char* last_message,
-    size_t reply_page,
+    size_t history_scroll,
     size_t command_selection,
     const char* status_line,
     Result last_rc,
@@ -1029,7 +1042,7 @@ void hermes_app_ui_render(
     } else if (screen == APP_SCREEN_CONVERSATIONS) {
         render_conversations_graphical(config, status_line, last_rc, conversation_list, conversation_selection);
     } else {
-        render_home_graphical(config, health_result, chat_result, last_message, reply_page, command_selection, status_line, conversation_list);
+        render_home_graphical(config, health_result, chat_result, last_message, history_scroll, command_selection, status_line, conversation_list);
     }
 
     app_gfx_end_frame();

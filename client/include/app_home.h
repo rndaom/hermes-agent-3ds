@@ -13,12 +13,11 @@
 
 typedef enum HomeCommand {
     HOME_COMMAND_NONE = -1,
-    HOME_COMMAND_ASK = 0,
+    HOME_COMMAND_TEXT = 0,
     HOME_COMMAND_CHECK = 1,
-    HOME_COMMAND_THREADS = 2,
-    HOME_COMMAND_CONFIG = 3,
-    HOME_COMMAND_MIC = 4,
-    HOME_COMMAND_CLEAR = 5,
+    HOME_COMMAND_SESSIONS = 2,
+    HOME_COMMAND_SETTINGS = 3,
+    HOME_COMMAND_AUDIO = 4,
 } HomeCommand;
 
 typedef void (*AppHomeRenderFn)(
@@ -29,7 +28,7 @@ typedef void (*AppHomeRenderFn)(
     const GatewayHealthResult* health_result,
     const BridgeChatResult* chat_result,
     const char* last_message,
-    size_t reply_page,
+    size_t history_scroll,
     size_t command_selection,
     const char* status_line,
     Result last_rc
@@ -43,7 +42,7 @@ typedef struct AppHomeContext {
     BridgeChatResult* chat_result;
     char* last_message;
     size_t last_message_size;
-    size_t* reply_page;
+    size_t* history_scroll;
     HomeCommand* command_selection;
     char* status_line;
     size_t status_line_size;

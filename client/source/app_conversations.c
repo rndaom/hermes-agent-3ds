@@ -49,15 +49,15 @@ static void merge_synced_conversations_into_config(AppConversationState* state, 
     clamp_conversation_selection(state, config);
 }
 
-static void clear_active_conversation_view(BridgeChatResult* chat_result, char* last_message, size_t last_message_size, size_t* reply_page)
+static void clear_active_conversation_view(BridgeChatResult* chat_result, char* last_message, size_t last_message_size, size_t* history_scroll)
 {
     hermes_app_ui_home_history_reset();
     if (chat_result != NULL)
         bridge_chat_result_reset(chat_result);
     if (last_message != NULL && last_message_size > 0)
         last_message[0] = '\0';
-    if (reply_page != NULL)
-        *reply_page = 0;
+    if (history_scroll != NULL)
+        *history_scroll = 0;
 }
 
 static void handle_activate_conversation(
@@ -67,32 +67,32 @@ static void handle_activate_conversation(
     BridgeChatResult* chat_result,
     char* last_message,
     size_t last_message_size,
-    size_t* reply_page,
+    size_t* history_scroll,
     char* status_line,
     size_t status_line_size
 )
 {
     if (state == NULL || config == NULL || screen == NULL || chat_result == NULL || last_message == NULL ||
-        reply_page == NULL || status_line == NULL || status_line_size == 0) {
+        history_scroll == NULL || status_line == NULL || status_line_size == 0) {
         return;
     }
 
     if (config->recent_conversation_count == 0) {
-        snprintf(status_line, status_line_size, "No saved rooms yet.");
+        snprintf(status_line, status_line_size, "No saved sessions yet.");
         return;
     }
     if (!hermes_app_config_set_active_conversation(config, config->recent_conversations[state->selection])) {
-        snprintf(status_line, status_line_size, "Room selection was invalid.");
+        snprintf(status_line, status_line_size, "Session selection was invalid.");
         return;
     }
     if (!hermes_app_config_save(config)) {
-        snprintf(status_line, status_line_size, "Could not save room selection.");
+        snprintf(status_line, status_line_size, "Could not save session selection.");
         return;
     }
 
-    clear_active_conversation_view(chat_result, last_message, last_message_size, reply_page);
+    clear_active_conversation_view(chat_result, last_message, last_message_size, history_scroll);
     *screen = APP_SCREEN_HOME;
-    snprintf(status_line, status_line_size, "Room %s selected.", config->active_conversation_id);
+    snprintf(status_line, status_line_size, "Session %s selected.", config->active_conversation_id);
 }
 
 static void handle_create_conversation(
@@ -102,7 +102,7 @@ static void handle_create_conversation(
     BridgeChatResult* chat_result,
     char* last_message,
     size_t last_message_size,
-    size_t* reply_page,
+    size_t* history_scroll,
     char* status_line,
     size_t status_line_size
 )
@@ -110,31 +110,31 @@ static void handle_create_conversation(
     char conversation_id[HERMES_APP_CONVERSATION_ID_MAX];
 
     if (state == NULL || config == NULL || screen == NULL || chat_result == NULL || last_message == NULL ||
-        reply_page == NULL || status_line == NULL || status_line_size == 0) {
+        history_scroll == NULL || status_line == NULL || status_line_size == 0) {
         return;
     }
 
     if (!prompt_conversation_input("", conversation_id, sizeof(conversation_id))) {
-        snprintf(status_line, status_line_size, "New room canceled.");
+        snprintf(status_line, status_line_size, "New session canceled.");
         return;
     }
     if (!hermes_app_config_is_valid_conversation_id(conversation_id)) {
-        snprintf(status_line, status_line_size, "Room IDs only allow letters, numbers, - _ .");
+        snprintf(status_line, status_line_size, "Session IDs only allow letters, numbers, - _ .");
         return;
     }
     if (!hermes_app_config_set_active_conversation(config, conversation_id)) {
-        snprintf(status_line, status_line_size, "Could not activate that room.");
+        snprintf(status_line, status_line_size, "Could not activate that session.");
         return;
     }
     if (!hermes_app_config_save(config)) {
-        snprintf(status_line, status_line_size, "Could not save the new room.");
+        snprintf(status_line, status_line_size, "Could not save the new session.");
         return;
     }
 
-    clear_active_conversation_view(chat_result, last_message, last_message_size, reply_page);
+    clear_active_conversation_view(chat_result, last_message, last_message_size, history_scroll);
     state->selection = find_recent_conversation_index(config, config->active_conversation_id);
     *screen = APP_SCREEN_HOME;
-    snprintf(status_line, status_line_size, "Room %s created.", config->active_conversation_id);
+    snprintf(status_line, status_line_size, "Session %s created.", config->active_conversation_id);
 }
 
 static void handle_conversation_sync(
@@ -169,13 +169,13 @@ static void handle_conversation_sync(
         state->list = fetched_conversations;
         merge_synced_conversations_into_config(state, config);
         if (!hermes_app_config_save(config))
-            snprintf(status_line, status_line_size, "Synced rooms, but could not save them.");
+            snprintf(status_line, status_line_size, "Synced sessions, but could not save them.");
         else
-            snprintf(status_line, status_line_size, "Synced %lu rooms.", (unsigned long)state->list.count);
+            snprintf(status_line, status_line_size, "Synced %lu sessions.", (unsigned long)state->list.count);
     } else if (fetched_conversations.error[0] != '\0') {
         snprintf(status_line, status_line_size, "%s", fetched_conversations.error);
     } else {
-        snprintf(status_line, status_line_size, "Room sync failed: 0x%08lX", (unsigned long)*request_rc);
+        snprintf(status_line, status_line_size, "Session sync failed: 0x%08lX", (unsigned long)*request_rc);
     }
 }
 
@@ -210,7 +210,7 @@ void hermes_app_conversations_open_picker(
 
     *screen = APP_SCREEN_CONVERSATIONS;
     hermes_app_conversations_refresh_selection_from_active(state, config);
-    snprintf(status_line, status_line_size, "Room book opened.");
+    snprintf(status_line, status_line_size, "Session book opened.");
 }
 
 bool hermes_app_conversations_handle_picker_input(
@@ -222,13 +222,13 @@ bool hermes_app_conversations_handle_picker_input(
     BridgeChatResult* chat_result,
     char* last_message,
     size_t last_message_size,
-    size_t* reply_page,
+    size_t* history_scroll,
     char* status_line,
     size_t status_line_size,
     Result* request_rc
 )
 {
-    if (state == NULL || config == NULL || screen == NULL || reply_page == NULL || status_line == NULL ||
+    if (state == NULL || config == NULL || screen == NULL || history_scroll == NULL || status_line == NULL ||
         status_line_size == 0 || request_rc == NULL) {
         return false;
     }
@@ -259,13 +259,13 @@ bool hermes_app_conversations_handle_picker_input(
             state,
             config,
             screen,
-            chat_result,
-            last_message,
-            last_message_size,
-            reply_page,
-            status_line,
-            status_line_size
-        );
+                chat_result,
+                last_message,
+                last_message_size,
+                history_scroll,
+                status_line,
+                status_line_size
+            );
         return true;
     }
 
@@ -274,13 +274,13 @@ bool hermes_app_conversations_handle_picker_input(
             state,
             config,
             screen,
-            chat_result,
-            last_message,
-            last_message_size,
-            reply_page,
-            status_line,
-            status_line_size
-        );
+                chat_result,
+                last_message,
+                last_message_size,
+                history_scroll,
+                status_line,
+                status_line_size
+            );
         return true;
     }
 

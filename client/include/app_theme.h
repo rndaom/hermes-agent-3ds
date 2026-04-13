@@ -72,7 +72,7 @@ PictochatThemeColor pictochat_theme_next(PictochatThemeColor current);
 PictochatThemeColor pictochat_theme_previous(PictochatThemeColor current);
 
 /* Default theme color */
-#define PICTOCHAT_THEME_DEFAULT PICTOCHAT_THEME_BLUE
+#define PICTOCHAT_THEME_DEFAULT PICTOCHAT_THEME_ORANGE
 
 /* Helper macro to create RGBA color */
 #define PCH_COLOR(r, g, b, a) ((u32)(r) | ((u32)(g) << 8) | ((u32)(b) << 16) | ((u32)(a) << 24))
