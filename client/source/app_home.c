@@ -43,7 +43,7 @@ static HomeCommand home_page_last_selection(HomeCommandPage page)
             return HOME_COMMAND_RESUME;
         case HOME_COMMAND_PAGE_TOOLS:
         default:
-            return HOME_COMMAND_AUDIO;
+            return HOME_COMMAND_PICTURE;
     }
 }
 
@@ -201,6 +201,20 @@ static void execute_selected_home_command(
             break;
         case HOME_COMMAND_AUDIO:
             hermes_app_requests_handle_voice(
+                config,
+                network_ready,
+                request_ui,
+                context->chat_result,
+                context->last_message,
+                context->last_message_size,
+                context->history_scroll,
+                context->status_line,
+                context->status_line_size,
+                context->request_rc
+            );
+            break;
+        case HOME_COMMAND_PICTURE:
+            hermes_app_requests_handle_picture(
                 config,
                 network_ready,
                 request_ui,
@@ -477,8 +491,10 @@ static HomeCommand home_command_from_touch(HomeCommandPage page, int px, int py)
         return HOME_COMMAND_SESSIONS;
     if (px >= 168 && px < 304 && py >= 80 && py < 108)
         return HOME_COMMAND_SETTINGS;
-    if (px >= 92 && px < 228 && py >= 116 && py < 144)
+    if (px >= 16 && px < 152 && py >= 116 && py < 144)
         return HOME_COMMAND_AUDIO;
+    if (px >= 168 && px < 304 && py >= 116 && py < 144)
+        return HOME_COMMAND_PICTURE;
     return HOME_COMMAND_NONE;
 }
 

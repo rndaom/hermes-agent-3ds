@@ -74,6 +74,7 @@ def test_transient_ui_paths_do_not_expose_printconsole_or_manual_buffer_swaps():
     assert "hermes_app_ui_render_interaction_prompt" in ui_h
     assert "hermes_app_ui_render_approval_prompt" in ui_h
     assert "hermes_app_ui_render_voice_recording" in ui_h
+    assert "hermes_app_ui_render_picture_capture" in ui_h
 
 
 def test_graphical_ui_bounds_variable_length_fields_and_uses_touch_sized_action_buttons():
@@ -84,6 +85,7 @@ def test_graphical_ui_bounds_variable_length_fields_and_uses_touch_sized_action_
     assert "HOME_LOG_TEXT_WIDTH" in ui_c
     assert 'draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Text Prompt"' in ui_c
     assert 'draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Settings"' in ui_c
+    assert 'draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Picture Prompt"' in ui_c
     assert 'draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Reset Session"' in ui_c
     assert 'draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Clear Screen"' in ui_c
     assert 'draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Compress"' in ui_c

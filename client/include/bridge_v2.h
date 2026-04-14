@@ -12,6 +12,8 @@
 #define BRIDGE_V2_CONVERSATION_TITLE_MAX 64
 #define BRIDGE_V2_CONVERSATION_PREVIEW_MAX 96
 #define BRIDGE_V2_CONVERSATION_COUNT_MAX 8
+#define BRIDGE_V2_MEDIA_ID_MAX 64
+#define BRIDGE_V2_MEDIA_TYPE_MAX 32
 #define BRIDGE_V2_INTERACTION_TITLE_MAX 64
 #define BRIDGE_V2_INTERACTION_TEXT_MAX 192
 #define BRIDGE_V2_INTERACTION_CHOICE_MAX 32
@@ -57,6 +59,10 @@ typedef struct BridgeV2EventPollResult {
     char request_id[BRIDGE_V2_REQUEST_ID_MAX];
     char reply_to_message_id[BRIDGE_V2_REQUEST_ID_MAX];
     char reply_text[BRIDGE_V2_TEXT_MAX];
+    char media_id[BRIDGE_V2_MEDIA_ID_MAX];
+    char media_type[BRIDGE_V2_MEDIA_TYPE_MAX];
+    u16 media_width;
+    u16 media_height;
     char interaction_title[BRIDGE_V2_INTERACTION_TITLE_MAX];
     char interaction_text[BRIDGE_V2_INTERACTION_TEXT_MAX];
     size_t interaction_option_count;
@@ -78,6 +84,8 @@ void bridge_v2_interaction_result_reset(BridgeV2InteractionResult* result);
 
 Result bridge_v2_list_conversations(const char* url, const char* token, const char* device_id, BridgeV2ConversationListResult* result);
 Result bridge_v2_send_message(const char* url, const char* token, const char* device_id, const char* conversation_id, const char* message, BridgeV2MessageResult* result);
+Result bridge_v2_send_image_message(const char* url, const char* token, const char* device_id, const char* conversation_id, const void* image_data, size_t image_size, const char* content_type, BridgeV2MessageResult* result);
 Result bridge_v2_send_voice_message(const char* url, const char* token, const char* device_id, const char* conversation_id, const void* wav_data, size_t wav_size, BridgeV2MessageResult* result);
 Result bridge_v2_poll_events(const char* url, const char* token, const char* device_id, const char* conversation_id, u32 cursor, u32 wait_ms, BridgeV2EventPollResult* result);
 Result bridge_v2_submit_interaction(const char* url, const char* token, const char* choice, BridgeV2InteractionResult* result);
+Result bridge_v2_download_media(const char* url, const char* token, void** out_data, size_t* out_size, char* out_content_type, size_t out_content_type_size, char* error_out, size_t error_out_size);

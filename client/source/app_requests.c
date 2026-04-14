@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "app_input.h"
+#include "picture_input.h"
 #include "voice_input.h"
 
 #define APP_REQUEST_EVENT_POLL_WAIT_MS 5000U
@@ -50,6 +51,95 @@ static void render_home_request_ui(
 );
 
 #define INTERACTION_VISIBLE_OPTION_COUNT 8U
+
+static bool event_has_image_media(const BridgeV2EventPollResult* event_result)
+{
+    return event_result != NULL &&
+        event_result->media_id[0] != '\0' &&
+        strncmp(event_result->media_type, "image/", 6) == 0;
+}
+
+static bool event_has_visible_reply(const BridgeV2EventPollResult* event_result)
+{
+    return event_result != NULL && (event_result->reply_text[0] != '\0' || event_has_image_media(event_result));
+}
+
+static const char* event_history_text(const BridgeV2EventPollResult* event_result)
+{
+    if (event_result == NULL)
+        return "";
+    if (event_result->reply_text[0] != '\0')
+        return event_result->reply_text;
+    if (event_has_image_media(event_result))
+        return "[img] Picture note";
+    return "";
+}
+
+static void apply_event_to_home_history(
+    const HermesAppConfig* config,
+    const BridgeV2EventPollResult* event_result,
+    bool upsert,
+    char* status_line,
+    size_t status_line_size
+)
+{
+    if (event_result == NULL)
+        return;
+
+    if (event_has_image_media(event_result) && config != NULL) {
+        char media_url[HERMES_APP_MEDIA_URL_MAX];
+        void* media_data = NULL;
+        size_t media_size = 0;
+        PictureInputPreview preview;
+
+        picture_input_preview_reset(&preview);
+        if (hermes_app_config_build_media_url(config, event_result->media_id, media_url, sizeof(media_url)) &&
+            R_SUCCEEDED(bridge_v2_download_media(
+                media_url,
+                config->token,
+                &media_data,
+                &media_size,
+                NULL,
+                0,
+                status_line,
+                status_line_size
+            )) && picture_input_decode_bmp_preview(media_data, media_size, &preview, status_line, status_line_size)) {
+            if (upsert) {
+                hermes_app_ui_home_history_upsert_image(
+                    APP_UI_MESSAGE_HERMES,
+                    event_history_text(event_result),
+                    preview.rgba8_data,
+                    preview.width,
+                    preview.height
+                );
+            } else {
+                hermes_app_ui_home_history_push_image(
+                    APP_UI_MESSAGE_HERMES,
+                    event_history_text(event_result),
+                    preview.rgba8_data,
+                    preview.width,
+                    preview.height
+                );
+            }
+            picture_input_preview_free(&preview);
+            free(media_data);
+            return;
+        }
+
+        picture_input_preview_free(&preview);
+        if (media_data != NULL)
+            free(media_data);
+        if (status_line != NULL && status_line_size > 0)
+            snprintf(status_line, status_line_size, "Picture preview was unavailable. Showing note text instead.");
+    }
+
+    if (event_history_text(event_result)[0] != '\0') {
+        if (upsert)
+            hermes_app_ui_home_history_upsert(APP_UI_MESSAGE_HERMES, event_history_text(event_result));
+        else
+            hermes_app_ui_home_history_push(APP_UI_MESSAGE_HERMES, event_history_text(event_result));
+    }
+}
 
 static bool interaction_choice_is_cancel_like(const char* choice)
 {
@@ -278,7 +368,7 @@ static const char* conversation_id_for_message(const HermesAppConfig* config, co
 static bool event_is_matching_reply(const BridgeV2EventPollResult* event_result, const BridgeV2MessageResult* message_result)
 {
     return event_result != NULL && message_result != NULL &&
-        event_result->reply_text[0] != '\0' &&
+        event_has_visible_reply(event_result) &&
         strcmp(event_result->reply_to_message_id, message_result->message_id) == 0;
 }
 
@@ -361,7 +451,7 @@ static Result poll_for_v2_reply(
             if (strcmp(event_result->event_type, "message.updated") == 0) {
                 *matched_reply = false;
                 set_chat_result_reply_text(chat_result, event_result->reply_text);
-                hermes_app_ui_home_history_upsert(APP_UI_MESSAGE_HERMES, event_result->reply_text);
+                apply_event_to_home_history(config, event_result, true, status_line, status_line_size);
                 if (status_line != NULL && status_line_size > 0)
                     snprintf(status_line, status_line_size, "(^.^) Hermes is replying...");
                 render_home_request_ui(config, ui, chat_result, last_message, 0, status_line, 0);
@@ -404,13 +494,69 @@ static void apply_v2_event_to_chat_result(const BridgeV2EventPollResult* event_r
         return;
     }
 
-    if (event_result->reply_text[0] == '\0') {
+    if (!event_has_visible_reply(event_result)) {
         snprintf(chat_result->error, sizeof(chat_result->error), "No assistant reply arrived yet.");
         return;
     }
 
     chat_result->success = true;
-    snprintf(chat_result->reply, sizeof(chat_result->reply), "%s", event_result->reply_text);
+    if (event_result->reply_text[0] != '\0')
+        snprintf(chat_result->reply, sizeof(chat_result->reply), "%s", event_result->reply_text);
+    else
+        snprintf(chat_result->reply, sizeof(chat_result->reply), "%s", "[img] Hermes sent a picture.");
+}
+
+static void drain_matching_reply_events(
+    const HermesAppConfig* config,
+    const AppRequestUiContext* ui,
+    const char* events_url,
+    const BridgeV2MessageResult* message_result,
+    u32* event_cursor,
+    BridgeChatResult* chat_result,
+    const char* last_message,
+    char* status_line,
+    size_t status_line_size,
+    bool* missed_events_out
+)
+{
+    u64 deadline_ms;
+
+    if (config == NULL || ui == NULL || events_url == NULL || message_result == NULL || event_cursor == NULL)
+        return;
+
+    deadline_ms = osGetTime() + 600ULL;
+    while (aptMainLoop() && osGetTime() < deadline_ms) {
+        BridgeV2EventPollResult extra_event;
+        Result extra_rc;
+
+        bridge_v2_event_poll_result_reset(&extra_event);
+        extra_rc = bridge_v2_poll_events(
+            events_url,
+            config->token,
+            config->device_id,
+            config->active_conversation_id,
+            *event_cursor,
+            150,
+            &extra_event
+        );
+        if (R_FAILED(extra_rc))
+            return;
+        if (extra_event.cursor > *event_cursor)
+            *event_cursor = extra_event.cursor;
+        if (extra_event.missed_events && missed_events_out != NULL)
+            *missed_events_out = true;
+        if (extra_event.event_type[0] == '\0' || !event_is_matching_reply(&extra_event, message_result))
+            return;
+
+        apply_event_to_home_history(
+            config,
+            &extra_event,
+            strcmp(extra_event.event_type, "message.updated") == 0,
+            status_line,
+            status_line_size
+        );
+        render_home_request_ui(config, ui, chat_result, last_message, 0, status_line, 0);
+    }
 }
 
 static void render_home_request_ui(
@@ -591,6 +737,19 @@ static Result complete_v2_roundtrip(
     }
 
     apply_v2_event_to_chat_result(matched_reply ? matched_event_result : event_result, chat_result);
+    apply_event_to_home_history(config, matched_reply ? matched_event_result : event_result, true, status_line, status_line_size);
+    drain_matching_reply_events(
+        config,
+        ui,
+        events_url,
+        message_result,
+        &event_cursor,
+        chat_result,
+        last_message,
+        status_line,
+        status_line_size,
+        &missed_events
+    );
 
 done:
     free(matched_event_result);
@@ -783,9 +942,9 @@ static void submit_text_message(
                     hermes_app_ui_home_history_reset();
                     *history_scroll = 0;
                     hermes_app_ui_home_history_push(APP_UI_MESSAGE_USER, message_buffer);
+                    if (chat_result->success)
+                        hermes_app_ui_home_history_push(APP_UI_MESSAGE_HERMES, chat_result->reply);
                 }
-                if (chat_result->success)
-                    hermes_app_ui_home_history_upsert(APP_UI_MESSAGE_HERMES, chat_result->reply);
                 if (chat_result->success && message_buffer[0] == '/')
                     *history_scroll = hermes_app_ui_home_history_max_scroll(status_line);
                 format_roundtrip_status(chat_result, missed_events, "Reply note received over native v2.", status_line, status_line_size);
@@ -1116,8 +1275,6 @@ void hermes_app_requests_handle_voice(
             &missed_events
         );
         if (R_SUCCEEDED(*request_rc)) {
-            if (chat_result->success)
-                hermes_app_ui_home_history_upsert(APP_UI_MESSAGE_HERMES, chat_result->reply);
             format_roundtrip_status(chat_result, missed_events, "Voice note reply received over native v2.", status_line, status_line_size);
         }
         else if (chat_result->error[0] != '\0')
@@ -1128,6 +1285,101 @@ void hermes_app_requests_handle_voice(
         snprintf(status_line, status_line_size, "%s", message_result.error);
     } else {
         snprintf(status_line, status_line_size, "Voice upload failed: 0x%08lX", (unsigned long)*request_rc);
+    }
+
+    render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
+}
+
+void hermes_app_requests_handle_picture(
+    const HermesAppConfig* config,
+    bool network_ready,
+    const AppRequestUiContext* ui,
+    BridgeChatResult* chat_result,
+    char* last_message,
+    size_t last_message_size,
+    size_t* history_scroll,
+    char* status_line,
+    size_t status_line_size,
+    Result* request_rc
+)
+{
+    char image_url[HERMES_APP_IMAGE_URL_MAX];
+    char events_url[HERMES_APP_EVENTS_URL_MAX];
+    u8* bmp_data = NULL;
+    size_t bmp_size = 0;
+    PictureInputPreview preview;
+    BridgeV2MessageResult message_result;
+    bool missed_events = false;
+
+    picture_input_preview_reset(&preview);
+    if (config == NULL || ui == NULL || chat_result == NULL || last_message == NULL || history_scroll == NULL ||
+        status_line == NULL || status_line_size == 0 || request_rc == NULL) {
+        return;
+    }
+
+    if (!network_ready) {
+        snprintf(status_line, status_line_size, "Networking services failed to start.");
+        render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
+        return;
+    }
+
+    if (!hermes_app_config_build_image_url(config, image_url, sizeof(image_url)) ||
+        !hermes_app_config_build_events_url(config, events_url, sizeof(events_url)) ||
+        config->device_id[0] == '\0') {
+        snprintf(status_line, status_line_size, "V2 config is incomplete. Set device_id.");
+        render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
+        return;
+    }
+
+    if (!picture_input_capture_prompt(config, &bmp_data, &bmp_size, &preview, status_line, status_line_size)) {
+        render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
+        return;
+    }
+
+    copy_bounded_string(last_message, last_message_size, "[cam] picture input");
+    hermes_app_ui_home_history_push_image(APP_UI_MESSAGE_USER, "[cam] picture input", preview.rgba8_data, preview.width, preview.height);
+    picture_input_preview_free(&preview);
+    reset_chat_request_state(chat_result, &message_result, request_rc, history_scroll);
+
+    snprintf(status_line, status_line_size, "(^_^) Sending picture note to Hermes...");
+    render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
+    gspWaitForVBlank();
+
+    *request_rc = bridge_v2_send_image_message(
+        image_url,
+        config->token,
+        config->device_id,
+        config->active_conversation_id,
+        bmp_data,
+        bmp_size,
+        "image/bmp",
+        &message_result
+    );
+    free(bmp_data);
+    bmp_data = NULL;
+
+    if (R_SUCCEEDED(*request_rc) && message_result.success) {
+        *request_rc = complete_v2_roundtrip(
+            config,
+            ui,
+            events_url,
+            &message_result,
+            chat_result,
+            last_message,
+            status_line,
+            status_line_size,
+            &missed_events
+        );
+        if (R_SUCCEEDED(*request_rc))
+            format_roundtrip_status(chat_result, missed_events, "Picture reply received over native v2.", status_line, status_line_size);
+        else if (chat_result->error[0] != '\0')
+            snprintf(status_line, status_line_size, "%s", chat_result->error);
+        else
+            snprintf(status_line, status_line_size, "Picture roundtrip failed: 0x%08lX", (unsigned long)*request_rc);
+    } else if (message_result.error[0] != '\0') {
+        snprintf(status_line, status_line_size, "%s", message_result.error);
+    } else {
+        snprintf(status_line, status_line_size, "Picture upload failed: 0x%08lX", (unsigned long)*request_rc);
     }
 
     render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);

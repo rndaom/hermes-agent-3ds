@@ -62,6 +62,7 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "hermes_app_config_build_events_url" in request_c
     assert "hermes_app_config_build_conversations_url" in conv_c
     assert "bridge_v2_send_message" in request_c
+    assert "bridge_v2_send_image_message" in request_c
     assert (
         "parse_content_length_header"
         in (CLIENT_DIR / "source" / "bridge_v2.c").read_text()
@@ -96,10 +97,13 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "KEY_DOWN" in conv_c
     assert "Write a note" in input_c
     assert "Record mic" in request_c or "mic" in request_c.lower()
+    assert "Picture prompt" in request_c or "picture" in request_c.lower()
     assert "bridge_v2_send_voice_message" in request_c
     assert "config->active_conversation_id" in request_c
     assert "wav_data" in request_c
+    assert "bmp_data" in request_c
     assert "MICU_StartSampling" in main_c or "voice_input_record_prompt" in request_c
+    assert "picture_input_capture_prompt" in request_c
     assert (
         "Last message" in main_c
         or "draw_message_card" in (CLIENT_DIR / "source" / "app_ui.c").read_text()
@@ -110,12 +114,14 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "hermes_app_home_handle_input" in main_c
     assert "hermes_app_requests_handle_text" in home_c
     assert "hermes_app_requests_handle_voice" in home_c
+    assert "hermes_app_requests_handle_picture" in home_c
     assert "hermes_app_requests_handle_clear_command" in home_c
     assert "APP_REQUEST_REPLY_WAIT_TIMEOUT_MS" in request_c
     assert "60ULL * 60ULL * 1000ULL" in request_c
     assert "Timed out waiting for Hermes reply." in request_c
     assert "Sending note to Hermes..." in request_c
     assert "Sending mic note to Hermes..." in request_c
+    assert "Sending picture note to Hermes..." in request_c
     assert (
         "status.updated" in request_c
         or "status.updated" in (CLIENT_DIR / "source" / "bridge_v2.c").read_text()
@@ -190,6 +196,23 @@ def test_voice_input_uses_graphical_recording_render_helpers_without_console_pri
     assert "consoleSelect" not in voice_input_c
     assert "consoleClear" not in voice_input_c
     assert "current_tenths != last_render_tenths" in voice_input_c
+
+
+def test_picture_input_uses_graphical_capture_render_helpers_without_console_printf():
+    picture_input_c = (CLIENT_DIR / "source" / "picture_input.c").read_text()
+    picture_input_h = (CLIENT_DIR / "include" / "picture_input.h").read_text()
+    ui_h = (CLIENT_DIR / "include" / "app_ui.h").read_text()
+
+    assert "PictureInputPreview" in picture_input_h
+    assert "picture_input_capture_prompt" in picture_input_h
+    assert "picture_input_decode_bmp_preview" in picture_input_h
+    assert "camInit()" in picture_input_c
+    assert "CAMU_StartCapture" in picture_input_c
+    assert "CAMU_SetReceiving" in picture_input_c
+    assert "hermes_app_ui_render_picture_capture" in picture_input_c
+    assert "hermes_app_ui_render_picture_capture" in ui_h
+    assert "consoleSelect" not in picture_input_c
+    assert "consoleClear" not in picture_input_c
 
 
 def test_main_c_uses_both_top_and_bottom_screens_for_ui():

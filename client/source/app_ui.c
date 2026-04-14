@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <tex3ds.h>
+
 #define HOME_WRAP_MAX_LINES 256
 #define HOME_WRAP_LINE_MAX 192
 #define HOME_SUMMARY_WRAP_MAX_LINES 4
@@ -26,6 +28,8 @@
 typedef struct AppUiHomeHistoryEntry {
     AppUiMessageAuthor author;
     bool continuation;
+    bool has_image;
+    unsigned int media_generation;
     float height;
     char text[HOME_HISTORY_TEXT_MAX];
 } AppUiHomeHistoryEntry;
@@ -34,8 +38,50 @@ static char g_message_wrap_lines[HOME_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
 static char g_home_status_lines[HOME_SUMMARY_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
 static AppUiHomeHistoryEntry g_home_history[HOME_HISTORY_MAX];
 static size_t g_home_history_count = 0;
+static C3D_Tex g_home_media_texture;
+static Tex3DS_SubTexture g_home_media_subtexture;
+static C2D_Image g_home_media_image;
+static bool g_home_media_ready = false;
+static unsigned int g_home_media_generation = 0;
 
 static void draw_chip(float x, float y, float w, const char* label, u32 fill, u32 text_color, u32 border);
+
+static void clear_home_media_preview(void)
+{
+    if (g_home_media_ready)
+        C3D_TexDelete(&g_home_media_texture);
+
+    memset(&g_home_media_texture, 0, sizeof(g_home_media_texture));
+    memset(&g_home_media_subtexture, 0, sizeof(g_home_media_subtexture));
+    memset(&g_home_media_image, 0, sizeof(g_home_media_image));
+    g_home_media_ready = false;
+}
+
+static bool set_home_media_preview(const u8* rgba8_data, u16 width, u16 height)
+{
+    if (rgba8_data == NULL || width == 0 || height == 0)
+        return false;
+
+    clear_home_media_preview();
+    if (!C3D_TexInit(&g_home_media_texture, width, height, GPU_RGBA8))
+        return false;
+
+    C3D_TexUpload(&g_home_media_texture, rgba8_data);
+    C3D_TexSetFilter(&g_home_media_texture, GPU_LINEAR, GPU_LINEAR);
+    g_home_media_subtexture.width = width;
+    g_home_media_subtexture.height = height;
+    g_home_media_subtexture.left = 0.0f;
+    g_home_media_subtexture.top = 1.0f;
+    g_home_media_subtexture.right = 1.0f;
+    g_home_media_subtexture.bottom = 0.0f;
+    g_home_media_image.tex = &g_home_media_texture;
+    g_home_media_image.subtex = &g_home_media_subtexture;
+    g_home_media_ready = true;
+    g_home_media_generation++;
+    if (g_home_media_generation == 0)
+        g_home_media_generation = 1;
+    return true;
+}
 
 static void copy_bounded_string(char* dest, size_t dest_size, const char* src)
 {
@@ -324,6 +370,16 @@ static float measure_message_card_height(const char* text)
     return message_card_height_for_line_count(line_count);
 }
 
+static float measure_image_card_height(const char* text)
+{
+    size_t line_count = wrap_text_for_pixels(text, HOME_LOG_TEXT_WIDTH, 0.28f, 0.28f, g_message_wrap_lines, 4);
+    float height = 152.0f + (float)line_count * HOME_LOG_LINE_STEP;
+
+    if (height < 162.0f)
+        height = 162.0f;
+    return height;
+}
+
 static bool message_card_intersects_view(float y, float height)
 {
     return y < HOME_LOG_CLIP_BOTTOM && y + height > HOME_LOG_CLIP_TOP;
@@ -430,11 +486,12 @@ static const char* home_status_summary(const char* status_line)
 
 void hermes_app_ui_home_history_reset(void)
 {
+    clear_home_media_preview();
     memset(g_home_history, 0, sizeof(g_home_history));
     g_home_history_count = 0;
 }
 
-static void append_history_entry(AppUiMessageAuthor author, const char* text, bool continuation)
+static void append_history_entry(AppUiMessageAuthor author, const char* text, bool continuation, bool has_image, unsigned int media_generation)
 {
     size_t index;
 
@@ -450,8 +507,10 @@ static void append_history_entry(AppUiMessageAuthor author, const char* text, bo
 
     g_home_history[index].author = author;
     g_home_history[index].continuation = continuation;
+    g_home_history[index].has_image = has_image;
+    g_home_history[index].media_generation = media_generation;
     copy_bounded_string(g_home_history[index].text, sizeof(g_home_history[index].text), text);
-    g_home_history[index].height = measure_message_card_height(g_home_history[index].text);
+    g_home_history[index].height = has_image ? measure_image_card_height(g_home_history[index].text) : measure_message_card_height(g_home_history[index].text);
 }
 
 static void push_history_message_chunks(AppUiMessageAuthor author, const char* text)
@@ -464,7 +523,7 @@ static void push_history_message_chunks(AppUiMessageAuthor author, const char* t
 
     total_lines = wrap_text_for_pixels(text, HOME_LOG_TEXT_WIDTH, HOME_LOG_TEXT_SCALE, HOME_LOG_TEXT_SCALE, g_message_wrap_lines, HOME_WRAP_MAX_LINES);
     if (total_lines == 0) {
-        append_history_entry(author, text, false);
+        append_history_entry(author, text, false, false, 0);
         return;
     }
 
@@ -489,8 +548,13 @@ static void push_history_message_chunks(AppUiMessageAuthor author, const char* t
                 chunk_text[chunk_used++] = '\n';
         }
         chunk_text[chunk_used] = '\0';
-        append_history_entry(author, chunk_text, line_index != 0);
+        append_history_entry(author, chunk_text, line_index != 0, false, 0);
     }
+}
+
+static void push_history_image(AppUiMessageAuthor author, const char* text)
+{
+    append_history_entry(author, text, false, true, g_home_media_generation);
 }
 
 static void remove_trailing_history_message(AppUiMessageAuthor author)
@@ -521,6 +585,18 @@ void hermes_app_ui_home_history_push(AppUiMessageAuthor author, const char* text
     push_history_message_chunks(author, text);
 }
 
+void hermes_app_ui_home_history_push_image(AppUiMessageAuthor author, const char* text, const u8* rgba8_data, u16 width, u16 height)
+{
+    const char* display_text = (text != NULL && text[0] != '\0') ? text : "[img] Picture note";
+
+    if (!set_home_media_preview(rgba8_data, width, height)) {
+        hermes_app_ui_home_history_push(author, display_text);
+        return;
+    }
+
+    push_history_image(author, display_text);
+}
+
 void hermes_app_ui_home_history_upsert(AppUiMessageAuthor author, const char* text)
 {
     AppUiHomeHistoryEntry* last;
@@ -541,6 +617,19 @@ void hermes_app_ui_home_history_upsert(AppUiMessageAuthor author, const char* te
 
     remove_trailing_history_message(author);
     push_history_message_chunks(author, text);
+}
+
+void hermes_app_ui_home_history_upsert_image(AppUiMessageAuthor author, const char* text, const u8* rgba8_data, u16 width, u16 height)
+{
+    const char* display_text = (text != NULL && text[0] != '\0') ? text : "[img] Picture note";
+
+    if (!set_home_media_preview(rgba8_data, width, height)) {
+        hermes_app_ui_home_history_upsert(author, display_text);
+        return;
+    }
+
+    remove_trailing_history_message(author);
+    push_history_image(author, display_text);
 }
 
 static const BridgeV2ConversationInfo* find_synced_conversation(
@@ -596,11 +685,13 @@ static const PictochatTheme* get_global_theme(const HermesAppConfig* config)
 
 bool hermes_app_ui_init(void)
 {
+    clear_home_media_preview();
     return app_gfx_init();
 }
 
 void hermes_app_ui_exit(void)
 {
+    clear_home_media_preview();
     app_gfx_fini();
 }
 
@@ -740,6 +831,7 @@ typedef enum ActionButtonIcon {
     ACTION_BUTTON_ICON_SESSIONS,
     ACTION_BUTTON_ICON_SETTINGS,
     ACTION_BUTTON_ICON_AUDIO,
+    ACTION_BUTTON_ICON_CAMERA,
     ACTION_BUTTON_ICON_RESET,
     ACTION_BUTTON_ICON_CLEAR,
     ACTION_BUTTON_ICON_COMPRESS,
@@ -796,6 +888,11 @@ static void draw_action_icon(float x, float y, float h, ActionButtonIcon icon, c
             app_gfx_panel(ix + 6.0f, iy + 2.0f, 6.0f, 6.0f, cutout, stroke);
             app_gfx_highlight_bar(ix + 8.0f, iy + 8.0f, 2.0f, 4.0f, stroke);
             app_gfx_highlight_bar(ix + 5.0f, iy + 11.0f, 8.0f, 1.0f, stroke);
+            break;
+        case ACTION_BUTTON_ICON_CAMERA:
+            app_gfx_panel(ix + 4.0f, iy + 4.0f, 10.0f, 7.0f, cutout, stroke);
+            app_gfx_panel(ix + 7.0f, iy + 2.0f, 4.0f, 2.0f, cutout, stroke);
+            app_gfx_panel(ix + 7.0f, iy + 6.0f, 4.0f, 3.0f, fill, stroke);
             break;
         case ACTION_BUTTON_ICON_RESET:
             app_gfx_highlight_bar(ix + 5.0f, iy + 3.0f, 8.0f, 2.0f, stroke);
@@ -949,6 +1046,49 @@ static float draw_message_card(
     return h;
 }
 
+static float draw_image_card(
+    float x,
+    float y,
+    float w,
+    const char* label,
+    const char* text,
+    bool preview_visible,
+    const PictochatTheme* theme
+)
+{
+    size_t caption_lines;
+    float h;
+    float preview_scale;
+    float preview_w = 256.0f;
+    float draw_w;
+    float draw_x;
+
+    if (theme == NULL)
+        theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, true);
+
+    caption_lines = wrap_text_for_pixels(text, w - 36.0f, 0.28f, 0.28f, g_message_wrap_lines, 4);
+    h = measure_image_card_height(text);
+
+    app_gfx_panel(x, y, w, h, theme->paper, theme->accent.primary_dark);
+    app_gfx_highlight_bar(x + 2.0f, y + 2.0f, w - 4.0f, 4.0f, theme->accent.primary_light);
+    draw_chip(x + 10.0f, y + 8.0f, chip_width_for_label(label), label, theme->accent.primary, theme->text, theme->accent.primary_dark);
+    app_gfx_panel(x + 18.0f, y + 34.0f, w - 36.0f, 108.0f, theme->paper_alt, theme->border);
+
+    if (preview_visible && g_home_media_ready) {
+        preview_scale = 0.75f;
+        draw_w = preview_w * preview_scale;
+        draw_x = x + ((w - draw_w) / 2.0f);
+        C2D_DrawImageAt(g_home_media_image, draw_x, y + 38.0f, 0.0f, NULL, preview_scale, preview_scale);
+    } else {
+        draw_ruled_paper(x + 22.0f, y + 38.0f, w - 44.0f, 100.0f, theme->paper_alt, theme);
+        app_gfx_text_fit(x + 34.0f, y + 78.0f, w - 68.0f, 0.26f, 0.26f, theme->text_muted, "Picture preview unavailable on this note.");
+    }
+
+    if (caption_lines > 0)
+        draw_text_lines(x + 18.0f, y + 148.0f, HOME_LOG_LINE_STEP, w - 36.0f, 0.28f, 0.28f, theme->text, g_message_wrap_lines, caption_lines, 0, caption_lines);
+    return h;
+}
+
 static void render_home_graphical(
     const HermesAppConfig* config,
     const GatewayHealthResult* health_result,
@@ -962,7 +1102,7 @@ static void render_home_graphical(
 {
     const PictochatTheme* theme = get_global_theme(config);
     char conversation_label[HERMES_APP_CONVERSATION_ID_MAX];
-    int command_page = command_selection <= (size_t)HOME_COMMAND_AUDIO || command_selection > (size_t)HOME_COMMAND_RESUME
+    int command_page = command_selection <= (size_t)HOME_COMMAND_PICTURE || command_selection > (size_t)HOME_COMMAND_RESUME
         ? 0
         : (command_selection <= (size_t)HOME_COMMAND_ROLLBACK ? 1 : 2);
     size_t selected_command = command_selection <= (size_t)HOME_COMMAND_RESUME ? command_selection : (size_t)HOME_COMMAND_TEXT;
@@ -1003,8 +1143,20 @@ static void render_home_graphical(
             const AppUiHomeHistoryEntry* entry = &g_home_history[index];
             float card_height = entry->height;
 
-            if (message_card_intersects_view(card_y, card_height))
-                draw_message_card(16.0f, card_y, 368.0f, entry->author == APP_UI_MESSAGE_USER ? "YOU" : "HERMES", entry->text, HOME_LOG_TEXT_SCALE, theme);
+            if (message_card_intersects_view(card_y, card_height)) {
+                if (entry->has_image)
+                    draw_image_card(
+                        16.0f,
+                        card_y,
+                        368.0f,
+                        entry->author == APP_UI_MESSAGE_USER ? "YOU" : "HERMES",
+                        entry->text,
+                        g_home_media_ready && entry->media_generation == g_home_media_generation,
+                        theme
+                    );
+                else
+                    draw_message_card(16.0f, card_y, 368.0f, entry->author == APP_UI_MESSAGE_USER ? "YOU" : "HERMES", entry->text, HOME_LOG_TEXT_SCALE, theme);
+            }
             card_y += card_height + HOME_LOG_GAP;
         }
 
@@ -1029,7 +1181,8 @@ static void render_home_graphical(
         draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Check Relay", ACTION_BUTTON_ICON_RELAY, theme, selected_command == (size_t)HOME_COMMAND_CHECK);
         draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Sessions", ACTION_BUTTON_ICON_SESSIONS, theme, selected_command == (size_t)HOME_COMMAND_SESSIONS);
         draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Settings", ACTION_BUTTON_ICON_SETTINGS, theme, selected_command == (size_t)HOME_COMMAND_SETTINGS);
-        draw_action_button(92.0f, 116.0f, 136.0f, 28.0f, "Audio Prompt", ACTION_BUTTON_ICON_AUDIO, theme, selected_command == (size_t)HOME_COMMAND_AUDIO);
+        draw_action_button(16.0f, 116.0f, 136.0f, 28.0f, "Audio Prompt", ACTION_BUTTON_ICON_AUDIO, theme, selected_command == (size_t)HOME_COMMAND_AUDIO);
+        draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Picture Prompt", ACTION_BUTTON_ICON_CAMERA, theme, selected_command == (size_t)HOME_COMMAND_PICTURE);
     } else if (command_page == 1) {
         draw_bottom_header_home(theme, "SLASH 1/2", conversation_label, "1/2");
         draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Reset Session", ACTION_BUTTON_ICON_RESET, theme, selected_command == (size_t)HOME_COMMAND_RESET);
@@ -1351,6 +1504,44 @@ void hermes_app_ui_render_voice_recording(
     app_gfx_text_fit(16.0f, 104.0f, 288.0f, 0.28f, 0.28f, theme->text, capture_state);
     app_gfx_text_fit(16.0f, 126.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "The session stops after five minutes or when the audio buffer fills.");
     app_gfx_text_fit(16.0f, 148.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "If A is already held when recording opens, release it once before trying to send.");
+    draw_hint_button(82.0f, 214.0f, 156.0f, "Return after send", theme);
+
+    app_gfx_end_frame();
+}
+
+void hermes_app_ui_render_picture_capture(
+    const HermesAppConfig* config,
+    const char* status_line,
+    bool waiting_for_a_release
+)
+{
+    const PictochatTheme* theme = get_global_theme(config);
+    const char* capture_state = waiting_for_a_release ? "Release A once before taking the picture." : "Press A to take a picture and send it to Hermes.";
+
+    app_gfx_begin_frame();
+
+    app_gfx_begin_top(theme->background);
+    app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, theme->paper_shadow, theme->border_dark);
+    draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, theme->paper, theme);
+    draw_top_header(theme, "PICTURE NOTE");
+    draw_alert_banner(32.0f, 44.0f, 336.0f, 24.0f, waiting_for_a_release ? "Release A to arm camera" : "Outer camera picture prompt", theme);
+    draw_ruled_paper(20.0f, 76.0f, 360.0f, 136.0f, theme->paper, theme);
+    app_gfx_text_fit(32.0f, 98.0f, 316.0f, 0.30f, 0.30f, theme->text, status_line != NULL && status_line[0] != '\0' ? status_line : "Picture prompt ready.");
+    app_gfx_text_fit(32.0f, 130.0f, 316.0f, 0.26f, 0.26f, theme->text_muted, capture_state);
+    app_gfx_text_fit(32.0f, 154.0f, 316.0f, 0.24f, 0.24f, theme->text_muted, "This first pass uses the 3DS outer camera and uploads a BMP note to Hermes for vision analysis.");
+    app_gfx_text_fit(32.0f, 178.0f, 316.0f, 0.24f, 0.24f, theme->text_muted, "Preview rendering happens after capture on the room board.");
+
+    app_gfx_begin_bottom(theme->background);
+    app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, theme->paper_shadow, theme->border_dark);
+    draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, theme->paper, theme);
+    draw_bottom_header(theme, "PICTURE KEYS");
+    draw_action_button(16.0f, 48.0f, 88.0f, 28.0f, "A Capture", ACTION_BUTTON_ICON_CAMERA, theme, !waiting_for_a_release);
+    draw_action_button(116.0f, 48.0f, 88.0f, 28.0f, "B Cancel", ACTION_BUTTON_ICON_DENY, theme, false);
+    draw_action_button(216.0f, 48.0f, 88.0f, 28.0f, "START Abort", ACTION_BUTTON_ICON_ABORT, theme, false);
+    draw_ruled_paper(8.0f, 92.0f, 304.0f, 116.0f, theme->paper_alt, theme);
+    app_gfx_text_fit(16.0f, 106.0f, 288.0f, 0.28f, 0.28f, theme->text, capture_state);
+    app_gfx_text_fit(16.0f, 132.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "The camera path stays intentionally simple so it remains reliable on original / Old 3DS hardware.");
+    app_gfx_text_fit(16.0f, 154.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "Lighting matters. The outer camera capture is meant for quick snapshots, not a full photo workflow.");
     draw_hint_button(82.0f, 214.0f, 156.0f, "Return after send", theme);
 
     app_gfx_end_frame();

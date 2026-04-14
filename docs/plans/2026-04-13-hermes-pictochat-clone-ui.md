@@ -75,7 +75,7 @@ Expected deployed files:
 
 - docs reference only the new PictoChat clone spec
 - the old dark-mode spec and plan are gone
-- the home UI now uses `Text Prompt`, `Check Relay`, `Sessions`, `Settings`, and `Audio Prompt`
+- the home UI now uses `Text Prompt`, `Check Relay`, `Sessions`, `Settings`, `Audio Prompt`, and `Picture Prompt`
 - the bottom screen includes a second slash-command page for native Hermes commands such as `/reset` and `/compress`
 - the session picker is presented as `Sessions`
 - setup reads as a paper config sheet

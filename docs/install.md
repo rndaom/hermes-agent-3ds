@@ -57,8 +57,10 @@ Run Hermes from the main `hermes-agent` repo with the 3DS gateway enabled on you
 - `GET /api/v2/health`
 - `GET /api/v2/conversations`
 - `POST /api/v2/messages`
+- `POST /api/v2/image`
 - `POST /api/v2/voice`
 - `GET /api/v2/events`
+- `GET /api/v2/media/{media_id}`
 - `POST /api/v2/interactions/{request_id}/respond`
 
 The handheld health check currently calls `GET /api/v2/health` with `token`, `device_id`, and the active `conversation_id` in the query string.
@@ -87,6 +89,7 @@ On the home screen:
 - use the D-pad or Circle Pad there to move through saved conversation slots
 - press `X` there if you want to create a new conversation ID, or `Y` to sync recent conversation slots from Hermes
 - return home, move to `Text Prompt`, and press `A` to send a test message in the active conversation
+- or move to `Picture Prompt` and press `A` to capture a still with the outer camera and upload it to Hermes
 - or move to `Audio Prompt` and press `A` to start recording, then press `A` again to stop and send it through host-side speech-to-text
 - press `B` during mic capture to cancel, or `START` to abort that recording session
 - use `L/R` to scroll the transcript on the top screen

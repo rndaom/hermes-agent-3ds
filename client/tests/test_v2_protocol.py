@@ -10,20 +10,26 @@ def test_app_config_supports_native_v2_urls_and_device_identity():
 
     assert "HERMES_APP_MESSAGES_URL_MAX" in header
     assert "HERMES_APP_EVENTS_URL_MAX" in header
+    assert "HERMES_APP_IMAGE_URL_MAX" in header
     assert "HERMES_APP_VOICE_URL_MAX" in header
+    assert "HERMES_APP_MEDIA_URL_MAX" in header
     assert "HERMES_APP_INTERACTION_URL_MAX" in header
     assert "HERMES_APP_DEVICE_ID_MAX" in header
     assert "device_id" in header
     assert "hermes_app_config_build_messages_url" in header
     assert "hermes_app_config_build_events_url" in header
+    assert "hermes_app_config_build_image_url" in header
     assert "hermes_app_config_build_voice_url" in header
+    assert "hermes_app_config_build_media_url" in header
     assert "hermes_app_config_build_interaction_url" in header
 
     assert "/api/v2/health?token=%s&device_id=%s&conversation_id=%s" in source
     assert '"/api/v1/health"' not in source
     assert '"/api/v2/messages"' in source
     assert '"/api/v2/events"' in source
+    assert '"/api/v2/image"' in source
     assert '"/api/v2/voice"' in source
+    assert '"/api/v2/media/"' in source
     assert '"/api/v2/conversations"' in source
     assert '"/api/v2/interactions/"' in source
     assert "device_id=" in source
@@ -44,17 +50,26 @@ def test_bridge_v2_module_exists_for_native_gateway_protocol():
     assert "BridgeV2InteractionResult" in header
     assert "u32 cursor;" in header
     assert "reply_to_message_id" in header
+    assert "media_id" in header
+    assert "media_type" in header
+    assert "media_width" in header
+    assert "media_height" in header
     assert "bridge_v2_send_message" in header
+    assert "bridge_v2_send_image_message" in header
     assert "bridge_v2_send_voice_message" in header
+    assert "bridge_v2_download_media" in header
     assert "bridge_v2_poll_events" in header
     assert "bridge_v2_submit_interaction" in header
 
     assert "Authorization: Bearer " in source
     assert "bridge_v2_send_message" in source or '"/api/v2/messages"' in source
+    assert "bridge_v2_send_image_message" in source or '"/api/v2/image"' in source
     assert "bridge_v2_send_voice_message" in source or '"/api/v2/voice"' in source
+    assert "bridge_v2_download_media" in source
     assert "bridge_v2_list_conversations" in source
     assert "device_id" in source
     assert "conversation_id" in source
+    assert "image/bmp" in source
     assert "audio/wav" in source
     assert 'extract_json_u32(response_body, "cursor"' in source
     assert "cursor" in source
@@ -65,6 +80,8 @@ def test_bridge_v2_module_exists_for_native_gateway_protocol():
     assert "message.updated" in source
     assert "status.updated" in source
     assert "reply_to" in source
+    assert '"media_id"' in source
+    assert '"media_type"' in source
     assert '\\"event\\"' in source
     assert "interaction_required" in header
     assert "BridgeV2InteractionOption" in header
@@ -125,6 +142,7 @@ def test_bridge_v2_message_body_buffer_matches_the_advertised_text_limit():
     assert "BRIDGE_V2_TEXT_MAX 8192" in header
     assert "BRIDGE_CHAT_REPLY_MAX 8192" in chat_header
     assert "BRIDGE_V2_RESPONSE_MAX 32768" in source
+    assert "BRIDGE_V2_MEDIA_RESPONSE_MAX 131072" in source
     assert "char body[1024]" not in source
     assert "Hermes reply exceeded the 3DS response buffer." in source
 

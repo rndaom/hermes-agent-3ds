@@ -53,8 +53,10 @@ The native 3DS gateway should expose:
 - `GET /api/v2/health` with `token`, `device_id`, and active `conversation_id` query parameters
 - `GET /api/v2/conversations`
 - `POST /api/v2/messages`
+- `POST /api/v2/image`
 - `POST /api/v2/voice`
 - `GET /api/v2/events`
+- `GET /api/v2/media/{media_id}`
 - `POST /api/v2/interactions/{request_id}/respond`
 
 ## Device config

@@ -416,6 +416,11 @@ bool hermes_app_config_build_events_url(const HermesAppConfig* config, char* out
     return build_url(config, "/api/v2/events", out_url, out_size);
 }
 
+bool hermes_app_config_build_image_url(const HermesAppConfig* config, char* out_url, size_t out_size)
+{
+    return build_url(config, "/api/v2/image", out_url, out_size);
+}
+
 bool hermes_app_config_build_voice_url(const HermesAppConfig* config, char* out_url, size_t out_size)
 {
     return build_url(config, "/api/v2/voice", out_url, out_size);
@@ -439,6 +444,28 @@ bool hermes_app_config_build_interaction_url(const HermesAppConfig* config, cons
         (unsigned int)config->port,
         "/api/v2/interactions/",
         request_id
+    );
+    return written > 0 && (size_t)written < out_size;
+}
+
+bool hermes_app_config_build_media_url(const HermesAppConfig* config, const char* media_id, char* out_url, size_t out_size)
+{
+    int written;
+
+    if (config == NULL || media_id == NULL || out_url == NULL || out_size == 0)
+        return false;
+
+    if (config->host[0] == '\0' || config->port == 0 || media_id[0] == '\0')
+        return false;
+
+    written = snprintf(
+        out_url,
+        out_size,
+        "http://%s:%u%s%s",
+        config->host,
+        (unsigned int)config->port,
+        "/api/v2/media/",
+        media_id
     );
     return written > 0 && (size_t)written < out_size;
 }

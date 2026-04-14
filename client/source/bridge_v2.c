@@ -19,6 +19,7 @@
 #define BRIDGE_V2_CONNECT_TIMEOUT_SECONDS 5
 #define BRIDGE_V2_IO_TIMEOUT_SECONDS 20
 #define BRIDGE_V2_RESPONSE_MAX 32768
+#define BRIDGE_V2_MEDIA_RESPONSE_MAX 131072
 #define BRIDGE_V2_MESSAGE_BODY_MAX ((BRIDGE_V2_TEXT_MAX * 2) + (BRIDGE_V2_CONVERSATION_ID_MAX * 4) + 256)
 
 static void set_error(char* out, size_t out_size, const char* message)
@@ -527,6 +528,20 @@ static bool extract_json_u32(const char* json, const char* key, u32* out_value)
     return true;
 }
 
+static bool extract_json_u32_after(const char* json, const char* marker, const char* key, u32* out_value)
+{
+    const char* cursor;
+
+    if (json == NULL || marker == NULL)
+        return false;
+
+    cursor = strstr(json, marker);
+    if (cursor == NULL)
+        return false;
+
+    return extract_json_u32(cursor, key, out_value);
+}
+
 static void extract_interaction_options_after(
     const char* json,
     const char* marker,
@@ -830,6 +845,60 @@ static bool parse_content_length_header(const char* response, size_t* out_conten
 
     *out_content_length = (size_t)parsed;
     return true;
+}
+
+static bool parse_content_type_header(const char* response, char* out_content_type, size_t out_size)
+{
+    const char* header;
+    const char* body;
+    size_t length;
+
+    if (response == NULL || out_content_type == NULL || out_size == 0)
+        return false;
+
+    body = strstr(response, "\r\n\r\n");
+    if (body == NULL)
+        return false;
+
+    header = strstr(response, "\r\nContent-Type:");
+    if (header != NULL)
+        header += 2;
+    else if (strncmp(response, "Content-Type:", strlen("Content-Type:")) == 0)
+        header = response;
+    else
+        return false;
+
+    if (header >= body)
+        return false;
+
+    header = strchr(header, ':');
+    if (header == NULL)
+        return false;
+    header++;
+
+    while (*header == ' ' || *header == '\t')
+        header++;
+
+    length = 0;
+    while (header[length] != '\0' && header[length] != '\r' && header[length] != '\n' && header + length < body)
+        length++;
+    if (length == 0)
+        return false;
+    if (length >= out_size)
+        length = out_size - 1;
+
+    memcpy(out_content_type, header, length);
+    out_content_type[length] = '\0';
+    return true;
+}
+
+static size_t response_header_size(const char* response)
+{
+    const char* body = strstr(response, "\r\n\r\n");
+
+    if (body == NULL)
+        return 0;
+    return (size_t)((body + 4) - response);
 }
 
 static bool response_complete(const char* response, size_t response_used)
@@ -1338,6 +1407,75 @@ Result bridge_v2_send_voice_message(const char* url, const char* token, const ch
     return rc;
 }
 
+Result bridge_v2_send_image_message(const char* url, const char* token, const char* device_id, const char* conversation_id, const void* image_data, size_t image_size, const char* content_type, BridgeV2MessageResult* result)
+{
+    char host[64];
+    char path[192];
+    char path_with_query[320];
+    char full_url[512];
+    char* response;
+    u16 port = 0;
+    u32 status_code = 0;
+    Result rc;
+
+    bridge_v2_message_result_reset(result);
+    if (result == NULL)
+        return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_POINTER);
+
+    if (url == NULL || device_id == NULL || device_id[0] == '\0' || image_data == NULL || image_size == 0) {
+        set_error(result->error, sizeof(result->error), "device_id and image_data are required.");
+        return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
+    }
+    if (!is_safe_query_value(device_id) || !is_safe_query_value(conversation_id != NULL ? conversation_id : "main")) {
+        set_error(result->error, sizeof(result->error), "device_id or conversation_id contains unsupported characters.");
+        return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
+    }
+
+    response = (char*)malloc(BRIDGE_V2_RESPONSE_MAX);
+    if (response == NULL) {
+        set_error(result->error, sizeof(result->error), "Could not allocate a response buffer.");
+        return MAKERESULT(RL_FATAL, RS_OUTOFRESOURCE, RM_APPLICATION, RD_OUT_OF_MEMORY);
+    }
+
+    if (!parse_http_url(url, host, sizeof(host), &port, path, sizeof(path))) {
+        set_error(result->error, sizeof(result->error), "Bridge URL is invalid.");
+        free(response);
+        return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
+    }
+
+    snprintf(
+        path_with_query,
+        sizeof(path_with_query),
+        "%s?device_id=%s&conversation_id=%s",
+        path,
+        device_id,
+        conversation_id != NULL ? conversation_id : "main"
+    );
+    snprintf(full_url, sizeof(full_url), "http://%s:%u%s", host, (unsigned int)port, path_with_query);
+
+    rc = perform_request(
+        "POST",
+        full_url,
+        token,
+        image_data,
+        image_size,
+        content_type != NULL && content_type[0] != '\0' ? content_type : "image/bmp",
+        response,
+        BRIDGE_V2_RESPONSE_MAX,
+        &status_code,
+        result->error,
+        sizeof(result->error)
+    );
+    if (R_FAILED(rc)) {
+        free(response);
+        return rc;
+    }
+
+    rc = parse_message_ack_response(response, status_code, result, "Image upload");
+    free(response);
+    return rc;
+}
+
 Result bridge_v2_poll_events(const char* url, const char* token, const char* device_id, const char* conversation_id, u32 cursor, u32 wait_ms, BridgeV2EventPollResult* result)
 {
     char host[64];
@@ -1468,6 +1606,16 @@ Result bridge_v2_poll_events(const char* url, const char* token, const char* dev
             extract_json_display_text_after(body, "\"message.updated\"", "text", result->reply_text, sizeof(result->reply_text));
         if (!extract_json_string_after(body, "\"event\"", "reply_to", result->reply_to_message_id, sizeof(result->reply_to_message_id)))
             extract_json_string_after(body, "\"message.updated\"", "reply_to", result->reply_to_message_id, sizeof(result->reply_to_message_id));
+        if (!extract_json_string_after(body, "\"event\"", "media_id", result->media_id, sizeof(result->media_id)))
+            extract_json_string_after(body, "\"message.updated\"", "media_id", result->media_id, sizeof(result->media_id));
+        if (!extract_json_string_after(body, "\"event\"", "media_type", result->media_type, sizeof(result->media_type)))
+            extract_json_string_after(body, "\"message.updated\"", "media_type", result->media_type, sizeof(result->media_type));
+        if (extract_json_u32_after(body, "\"event\"", "media_width", &parsed_cursor) ||
+            extract_json_u32_after(body, "\"message.updated\"", "media_width", &parsed_cursor))
+            result->media_width = (u16)parsed_cursor;
+        if (extract_json_u32_after(body, "\"event\"", "media_height", &parsed_cursor) ||
+            extract_json_u32_after(body, "\"message.updated\"", "media_height", &parsed_cursor))
+            result->media_height = (u16)parsed_cursor;
         result->success = true;
         free(response);
         return 0;
@@ -1486,12 +1634,110 @@ Result bridge_v2_poll_events(const char* url, const char* token, const char* dev
             extract_json_display_text_after(body, "\"message.created\"", "text", result->reply_text, sizeof(result->reply_text));
         if (!extract_json_string_after(body, "\"event\"", "reply_to", result->reply_to_message_id, sizeof(result->reply_to_message_id)))
             extract_json_string_after(body, "\"message.created\"", "reply_to", result->reply_to_message_id, sizeof(result->reply_to_message_id));
+        if (!extract_json_string_after(body, "\"event\"", "media_id", result->media_id, sizeof(result->media_id)))
+            extract_json_string_after(body, "\"message.created\"", "media_id", result->media_id, sizeof(result->media_id));
+        if (!extract_json_string_after(body, "\"event\"", "media_type", result->media_type, sizeof(result->media_type)))
+            extract_json_string_after(body, "\"message.created\"", "media_type", result->media_type, sizeof(result->media_type));
+        if (extract_json_u32_after(body, "\"event\"", "media_width", &parsed_cursor) ||
+            extract_json_u32_after(body, "\"message.created\"", "media_width", &parsed_cursor))
+            result->media_width = (u16)parsed_cursor;
+        if (extract_json_u32_after(body, "\"event\"", "media_height", &parsed_cursor) ||
+            extract_json_u32_after(body, "\"message.created\"", "media_height", &parsed_cursor))
+            result->media_height = (u16)parsed_cursor;
         result->success = true;
         free(response);
         return 0;
     }
 
     result->success = true;
+    free(response);
+    return 0;
+}
+
+Result bridge_v2_download_media(const char* url, const char* token, void** out_data, size_t* out_size, char* out_content_type, size_t out_content_type_size, char* error_out, size_t error_out_size)
+{
+    char* response;
+    const char* body;
+    void* media_data;
+    size_t header_size;
+    size_t body_size = 0;
+    u32 status_code = 0;
+    Result rc;
+
+    if (out_data == NULL || out_size == NULL) {
+        set_error(error_out, error_out_size, "Media output buffers are required.");
+        return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_POINTER);
+    }
+
+    *out_data = NULL;
+    *out_size = 0;
+    if (out_content_type != NULL && out_content_type_size > 0)
+        out_content_type[0] = '\0';
+
+    if (url == NULL || url[0] == '\0') {
+        set_error(error_out, error_out_size, "Media URL is invalid.");
+        return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
+    }
+
+    response = (char*)malloc(BRIDGE_V2_MEDIA_RESPONSE_MAX);
+    if (response == NULL) {
+        set_error(error_out, error_out_size, "Could not allocate a media buffer.");
+        return MAKERESULT(RL_FATAL, RS_OUTOFRESOURCE, RM_APPLICATION, RD_OUT_OF_MEMORY);
+    }
+
+    rc = perform_request(
+        "GET",
+        url,
+        token,
+        NULL,
+        0,
+        NULL,
+        response,
+        BRIDGE_V2_MEDIA_RESPONSE_MAX,
+        &status_code,
+        error_out,
+        error_out_size
+    );
+    if (R_FAILED(rc)) {
+        free(response);
+        return rc;
+    }
+
+    body = response_body_start(response);
+    header_size = response_header_size(response);
+    if (body == NULL || header_size == 0 || !parse_content_length_header(response, &body_size)) {
+        set_error(error_out, error_out_size, "Hermes media response was incomplete.");
+        free(response);
+        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
+    }
+    if (status_code != 200) {
+        const char* response_body = response_body_start(response);
+        if (response_body != NULL && !extract_json_string_v2(response_body, "error", error_out, error_out_size))
+            snprintf(error_out, error_out_size, "Hermes gateway returned HTTP %lu.", (unsigned long)status_code);
+        free(response);
+        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
+    }
+    if (body_size == 0) {
+        set_error(error_out, error_out_size, "Hermes media response body was empty.");
+        free(response);
+        return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
+    }
+
+    media_data = malloc(body_size);
+    if (media_data == NULL) {
+        set_error(error_out, error_out_size, "Could not allocate media output.");
+        free(response);
+        return MAKERESULT(RL_FATAL, RS_OUTOFRESOURCE, RM_APPLICATION, RD_OUT_OF_MEMORY);
+    }
+
+    memcpy(media_data, response + header_size, body_size);
+    if (out_content_type != NULL && out_content_type_size > 0 &&
+        !parse_content_type_header(response, out_content_type, out_content_type_size)) {
+        snprintf(out_content_type, out_content_type_size, "%s", "application/octet-stream");
+    }
+
+    *out_data = media_data;
+    *out_size = body_size;
     free(response);
     return 0;
 }

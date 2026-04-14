@@ -38,6 +38,7 @@ def test_home_command_menu_has_touch_support_and_reply_paging_on_pad_circle_and_
     assert "HOME_COMMAND_SESSIONS" in home_h
     assert "HOME_COMMAND_SETTINGS" in home_h
     assert "HOME_COMMAND_AUDIO" in home_h
+    assert "HOME_COMMAND_PICTURE" in home_h
     assert "HOME_COMMAND_RESET" in home_h
     assert "HOME_COMMAND_CLEAR" in home_h
     assert "HOME_COMMAND_COMPRESS" in home_h
@@ -71,7 +72,8 @@ def test_home_command_menu_has_touch_support_and_reply_paging_on_pad_circle_and_
     assert 'draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Check Relay"' in ui_c
     assert 'draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Sessions"' in ui_c
     assert 'draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Settings"' in ui_c
-    assert 'draw_action_button(92.0f, 116.0f, 136.0f, 28.0f, "Audio Prompt"' in ui_c
+    assert 'draw_action_button(16.0f, 116.0f, 136.0f, 28.0f, "Audio Prompt"' in ui_c
+    assert 'draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Picture Prompt"' in ui_c
     assert 'draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Reset Session"' in ui_c
     assert 'draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Clear Screen"' in ui_c
     assert 'draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Compress"' in ui_c

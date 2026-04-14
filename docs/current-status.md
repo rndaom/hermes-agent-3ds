@@ -23,11 +23,15 @@ Last major verified milestone: **the V2-only 3DS client is validated end-to-end 
 - conversation picker exists from the home action list for switching/syncing conversation slots
 - native V2 chat flow is implemented with:
   - `POST /api/v2/messages`
+  - `POST /api/v2/image`
   - `POST /api/v2/voice`
   - `GET /api/v2/events`
+  - `GET /api/v2/media/{media_id}`
   - approval handling through `POST /api/v2/interactions/{request_id}/respond`
 - microphone input is implemented on-device and routed through host-side speech-to-text with `UP`
+- picture input is now implemented on-device through the outer camera and uploaded to Hermes as a BMP still
 - the mic recording screen now uses graphical in-app rendering instead of the old console shell
+- the picture capture screen now uses graphical in-app rendering instead of the old console shell
 - approval prompts now use graphical in-app rendering instead of the old console shell
 - renderer ownership cleanup is complete for normal GUI screens
 - stale-event filtering is in place using:
@@ -47,8 +51,10 @@ Last major verified milestone: **the V2-only 3DS client is validated end-to-end 
   - `GET /api/v2/health` with `token`, `device_id`, and active `conversation_id` query parameters
   - `GET /api/v2/conversations`
   - `POST /api/v2/messages`
+  - `POST /api/v2/image`
   - `POST /api/v2/voice`
   - `GET /api/v2/events`
+  - `GET /api/v2/media/{media_id}`
   - `POST /api/v2/interactions/{request_id}/respond`
 - live local integration has been validated against the Hermes-side gateway
 - the latest app build has been deployed over FTPD to the real Old 3DS for current hardware verification
@@ -76,8 +82,10 @@ Host-side gateway ownership belongs in `hermes-agent`, where 3DS behaves like an
   - `/api/v2/health` with query-string identity parameters
   - `/api/v2/conversations`
   - `/api/v2/messages`
+  - `/api/v2/image`
   - `/api/v2/voice`
   - `/api/v2/events`
+  - `/api/v2/media/{media_id}`
 - real-hardware deployment over FTPD to the Old 3DS
 
 Latest built artifact:
@@ -92,6 +100,6 @@ Latest built artifact:
 ## Recommended next steps
 
 1. decide whether to import sprite-backed DS icons and chrome through `client/gfx/` or keep the procedural shell for Old-3DS simplicity
-2. add richer media handling such as camera upload, inline generated image rendering, and generated audio playback
+2. tighten the first-pass picture workflow on hardware, especially capture quality and picture-reply rendering
 3. add more native slash commands to the bottom-screen command page
 4. continue tightening any remaining text-fit or readability issues found on hardware

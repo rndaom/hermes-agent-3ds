@@ -112,3 +112,16 @@ void hermes_app_requests_handle_voice(
     size_t status_line_size,
     Result* request_rc
 );
+
+void hermes_app_requests_handle_picture(
+    const HermesAppConfig* config,
+    bool network_ready,
+    const AppRequestUiContext* ui,
+    BridgeChatResult* chat_result,
+    char* last_message,
+    size_t last_message_size,
+    size_t* history_scroll,
+    char* status_line,
+    size_t status_line_size,
+    Result* request_rc
+);

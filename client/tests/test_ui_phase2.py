@@ -35,6 +35,7 @@ def test_phase2_followup_uses_touch_sized_home_buttons_and_message_cards():
 
     assert "draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f" in ui_c
     assert 'draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Text Prompt"' in ui_c
-    assert 'draw_action_button(92.0f, 116.0f, 136.0f, 28.0f, "Audio Prompt"' in ui_c
+    assert 'draw_action_button(16.0f, 116.0f, 136.0f, 28.0f, "Audio Prompt"' in ui_c
+    assert 'draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Picture Prompt"' in ui_c
     assert "draw_message_card(" in ui_c
     assert 'printf("Gateway:' not in ui_c

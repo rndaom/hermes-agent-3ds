@@ -191,6 +191,7 @@ Required home tools:
 - `Sessions`
 - `Settings`
 - `Audio Prompt`
+- `Picture Prompt`
 
 Required slash-command entries:
 - `Reset Session` -> native `/reset`
