@@ -43,9 +43,14 @@ def test_home_command_menu_has_touch_support_and_reply_paging_on_pad_circle_and_
     assert "HOME_COMMAND_COMPRESS" in home_h
     assert "HOME_COMMAND_HELP" in home_h
     assert "HOME_COMMAND_STATUS" in home_h
+    assert "HOME_COMMAND_PROVIDER" in home_h
+    assert "HOME_COMMAND_ROLLBACK" in home_h
     assert "HOME_COMMAND_REASONING" in home_h
+    assert "HOME_COMMAND_FAST" in home_h
     assert "HOME_COMMAND_MODEL" in home_h
     assert "HOME_COMMAND_COMMANDS" in home_h
+    assert "HOME_COMMAND_PERSONALITY" in home_h
+    assert "HOME_COMMAND_RESUME" in home_h
     assert "HomeCommand* command_selection" in home_h
     assert "KEY_DOWN" in home_c
     assert "KEY_UP" in home_c
@@ -72,9 +77,14 @@ def test_home_command_menu_has_touch_support_and_reply_paging_on_pad_circle_and_
     assert 'draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Compress"' in ui_c
     assert 'draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Help"' in ui_c
     assert 'draw_action_button(16.0f, 116.0f, 136.0f, 28.0f, "Status"' in ui_c
-    assert 'draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Reasoning"' in ui_c
-    assert 'draw_action_button(16.0f, 152.0f, 136.0f, 28.0f, "Model"' in ui_c
     assert 'draw_action_button(168.0f, 152.0f, 136.0f, 28.0f, "Commands"' in ui_c
+    assert 'draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Providers"' in ui_c
+    assert 'draw_action_button(16.0f, 152.0f, 136.0f, 28.0f, "Rollback"' in ui_c
+    assert 'draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Reasoning"' in ui_c
+    assert 'draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Fast"' in ui_c
+    assert 'draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Model"' in ui_c
+    assert 'draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Personality"' in ui_c
+    assert 'draw_action_button(92.0f, 116.0f, 136.0f, 28.0f, "Resume"' in ui_c
     assert 'draw_hint_button(200.0f, 214.0f, 104.0f, "<- -> Page"' in ui_c
     assert '"B Ask Hermes"' not in ui_c
     assert '"A Check Link"' not in ui_c

@@ -45,6 +45,17 @@ void hermes_app_ui_render(
     size_t conversation_selection
 );
 
+void hermes_app_ui_render_interaction_prompt(
+    const HermesAppConfig* config,
+    const char* header,
+    const char* title,
+    const char* body,
+    const BridgeV2InteractionOption* options,
+    size_t option_count,
+    size_t selection,
+    const char* hint_line
+);
+
 void hermes_app_ui_render_approval_prompt(const HermesAppConfig* config, const char* request_id);
 void hermes_app_ui_render_voice_recording(
     const HermesAppConfig* config,

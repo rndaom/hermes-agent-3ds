@@ -60,11 +60,18 @@ def test_bridge_v2_module_exists_for_native_gateway_protocol():
     assert "cursor" in source
     assert "wait" in source
     assert "approval.request" in source
+    assert "interaction.request" in source
     assert "message.created" in source
     assert "message.updated" in source
     assert "status.updated" in source
     assert "reply_to" in source
     assert '\\"event\\"' in source
+    assert "interaction_required" in header
+    assert "BridgeV2InteractionOption" in header
+    assert "BRIDGE_V2_INTERACTION_OPTION_COUNT_MAX 24" in header
+    assert "option_count" in source
+    assert '"choice_%lu"' in source
+    assert '"label_%lu"' in source
 
 
 def test_bridge_v2_decodes_common_json_unicode_punctuation_for_3ds_console():

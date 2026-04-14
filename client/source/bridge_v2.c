@@ -527,6 +527,44 @@ static bool extract_json_u32(const char* json, const char* key, u32* out_value)
     return true;
 }
 
+static void extract_interaction_options_after(
+    const char* json,
+    const char* marker,
+    BridgeV2InteractionOption* options,
+    size_t option_capacity,
+    size_t* out_count
+)
+{
+    u32 parsed_count = 0;
+    size_t index;
+
+    if (out_count != NULL)
+        *out_count = 0;
+    if (json == NULL || marker == NULL || options == NULL || option_capacity == 0 || out_count == NULL)
+        return;
+
+    if (!extract_json_u32(strstr(json, marker) != NULL ? strstr(json, marker) : json, "option_count", &parsed_count))
+        return;
+
+    if (parsed_count > option_capacity)
+        parsed_count = (u32)option_capacity;
+
+    for (index = 0; index < (size_t)parsed_count; index++) {
+        char choice_key[24];
+        char label_key[24];
+
+        snprintf(choice_key, sizeof(choice_key), "choice_%lu", (unsigned long)index);
+        snprintf(label_key, sizeof(label_key), "label_%lu", (unsigned long)index);
+        options[index].choice[0] = '\0';
+        options[index].label[0] = '\0';
+        if (!extract_json_string_after(json, marker, choice_key, options[index].choice, sizeof(options[index].choice)))
+            break;
+        if (!extract_json_display_text_after(json, marker, label_key, options[index].label, sizeof(options[index].label)))
+            snprintf(options[index].label, sizeof(options[index].label), "%s", options[index].choice);
+        *out_count = index + 1;
+    }
+}
+
 static bool is_safe_query_value(const char* value)
 {
     if (value == NULL || value[0] == '\0')
@@ -1386,6 +1424,8 @@ Result bridge_v2_poll_events(const char* url, const char* token, const char* dev
     if (result->event_type[0] == '\0') {
         if (strstr(body, "\"approval.request\"") != NULL)
             snprintf(result->event_type, sizeof(result->event_type), "%s", "approval.request");
+        else if (strstr(body, "\"interaction.request\"") != NULL)
+            snprintf(result->event_type, sizeof(result->event_type), "%s", "interaction.request");
         else if (strstr(body, "\"status.updated\"") != NULL)
             snprintf(result->event_type, sizeof(result->event_type), "%s", "status.updated");
         else if (strstr(body, "\"message.updated\"") != NULL)
@@ -1398,6 +1438,26 @@ Result bridge_v2_poll_events(const char* url, const char* token, const char* dev
         result->approval_required = true;
         if (!extract_json_string_after(body, "\"event\"", "request_id", result->request_id, sizeof(result->request_id)))
             extract_json_string_after(body, "\"approval.request\"", "request_id", result->request_id, sizeof(result->request_id));
+        result->success = true;
+        free(response);
+        return 0;
+    }
+
+    if (strcmp(result->event_type, "interaction.request") == 0) {
+        result->interaction_required = true;
+        if (!extract_json_string_after(body, "\"event\"", "request_id", result->request_id, sizeof(result->request_id)))
+            extract_json_string_after(body, "\"interaction.request\"", "request_id", result->request_id, sizeof(result->request_id));
+        if (!extract_json_display_text_after(body, "\"event\"", "title", result->interaction_title, sizeof(result->interaction_title)))
+            extract_json_display_text_after(body, "\"interaction.request\"", "title", result->interaction_title, sizeof(result->interaction_title));
+        if (!extract_json_display_text_after(body, "\"event\"", "text", result->interaction_text, sizeof(result->interaction_text)))
+            extract_json_display_text_after(body, "\"interaction.request\"", "text", result->interaction_text, sizeof(result->interaction_text));
+        extract_interaction_options_after(
+            body,
+            strstr(body, "\"event\"") != NULL ? "\"event\"" : "\"interaction.request\"",
+            result->interaction_options,
+            BRIDGE_V2_INTERACTION_OPTION_COUNT_MAX,
+            &result->interaction_option_count
+        );
         result->success = true;
         free(response);
         return 0;

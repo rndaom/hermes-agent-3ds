@@ -146,6 +146,13 @@ def test_main_c_wraps_and_scrolls_message_history_for_small_screens():
     assert "hermes_app_ui_home_history_max_scroll(status_line)" in request_c
     assert "text_is_fresh_session_command" in request_c
     assert "submit_hidden_reset_command" in request_c
+    assert "prompt_picker_choice" in request_c
+    assert "prompt_v2_interaction_choice" in request_c
+    assert "interaction_required" in request_c
+    assert "INTERACTION_VISIBLE_OPTION_COUNT 8U" in request_c
+    assert '"Use Pad/touch. L/R page %lu/%lu. A choose, B cancel."' in request_c
+    assert "hermes_app_requests_handle_reasoning_command" in request_c
+    assert "hermes_app_requests_handle_fast_command" in request_c
     assert "THINKING" in ui_c
     assert "WORKING" in ui_c
     assert "g_home_history[index].height" in ui_c

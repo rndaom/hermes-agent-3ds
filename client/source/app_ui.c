@@ -962,8 +962,10 @@ static void render_home_graphical(
 {
     const PictochatTheme* theme = get_global_theme(config);
     char conversation_label[HERMES_APP_CONVERSATION_ID_MAX];
-    bool tools_page = command_selection <= (size_t)HOME_COMMAND_AUDIO || command_selection > (size_t)HOME_COMMAND_COMMANDS;
-    size_t selected_command = command_selection <= (size_t)HOME_COMMAND_COMMANDS ? command_selection : (size_t)HOME_COMMAND_TEXT;
+    int command_page = command_selection <= (size_t)HOME_COMMAND_AUDIO || command_selection > (size_t)HOME_COMMAND_RESUME
+        ? 0
+        : (command_selection <= (size_t)HOME_COMMAND_ROLLBACK ? 1 : 2);
+    size_t selected_command = command_selection <= (size_t)HOME_COMMAND_RESUME ? command_selection : (size_t)HOME_COMMAND_TEXT;
     size_t max_scroll;
     size_t index;
     float transcript_height;
@@ -1021,23 +1023,30 @@ static void render_home_graphical(
     app_gfx_begin_bottom(theme->background);
     app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, theme->paper_shadow, theme->border_dark);
     draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, theme->paper, theme);
-    if (tools_page) {
+    if (command_page == 0) {
         draw_bottom_header_home(theme, "TOOL TRAY", conversation_label, "CMDS >");
         draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Text Prompt", ACTION_BUTTON_ICON_TEXT, theme, selected_command == (size_t)HOME_COMMAND_TEXT);
         draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Check Relay", ACTION_BUTTON_ICON_RELAY, theme, selected_command == (size_t)HOME_COMMAND_CHECK);
         draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Sessions", ACTION_BUTTON_ICON_SESSIONS, theme, selected_command == (size_t)HOME_COMMAND_SESSIONS);
         draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Settings", ACTION_BUTTON_ICON_SETTINGS, theme, selected_command == (size_t)HOME_COMMAND_SETTINGS);
         draw_action_button(92.0f, 116.0f, 136.0f, 28.0f, "Audio Prompt", ACTION_BUTTON_ICON_AUDIO, theme, selected_command == (size_t)HOME_COMMAND_AUDIO);
-    } else {
-        draw_bottom_header_home(theme, "SLASH CMDS", conversation_label, "< TOOLS");
+    } else if (command_page == 1) {
+        draw_bottom_header_home(theme, "SLASH 1/2", conversation_label, "1/2");
         draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Reset Session", ACTION_BUTTON_ICON_RESET, theme, selected_command == (size_t)HOME_COMMAND_RESET);
         draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Clear Screen", ACTION_BUTTON_ICON_CLEAR, theme, selected_command == (size_t)HOME_COMMAND_CLEAR);
         draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Compress", ACTION_BUTTON_ICON_COMPRESS, theme, selected_command == (size_t)HOME_COMMAND_COMPRESS);
         draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Help", ACTION_BUTTON_ICON_HELP, theme, selected_command == (size_t)HOME_COMMAND_HELP);
         draw_action_button(16.0f, 116.0f, 136.0f, 28.0f, "Status", ACTION_BUTTON_ICON_STATUS, theme, selected_command == (size_t)HOME_COMMAND_STATUS);
-        draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Reasoning", ACTION_BUTTON_ICON_REASONING, theme, selected_command == (size_t)HOME_COMMAND_REASONING);
-        draw_action_button(16.0f, 152.0f, 136.0f, 28.0f, "Model", ACTION_BUTTON_ICON_MODEL, theme, selected_command == (size_t)HOME_COMMAND_MODEL);
         draw_action_button(168.0f, 152.0f, 136.0f, 28.0f, "Commands", ACTION_BUTTON_ICON_COMMANDS, theme, selected_command == (size_t)HOME_COMMAND_COMMANDS);
+        draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Providers", ACTION_BUTTON_ICON_MODEL, theme, selected_command == (size_t)HOME_COMMAND_PROVIDER);
+        draw_action_button(16.0f, 152.0f, 136.0f, 28.0f, "Rollback", ACTION_BUTTON_ICON_ABORT, theme, selected_command == (size_t)HOME_COMMAND_ROLLBACK);
+    } else {
+        draw_bottom_header_home(theme, "SLASH 2/2", conversation_label, "2/2");
+        draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Reasoning", ACTION_BUTTON_ICON_REASONING, theme, selected_command == (size_t)HOME_COMMAND_REASONING);
+        draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Fast", ACTION_BUTTON_ICON_SEND, theme, selected_command == (size_t)HOME_COMMAND_FAST);
+        draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Model", ACTION_BUTTON_ICON_MODEL, theme, selected_command == (size_t)HOME_COMMAND_MODEL);
+        draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Personality", ACTION_BUTTON_ICON_BOOKMARK, theme, selected_command == (size_t)HOME_COMMAND_PERSONALITY);
+        draw_action_button(92.0f, 116.0f, 136.0f, 28.0f, "Resume", ACTION_BUTTON_ICON_SESSIONS, theme, selected_command == (size_t)HOME_COMMAND_RESUME);
     }
 
     draw_hint_button(16.0f, 214.0f, 92.0f, "L/R Scroll", theme);
@@ -1191,6 +1200,71 @@ static void render_conversations_graphical(
     draw_menu_row(16.0f, 144.0f, 288.0f, "START Exit app", theme);
     draw_ruled_paper(8.0f, 190.0f, 304.0f, 30.0f, theme->paper_alt, theme);
     app_gfx_text_fit(16.0f, 198.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "Sessions are Hermes conversation IDs inside the handheld shell.");
+}
+
+void hermes_app_ui_render_interaction_prompt(
+    const HermesAppConfig* config,
+    const char* header,
+    const char* title,
+    const char* body,
+    const BridgeV2InteractionOption* options,
+    size_t option_count,
+    size_t selection,
+    const char* hint_line
+)
+{
+    const PictochatTheme* theme = get_global_theme(config);
+    size_t index;
+    const char* frame_header = header != NULL && header[0] != '\0' ? header : "CHOICE";
+    const char* frame_title = title != NULL && title[0] != '\0' ? title : "Choose an option";
+    const char* frame_body = body != NULL && body[0] != '\0' ? body : "Pick one of the handheld-friendly options below.";
+    const char* footer_hint = hint_line != NULL && hint_line[0] != '\0' ? hint_line : "Use the D-pad or touch, then press A.";
+
+    if (selection >= option_count && option_count > 0)
+        selection = option_count - 1;
+
+    app_gfx_begin_frame();
+
+    app_gfx_begin_top(theme->background);
+    app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, theme->paper_shadow, theme->border_dark);
+    draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, theme->paper, theme);
+    draw_top_header(theme, frame_header);
+    draw_alert_banner(28.0f, 44.0f, 344.0f, 24.0f, frame_title, theme);
+    draw_ruled_paper(20.0f, 76.0f, 360.0f, 136.0f, theme->paper, theme);
+    app_gfx_text_fit(32.0f, 90.0f, 336.0f, 0.28f, 0.28f, theme->text, frame_body);
+    app_gfx_text_fit(32.0f, 188.0f, 336.0f, 0.24f, 0.24f, theme->text_muted, footer_hint);
+
+    app_gfx_begin_bottom(theme->background);
+    app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, theme->paper_shadow, theme->border_dark);
+    draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, theme->paper, theme);
+    draw_bottom_header(theme, "INTERACTION");
+
+    if (option_count == 0) {
+        draw_ruled_paper(8.0f, 44.0f, 304.0f, 138.0f, theme->paper_alt, theme);
+        app_gfx_text_fit(16.0f, 102.0f, 288.0f, 0.28f, 0.28f, theme->text, "No options are available for this request.");
+    } else {
+        for (index = 0; index < option_count && index < 8; index++) {
+            float x = index % 2 == 0 ? 16.0f : 168.0f;
+            float y = 48.0f + (float)(index / 2) * 36.0f;
+
+            draw_action_button(
+                x,
+                y,
+                136.0f,
+                28.0f,
+                options[index].label[0] != '\0' ? options[index].label : options[index].choice,
+                ACTION_BUTTON_ICON_GENERIC,
+                theme,
+                index == selection
+            );
+        }
+    }
+
+    draw_hint_button(16.0f, 214.0f, 92.0f, "Pad Move", theme);
+    draw_hint_button(114.0f, 214.0f, 80.0f, "A Choose", theme);
+    draw_hint_button(200.0f, 214.0f, 104.0f, "B Cancel", theme);
+
+    app_gfx_end_frame();
 }
 
 void hermes_app_ui_render_approval_prompt(const HermesAppConfig* config, const char* request_id)

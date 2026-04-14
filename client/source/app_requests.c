@@ -49,6 +49,211 @@ static void render_home_request_ui(
     Result request_rc
 );
 
+#define INTERACTION_VISIBLE_OPTION_COUNT 8U
+
+static bool interaction_choice_is_cancel_like(const char* choice)
+{
+    return choice != NULL && (
+        strcmp(choice, "cancel") == 0 ||
+        strcmp(choice, "deny") == 0
+    );
+}
+
+static int interaction_cancel_choice_index(const BridgeV2InteractionOption* options, size_t option_count)
+{
+    size_t index;
+
+    if (options == NULL)
+        return -1;
+
+    for (index = 0; index < option_count; index++) {
+        if (interaction_choice_is_cancel_like(options[index].choice))
+            return (int)index;
+    }
+
+    return -1;
+}
+
+static int interaction_touch_option_index(int px, int py, size_t option_count)
+{
+    size_t index;
+
+    for (index = 0; index < option_count && index < 8; index++) {
+        int x = index % 2 == 0 ? 16 : 168;
+        int y = 48 + (int)(index / 2) * 36;
+
+        if (px >= x && px < x + 136 && py >= y && py < y + 28)
+            return (int)index;
+    }
+
+    return -1;
+}
+
+static size_t interaction_page_count(size_t option_count)
+{
+    return option_count == 0 ? 1 : ((option_count - 1) / INTERACTION_VISIBLE_OPTION_COUNT) + 1;
+}
+
+static size_t interaction_page_start(size_t selection)
+{
+    return (selection / INTERACTION_VISIBLE_OPTION_COUNT) * INTERACTION_VISIBLE_OPTION_COUNT;
+}
+
+static size_t move_interaction_selection(size_t current, size_t option_count, int delta_x, int delta_y)
+{
+    size_t row;
+    size_t column;
+    size_t next;
+
+    if (option_count == 0)
+        return 0;
+
+    row = current / 2;
+    column = current % 2;
+
+    if (delta_x < 0 && column > 0)
+        column--;
+    else if (delta_x > 0 && column < 1)
+        column++;
+
+    if (delta_y < 0 && row > 0)
+        row--;
+    else if (delta_y > 0)
+        row++;
+
+    next = row * 2 + column;
+    if (next >= option_count) {
+        if (delta_y > 0)
+            return current;
+        if (option_count > 0)
+            return option_count - 1;
+    }
+
+    return next < option_count ? next : current;
+}
+
+static bool prompt_picker_choice(
+    const HermesAppConfig* config,
+    const char* header,
+    const char* title,
+    const char* body,
+    const BridgeV2InteractionOption* options,
+    size_t option_count,
+    char* out_choice,
+    size_t out_size
+)
+{
+    char hint_line[96];
+    size_t selection = 0;
+    size_t page_count;
+    size_t page_start;
+    size_t visible_count;
+    int cancel_index;
+
+    if (out_choice == NULL || out_size == 0 || options == NULL || option_count == 0)
+        return false;
+
+    out_choice[0] = '\0';
+    cancel_index = interaction_cancel_choice_index(options, option_count);
+    page_count = interaction_page_count(option_count);
+
+    while (aptMainLoop()) {
+        u32 kDown;
+        touchPosition touch = {0};
+        int touched_index = -1;
+
+        page_start = interaction_page_start(selection);
+        visible_count = option_count - page_start;
+        if (visible_count > INTERACTION_VISIBLE_OPTION_COUNT)
+            visible_count = INTERACTION_VISIBLE_OPTION_COUNT;
+
+        if (page_count > 1) {
+            snprintf(
+                hint_line,
+                sizeof(hint_line),
+                "Use Pad/touch. L/R page %lu/%lu. A choose, B cancel.",
+                (unsigned long)((page_start / INTERACTION_VISIBLE_OPTION_COUNT) + 1),
+                (unsigned long)page_count
+            );
+        } else {
+            snprintf(hint_line, sizeof(hint_line), "Use the D-pad, touch, or A/B.");
+        }
+
+        hermes_app_ui_render_interaction_prompt(
+            config,
+            header,
+            title,
+            body,
+            options + page_start,
+            visible_count,
+            selection - page_start,
+            hint_line
+        );
+        gspWaitForVBlank();
+        hidScanInput();
+        kDown = hidKeysDown();
+
+        if ((kDown & KEY_L) != 0 && page_start >= INTERACTION_VISIBLE_OPTION_COUNT) {
+            selection = page_start - INTERACTION_VISIBLE_OPTION_COUNT;
+        } else if ((kDown & KEY_R) != 0 && page_start + visible_count < option_count) {
+            selection = page_start + INTERACTION_VISIBLE_OPTION_COUNT;
+            if (selection >= option_count)
+                selection = option_count - 1;
+        } else if ((kDown & (KEY_UP | KEY_CPAD_UP)) != 0) {
+            selection = move_interaction_selection(selection, option_count, 0, -1);
+        } else if ((kDown & (KEY_DOWN | KEY_CPAD_DOWN)) != 0) {
+            selection = move_interaction_selection(selection, option_count, 0, 1);
+        } else if ((kDown & KEY_LEFT) != 0) {
+            selection = move_interaction_selection(selection, option_count, -1, 0);
+        } else if ((kDown & KEY_RIGHT) != 0) {
+            selection = move_interaction_selection(selection, option_count, 1, 0);
+        } else if ((kDown & KEY_TOUCH) != 0) {
+            hidTouchRead(&touch);
+            touched_index = interaction_touch_option_index((int)touch.px, (int)touch.py, visible_count);
+            if (touched_index >= 0)
+                selection = page_start + (size_t)touched_index;
+        }
+
+        if ((kDown & KEY_A) != 0 || ((kDown & KEY_TOUCH) != 0 && touched_index >= 0)) {
+            snprintf(out_choice, out_size, "%s", options[selection].choice);
+            return true;
+        }
+
+        if (((kDown & KEY_B) != 0 || (kDown & KEY_START) != 0) && cancel_index >= 0) {
+            snprintf(out_choice, out_size, "%s", options[cancel_index].choice);
+            return true;
+        }
+        if ((kDown & KEY_B) != 0)
+            return false;
+        if ((kDown & KEY_START) != 0)
+            return false;
+    }
+
+    return false;
+}
+
+static bool prompt_v2_interaction_choice(
+    const HermesAppConfig* config,
+    const BridgeV2EventPollResult* event_result,
+    char* out_choice,
+    size_t out_size
+)
+{
+    if (event_result == NULL)
+        return false;
+
+    return prompt_picker_choice(
+        config,
+        "CHOICE",
+        event_result->interaction_title,
+        event_result->interaction_text,
+        event_result->interaction_options,
+        event_result->interaction_option_count,
+        out_choice,
+        out_size
+    );
+}
+
 static void reset_chat_request_state(BridgeChatResult* chat_result, BridgeV2MessageResult* message_result, Result* request_rc, size_t* history_scroll)
 {
     if (chat_result != NULL)
@@ -141,7 +346,7 @@ static Result poll_for_v2_reply(
         if (event_result->cursor > *event_cursor)
             *event_cursor = event_result->cursor;
 
-        if (event_result->approval_required)
+        if (event_result->approval_required || event_result->interaction_required)
             break;
 
         if (strcmp(event_result->event_type, "status.updated") == 0 && event_result->reply_text[0] != '\0') {
@@ -169,7 +374,7 @@ static Result poll_for_v2_reply(
         }
     }
 
-    if (R_SUCCEEDED(request_rc) && !*matched_reply && !event_result->approval_required) {
+    if (R_SUCCEEDED(request_rc) && !*matched_reply && !event_result->approval_required && !event_result->interaction_required) {
         event_result->success = false;
         snprintf(event_result->error, sizeof(event_result->error), "Timed out waiting for Hermes reply.");
     }
@@ -191,6 +396,11 @@ static void apply_v2_event_to_chat_result(const BridgeV2EventPollResult* event_r
 
     if (event_result->approval_required) {
         snprintf(chat_result->error, sizeof(chat_result->error), "Approval required. Use A/X/Y/B to respond.");
+        return;
+    }
+
+    if (event_result->interaction_required) {
+        snprintf(chat_result->error, sizeof(chat_result->error), "Interaction required. Use the bottom screen picker.");
         return;
     }
 
@@ -282,14 +492,14 @@ static Result complete_v2_roundtrip(
 )
 {
     char interaction_url[HERMES_APP_INTERACTION_URL_MAX];
-    char approval_choice[16];
+    char interaction_choice[BRIDGE_V2_INTERACTION_CHOICE_MAX];
     BridgeV2EventPollResult* event_result = NULL;
     BridgeV2EventPollResult* matched_event_result = NULL;
     BridgeV2InteractionResult interaction_result;
     bool matched_reply = false;
     bool missed_events = false;
     u32 event_cursor;
-    Result request_rc;
+    Result request_rc = 0;
 
     if (missed_events_out != NULL)
         *missed_events_out = false;
@@ -310,56 +520,7 @@ static Result complete_v2_roundtrip(
     bridge_v2_event_poll_result_reset(matched_event_result);
 
     event_cursor = message_result->cursor;
-    request_rc = poll_for_v2_reply(
-        config,
-        ui,
-        events_url,
-        message_result,
-        &event_cursor,
-        event_result,
-        matched_event_result,
-        &matched_reply,
-        chat_result,
-        last_message,
-        status_line,
-        status_line_size
-    );
-    if (R_FAILED(request_rc)) {
-        if (event_result->error[0] != '\0')
-            set_chat_result_error(chat_result, event_result->error);
-        goto done;
-    }
-
-    if (event_result->missed_events)
-        missed_events = true;
-
-    if (event_result->approval_required) {
-        approval_choice[0] = '\0';
-        bridge_v2_interaction_result_reset(&interaction_result);
-
-        if (!hermes_app_config_build_interaction_url(config, event_result->request_id, interaction_url, sizeof(interaction_url))) {
-            set_chat_result_error(chat_result, "Approval URL could not be built.");
-            goto done;
-        }
-        if (!prompt_v2_approval_choice(config, event_result->request_id, approval_choice, sizeof(approval_choice))) {
-            set_chat_result_error(chat_result, "Approval canceled.");
-            goto done;
-        }
-
-        request_rc = bridge_v2_submit_interaction(interaction_url, config->token, approval_choice, &interaction_result);
-        if (R_FAILED(request_rc) || !interaction_result.success) {
-            set_chat_result_error(
-                chat_result,
-                interaction_result.error[0] != '\0' ? interaction_result.error : "Approval response failed."
-            );
-            goto done;
-        }
-        if (strcmp(approval_choice, "deny") == 0) {
-            set_chat_result_error(chat_result, "Command denied.");
-            request_rc = 0;
-            goto done;
-        }
-
+    while (aptMainLoop()) {
         request_rc = poll_for_v2_reply(
             config,
             ui,
@@ -382,6 +543,51 @@ static Result complete_v2_roundtrip(
 
         if (event_result->missed_events)
             missed_events = true;
+
+        if (matched_reply)
+            break;
+
+        if (!event_result->approval_required && !event_result->interaction_required)
+            break;
+
+        interaction_choice[0] = '\0';
+        bridge_v2_interaction_result_reset(&interaction_result);
+
+        if (!hermes_app_config_build_interaction_url(config, event_result->request_id, interaction_url, sizeof(interaction_url))) {
+            set_chat_result_error(chat_result, event_result->approval_required ? "Approval URL could not be built." : "Interaction URL could not be built.");
+            goto done;
+        }
+
+        if (event_result->approval_required) {
+            if (!prompt_v2_approval_choice(config, event_result->request_id, interaction_choice, sizeof(interaction_choice))) {
+                set_chat_result_error(chat_result, "Approval canceled.");
+                goto done;
+            }
+        } else {
+            if (!prompt_v2_interaction_choice(config, event_result, interaction_choice, sizeof(interaction_choice))) {
+                set_chat_result_error(chat_result, "Interaction canceled.");
+                goto done;
+            }
+        }
+
+        request_rc = bridge_v2_submit_interaction(interaction_url, config->token, interaction_choice, &interaction_result);
+        if (R_FAILED(request_rc) || !interaction_result.success) {
+            set_chat_result_error(
+                chat_result,
+                interaction_result.error[0] != '\0' ? interaction_result.error : "Interaction response failed."
+            );
+            goto done;
+        }
+        if (strcmp(interaction_choice, "deny") == 0) {
+            set_chat_result_error(chat_result, "Command denied.");
+            request_rc = 0;
+            goto done;
+        }
+        if (strcmp(interaction_choice, "cancel") == 0) {
+            set_chat_result_error(chat_result, "Command canceled.");
+            request_rc = 0;
+            goto done;
+        }
     }
 
     apply_v2_event_to_chat_result(matched_reply ? matched_event_result : event_result, chat_result);
@@ -600,6 +806,42 @@ static void submit_text_message(
     render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
 }
 
+static void submit_picked_command(
+    const HermesAppConfig* config,
+    bool network_ready,
+    const AppRequestUiContext* ui,
+    BridgeChatResult* chat_result,
+    char* last_message,
+    size_t last_message_size,
+    size_t* history_scroll,
+    char* status_line,
+    size_t status_line_size,
+    Result* request_rc,
+    const char* command_name,
+    const char* command_choice
+)
+{
+    char command_buffer[BRIDGE_CHAT_MESSAGE_MAX];
+
+    if (command_name == NULL || command_name[0] == '\0' || command_choice == NULL || command_choice[0] == '\0')
+        return;
+
+    snprintf(command_buffer, sizeof(command_buffer), "/%s %s", command_name, command_choice);
+    submit_text_message(
+        config,
+        network_ready,
+        ui,
+        chat_result,
+        last_message,
+        last_message_size,
+        history_scroll,
+        status_line,
+        status_line_size,
+        request_rc,
+        command_buffer
+    );
+}
+
 void hermes_app_requests_handle_text(
     const HermesAppConfig* config,
     bool network_ready,
@@ -668,6 +910,113 @@ void hermes_app_requests_handle_command(
         status_line_size,
         request_rc,
         command_text
+    );
+}
+
+void hermes_app_requests_handle_reasoning_command(
+    const HermesAppConfig* config,
+    bool network_ready,
+    const AppRequestUiContext* ui,
+    BridgeChatResult* chat_result,
+    char* last_message,
+    size_t last_message_size,
+    size_t* history_scroll,
+    char* status_line,
+    size_t status_line_size,
+    Result* request_rc
+)
+{
+    static const BridgeV2InteractionOption reasoning_options[] = {
+        {"none", "None"},
+        {"minimal", "Minimal"},
+        {"low", "Low"},
+        {"medium", "Medium"},
+        {"high", "High"},
+        {"xhigh", "XHigh"},
+        {"show", "Show"},
+        {"hide", "Hide"},
+    };
+    char choice[BRIDGE_V2_INTERACTION_CHOICE_MAX];
+
+    if (!prompt_picker_choice(
+            config,
+            "REASONING",
+            "Reasoning settings",
+            "Choose a reasoning effort level, or toggle whether Hermes shows its thinking before replies.",
+            reasoning_options,
+            sizeof(reasoning_options) / sizeof(reasoning_options[0]),
+            choice,
+            sizeof(choice)
+        )) {
+        snprintf(status_line, status_line_size, "Reasoning change canceled.");
+        render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
+        return;
+    }
+
+    submit_picked_command(
+        config,
+        network_ready,
+        ui,
+        chat_result,
+        last_message,
+        last_message_size,
+        history_scroll,
+        status_line,
+        status_line_size,
+        request_rc,
+        "reasoning",
+        choice
+    );
+}
+
+void hermes_app_requests_handle_fast_command(
+    const HermesAppConfig* config,
+    bool network_ready,
+    const AppRequestUiContext* ui,
+    BridgeChatResult* chat_result,
+    char* last_message,
+    size_t last_message_size,
+    size_t* history_scroll,
+    char* status_line,
+    size_t status_line_size,
+    Result* request_rc
+)
+{
+    static const BridgeV2InteractionOption fast_options[] = {
+        {"fast", "Fast"},
+        {"normal", "Normal"},
+        {"status", "Status"},
+    };
+    char choice[BRIDGE_V2_INTERACTION_CHOICE_MAX];
+
+    if (!prompt_picker_choice(
+            config,
+            "PRIORITY",
+            "Priority processing",
+            "Choose fast mode, return to normal mode, or just ask Hermes for the current Priority Processing state.",
+            fast_options,
+            sizeof(fast_options) / sizeof(fast_options[0]),
+            choice,
+            sizeof(choice)
+        )) {
+        snprintf(status_line, status_line_size, "Priority Processing change canceled.");
+        render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
+        return;
+    }
+
+    submit_picked_command(
+        config,
+        network_ready,
+        ui,
+        chat_result,
+        last_message,
+        last_message_size,
+        history_scroll,
+        status_line,
+        status_line_size,
+        request_rc,
+        "fast",
+        choice
     );
 }
 

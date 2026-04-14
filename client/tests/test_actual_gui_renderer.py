@@ -71,6 +71,7 @@ def test_transient_ui_paths_do_not_expose_printconsole_or_manual_buffer_swaps():
     assert "gfxFlushBuffers" not in request_c
     assert "gfxSwapBuffers" not in voice_c
     assert "gfxFlushBuffers" not in voice_c
+    assert "hermes_app_ui_render_interaction_prompt" in ui_h
     assert "hermes_app_ui_render_approval_prompt" in ui_h
     assert "hermes_app_ui_render_voice_recording" in ui_h
 
@@ -87,6 +88,10 @@ def test_graphical_ui_bounds_variable_length_fields_and_uses_touch_sized_action_
     assert 'draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Clear Screen"' in ui_c
     assert 'draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Compress"' in ui_c
     assert 'draw_action_button(168.0f, 152.0f, 136.0f, 28.0f, "Commands"' in ui_c
+    assert 'draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Reasoning"' in ui_c
+    assert 'draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Fast"' in ui_c
+    assert 'draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Personality"' in ui_c
+    assert 'draw_action_button(92.0f, 116.0f, 136.0f, 28.0f, "Resume"' in ui_c
     assert "draw_ruled_paper(8.0f, 156.0f, 304.0f, 52.0f" not in ui_c
     assert 'draw_hint_button(16.0f, 214.0f, 92.0f, "L/R Scroll"' in ui_c
     assert 'draw_hint_button(114.0f, 214.0f, 80.0f, "A Select"' in ui_c
