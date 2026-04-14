@@ -144,6 +144,13 @@ static Result poll_for_v2_reply(
         if (event_result->approval_required)
             break;
 
+        if (strcmp(event_result->event_type, "status.updated") == 0 && event_result->reply_text[0] != '\0') {
+            if (status_line != NULL && status_line_size > 0)
+                snprintf(status_line, status_line_size, "%s", event_result->reply_text);
+            render_home_request_ui(config, ui, chat_result, last_message, 0, status_line, 0);
+            continue;
+        }
+
         if (event_is_matching_reply(event_result, message_result)) {
             *matched_event_result = *event_result;
             if (strcmp(event_result->event_type, "message.updated") == 0) {
@@ -151,7 +158,7 @@ static Result poll_for_v2_reply(
                 set_chat_result_reply_text(chat_result, event_result->reply_text);
                 hermes_app_ui_home_history_upsert(APP_UI_MESSAGE_HERMES, event_result->reply_text);
                 if (status_line != NULL && status_line_size > 0)
-                    snprintf(status_line, status_line_size, "Hermes is replying...");
+                    snprintf(status_line, status_line_size, "(^.^) Hermes is replying...");
                 render_home_request_ui(config, ui, chat_result, last_message, 0, status_line, 0);
                 continue;
             }
@@ -276,8 +283,8 @@ static Result complete_v2_roundtrip(
 {
     char interaction_url[HERMES_APP_INTERACTION_URL_MAX];
     char approval_choice[16];
-    BridgeV2EventPollResult event_result;
-    BridgeV2EventPollResult matched_event_result;
+    BridgeV2EventPollResult* event_result = NULL;
+    BridgeV2EventPollResult* matched_event_result = NULL;
     BridgeV2InteractionResult interaction_result;
     bool matched_reply = false;
     bool missed_events = false;
@@ -290,6 +297,18 @@ static Result complete_v2_roundtrip(
     if (config == NULL || ui == NULL || events_url == NULL || message_result == NULL || chat_result == NULL)
         return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_POINTER);
 
+    event_result = (BridgeV2EventPollResult*)malloc(sizeof(*event_result));
+    matched_event_result = (BridgeV2EventPollResult*)malloc(sizeof(*matched_event_result));
+    if (event_result == NULL || matched_event_result == NULL) {
+        free(event_result);
+        free(matched_event_result);
+        set_chat_result_error(chat_result, "Could not allocate reply buffers.");
+        return MAKERESULT(RL_FATAL, RS_OUTOFRESOURCE, RM_APPLICATION, RD_OUT_OF_MEMORY);
+    }
+
+    bridge_v2_event_poll_result_reset(event_result);
+    bridge_v2_event_poll_result_reset(matched_event_result);
+
     event_cursor = message_result->cursor;
     request_rc = poll_for_v2_reply(
         config,
@@ -297,8 +316,8 @@ static Result complete_v2_roundtrip(
         events_url,
         message_result,
         &event_cursor,
-        &event_result,
-        &matched_event_result,
+        event_result,
+        matched_event_result,
         &matched_reply,
         chat_result,
         last_message,
@@ -306,23 +325,23 @@ static Result complete_v2_roundtrip(
         status_line_size
     );
     if (R_FAILED(request_rc)) {
-        if (event_result.error[0] != '\0')
-            set_chat_result_error(chat_result, event_result.error);
-        return request_rc;
+        if (event_result->error[0] != '\0')
+            set_chat_result_error(chat_result, event_result->error);
+        goto done;
     }
 
-    if (event_result.missed_events)
+    if (event_result->missed_events)
         missed_events = true;
 
-    if (event_result.approval_required) {
+    if (event_result->approval_required) {
         approval_choice[0] = '\0';
         bridge_v2_interaction_result_reset(&interaction_result);
 
-        if (!hermes_app_config_build_interaction_url(config, event_result.request_id, interaction_url, sizeof(interaction_url))) {
+        if (!hermes_app_config_build_interaction_url(config, event_result->request_id, interaction_url, sizeof(interaction_url))) {
             set_chat_result_error(chat_result, "Approval URL could not be built.");
             goto done;
         }
-        if (!prompt_v2_approval_choice(config, event_result.request_id, approval_choice, sizeof(approval_choice))) {
+        if (!prompt_v2_approval_choice(config, event_result->request_id, approval_choice, sizeof(approval_choice))) {
             set_chat_result_error(chat_result, "Approval canceled.");
             goto done;
         }
@@ -347,8 +366,8 @@ static Result complete_v2_roundtrip(
             events_url,
             message_result,
             &event_cursor,
-            &event_result,
-            &matched_event_result,
+            event_result,
+            matched_event_result,
             &matched_reply,
             chat_result,
             last_message,
@@ -356,18 +375,20 @@ static Result complete_v2_roundtrip(
             status_line_size
         );
         if (R_FAILED(request_rc)) {
-            if (event_result.error[0] != '\0')
-                set_chat_result_error(chat_result, event_result.error);
-            return request_rc;
+            if (event_result->error[0] != '\0')
+                set_chat_result_error(chat_result, event_result->error);
+            goto done;
         }
 
-        if (event_result.missed_events)
+        if (event_result->missed_events)
             missed_events = true;
     }
 
-    apply_v2_event_to_chat_result(matched_reply ? &matched_event_result : &event_result, chat_result);
+    apply_v2_event_to_chat_result(matched_reply ? matched_event_result : event_result, chat_result);
 
 done:
+    free(matched_event_result);
+    free(event_result);
     if (missed_events_out != NULL)
         *missed_events_out = missed_events;
     return request_rc;
@@ -396,7 +417,25 @@ static void format_roundtrip_status(
     }
 }
 
-void hermes_app_requests_handle_text(
+static bool text_is_fresh_session_command(const char* text)
+{
+    size_t prefix_length;
+
+    if (text == NULL || text[0] != '/')
+        return false;
+
+    if (strncmp(text, "/reset", 6) == 0) {
+        prefix_length = 6;
+    } else if (strncmp(text, "/new", 4) == 0) {
+        prefix_length = 4;
+    } else {
+        return false;
+    }
+
+    return text[prefix_length] == '\0' || text[prefix_length] == ' ';
+}
+
+static void submit_hidden_reset_command(
     const HermesAppConfig* config,
     bool network_ready,
     const AppRequestUiContext* ui,
@@ -409,7 +448,6 @@ void hermes_app_requests_handle_text(
     Result* request_rc
 )
 {
-    char message_buffer[BRIDGE_CHAT_MESSAGE_MAX];
     char messages_url[HERMES_APP_MESSAGES_URL_MAX];
     char events_url[HERMES_APP_EVENTS_URL_MAX];
     BridgeV2MessageResult message_result;
@@ -420,13 +458,90 @@ void hermes_app_requests_handle_text(
         return;
     }
 
-    message_buffer[0] = '\0';
-    if (!prompt_message_input(message_buffer, sizeof(message_buffer))) {
-        snprintf(status_line, status_line_size, "Write note canceled.");
+    hermes_app_ui_home_history_reset();
+    bridge_chat_result_reset(chat_result);
+    last_message[0] = '\0';
+    *history_scroll = 0;
+    *request_rc = 0;
+
+    if (!hermes_app_config_build_messages_url(config, messages_url, sizeof(messages_url)) ||
+        !hermes_app_config_build_events_url(config, events_url, sizeof(events_url)) ||
+        config->device_id[0] == '\0') {
+        snprintf(status_line, status_line_size, "Session cleared locally. Device ID is still missing.");
         render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
         return;
     }
 
+    snprintf(status_line, status_line_size, "(^_^) Clearing the board...");
+    render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
+    gspWaitForVBlank();
+
+    if (!network_ready) {
+        snprintf(status_line, status_line_size, "Board cleared locally. Network is offline, so Hermes could not reset the session.");
+        render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
+        return;
+    }
+
+    *request_rc = bridge_v2_send_message(messages_url, config->token, config->device_id, config->active_conversation_id, "/reset", &message_result);
+    if (R_SUCCEEDED(*request_rc) && message_result.success) {
+        *request_rc = complete_v2_roundtrip(
+            config,
+            ui,
+            events_url,
+            &message_result,
+            chat_result,
+            last_message,
+            status_line,
+            status_line_size,
+            &missed_events
+        );
+        bridge_chat_result_reset(chat_result);
+        last_message[0] = '\0';
+        if (R_SUCCEEDED(*request_rc)) {
+            if (missed_events)
+                snprintf(status_line, status_line_size, "Board cleared. Fresh session ready (events trimmed).");
+            else
+                snprintf(status_line, status_line_size, "Board cleared. Fresh session ready.");
+        } else if (chat_result->error[0] != '\0') {
+            snprintf(status_line, status_line_size, "%s", chat_result->error);
+        } else {
+            snprintf(status_line, status_line_size, "Session clear failed: 0x%08lX", (unsigned long)*request_rc);
+        }
+    } else if (message_result.error[0] != '\0') {
+        snprintf(status_line, status_line_size, "%s", message_result.error);
+    } else {
+        snprintf(status_line, status_line_size, "Session clear failed: 0x%08lX", (unsigned long)*request_rc);
+    }
+
+    render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
+}
+
+static void submit_text_message(
+    const HermesAppConfig* config,
+    bool network_ready,
+    const AppRequestUiContext* ui,
+    BridgeChatResult* chat_result,
+    char* last_message,
+    size_t last_message_size,
+    size_t* history_scroll,
+    char* status_line,
+    size_t status_line_size,
+    Result* request_rc,
+    const char* message_buffer
+)
+{
+    char messages_url[HERMES_APP_MESSAGES_URL_MAX];
+    char events_url[HERMES_APP_EVENTS_URL_MAX];
+    BridgeV2MessageResult message_result;
+    bool missed_events = false;
+    bool fresh_session_command;
+
+    if (config == NULL || ui == NULL || chat_result == NULL || last_message == NULL || history_scroll == NULL ||
+        status_line == NULL || status_line_size == 0 || request_rc == NULL || message_buffer == NULL || message_buffer[0] == '\0') {
+        return;
+    }
+
+    fresh_session_command = text_is_fresh_session_command(message_buffer);
     copy_bounded_string(last_message, last_message_size, message_buffer);
     hermes_app_ui_home_history_push(APP_UI_MESSAGE_USER, message_buffer);
     reset_chat_request_state(chat_result, &message_result, request_rc, history_scroll);
@@ -439,7 +554,7 @@ void hermes_app_requests_handle_text(
         return;
     }
 
-    snprintf(status_line, status_line_size, "Sending note to Hermes...");
+    snprintf(status_line, status_line_size, "(^_^) Sending note to Hermes...");
     render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
     gspWaitForVBlank();
 
@@ -458,8 +573,15 @@ void hermes_app_requests_handle_text(
                 &missed_events
             );
             if (R_SUCCEEDED(*request_rc)) {
+                if (fresh_session_command) {
+                    hermes_app_ui_home_history_reset();
+                    *history_scroll = 0;
+                    hermes_app_ui_home_history_push(APP_UI_MESSAGE_USER, message_buffer);
+                }
                 if (chat_result->success)
-                    hermes_app_ui_home_history_push(APP_UI_MESSAGE_HERMES, chat_result->reply);
+                    hermes_app_ui_home_history_upsert(APP_UI_MESSAGE_HERMES, chat_result->reply);
+                if (chat_result->success && message_buffer[0] == '/')
+                    *history_scroll = hermes_app_ui_home_history_max_scroll(status_line);
                 format_roundtrip_status(chat_result, missed_events, "Reply note received over native v2.", status_line, status_line_size);
             }
             else if (chat_result->error[0] != '\0')
@@ -476,6 +598,104 @@ void hermes_app_requests_handle_text(
     }
 
     render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
+}
+
+void hermes_app_requests_handle_text(
+    const HermesAppConfig* config,
+    bool network_ready,
+    const AppRequestUiContext* ui,
+    BridgeChatResult* chat_result,
+    char* last_message,
+    size_t last_message_size,
+    size_t* history_scroll,
+    char* status_line,
+    size_t status_line_size,
+    Result* request_rc
+)
+{
+    char message_buffer[BRIDGE_CHAT_MESSAGE_MAX];
+
+    if (config == NULL || ui == NULL || chat_result == NULL || last_message == NULL || history_scroll == NULL ||
+        status_line == NULL || status_line_size == 0 || request_rc == NULL) {
+        return;
+    }
+
+    message_buffer[0] = '\0';
+    if (!prompt_message_input(message_buffer, sizeof(message_buffer))) {
+        snprintf(status_line, status_line_size, "Write note canceled.");
+        render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
+        return;
+    }
+
+    submit_text_message(
+        config,
+        network_ready,
+        ui,
+        chat_result,
+        last_message,
+        last_message_size,
+        history_scroll,
+        status_line,
+        status_line_size,
+        request_rc,
+        message_buffer
+    );
+}
+
+void hermes_app_requests_handle_command(
+    const HermesAppConfig* config,
+    bool network_ready,
+    const AppRequestUiContext* ui,
+    BridgeChatResult* chat_result,
+    char* last_message,
+    size_t last_message_size,
+    size_t* history_scroll,
+    char* status_line,
+    size_t status_line_size,
+    Result* request_rc,
+    const char* command_text
+)
+{
+    submit_text_message(
+        config,
+        network_ready,
+        ui,
+        chat_result,
+        last_message,
+        last_message_size,
+        history_scroll,
+        status_line,
+        status_line_size,
+        request_rc,
+        command_text
+    );
+}
+
+void hermes_app_requests_handle_clear_command(
+    const HermesAppConfig* config,
+    bool network_ready,
+    const AppRequestUiContext* ui,
+    BridgeChatResult* chat_result,
+    char* last_message,
+    size_t last_message_size,
+    size_t* history_scroll,
+    char* status_line,
+    size_t status_line_size,
+    Result* request_rc
+)
+{
+    submit_hidden_reset_command(
+        config,
+        network_ready,
+        ui,
+        chat_result,
+        last_message,
+        last_message_size,
+        history_scroll,
+        status_line,
+        status_line_size,
+        request_rc
+    );
 }
 
 void hermes_app_requests_handle_voice(
@@ -526,7 +746,7 @@ void hermes_app_requests_handle_voice(
     hermes_app_ui_home_history_push(APP_UI_MESSAGE_USER, "[mic] voice input");
     reset_chat_request_state(chat_result, &message_result, request_rc, history_scroll);
 
-    snprintf(status_line, status_line_size, "Sending mic note to Hermes...");
+    snprintf(status_line, status_line_size, "(^_^) Sending mic note to Hermes...");
     render_home_request_ui(config, ui, chat_result, last_message, *history_scroll, status_line, *request_rc);
     gspWaitForVBlank();
 
@@ -548,7 +768,7 @@ void hermes_app_requests_handle_voice(
         );
         if (R_SUCCEEDED(*request_rc)) {
             if (chat_result->success)
-                hermes_app_ui_home_history_push(APP_UI_MESSAGE_HERMES, chat_result->reply);
+                hermes_app_ui_home_history_upsert(APP_UI_MESSAGE_HERMES, chat_result->reply);
             format_roundtrip_status(chat_result, missed_events, "Voice note reply received over native v2.", status_line, status_line_size);
         }
         else if (chat_result->error[0] != '\0')

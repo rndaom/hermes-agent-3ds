@@ -17,7 +17,9 @@ The client now has:
 - native V2 message send / event poll flow
 - on-device approval handling
 - in-app rendering for the last message and last reply
-- reply paging for long output
+- scrollable transcript history on the top screen
+- streamed `message.updated` reply rendering when the gateway emits partial updates
+- a second bottom-screen slash-command page for native `/reset` and `/compress`
 
 Current design work is now driven by:
 - `docs/hermes-pictochat-clone-spec.md`
@@ -28,8 +30,9 @@ The current UI target is a PictoChat-clone handheld shell for Hermes, using rule
 Current controls:
 
 ### Home
-- `UP/DOWN` — move through the home action list
-- Circle Pad `UP/DOWN` — scroll the message transcript
+- `UP/DOWN` or Circle Pad `UP/DOWN` — move through the current bottom-screen page
+- `LEFT/RIGHT` — switch between the tool tray and slash-command page
+- `L/R` — scroll the top-screen message transcript
 - `A` — run the selected action
 - touch the bottom-screen action buttons — select and run that action
 - `START` — exit back to Homebrew Launcher
@@ -52,6 +55,16 @@ Current controls:
 - `A` — stop recording and send the captured audio
 - `B` — cancel the recording
 - `START` — abort the recording
+
+### Slash Commands Page
+- `Reset Session` sends native `/reset`
+- `Clear Screen` clears the 3DS board and resets Hermes to a fresh session
+- `Compress` sends native `/compress`
+- `Help` sends native `/help`
+- `Status` sends native `/status`
+- `Reasoning` sends native `/reasoning`
+- `Model` sends native `/model`
+- `Commands` sends native `/commands`
 
 Config is stored at:
 

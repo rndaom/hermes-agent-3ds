@@ -70,8 +70,8 @@ By default the local setup here uses port `8787`.
 Open **Hermes Agent 3DS** in Homebrew Launcher.
 
 On the home screen:
-- move to `Setup` with the D-pad / Circle Pad
-- press `A` to open setup
+- move to `Settings` with the D-pad / Circle Pad
+- press `A` to open settings
 - set `Host` to your PC's LAN IP
 - set `Port` to the gateway port
 - set `Token` to the same value configured in Hermes
@@ -83,13 +83,14 @@ On the home screen:
 
 On the home screen:
 - move to `Check Relay` with the D-pad / Circle Pad and press `A`
-- if that succeeds, move to `Rooms` and press `A` to open the room book
+- if that succeeds, move to `Sessions` and press `A` to open the session list
 - use the D-pad or Circle Pad there to move through saved conversation slots
 - press `X` there if you want to create a new conversation ID, or `Y` to sync recent conversation slots from Hermes
-- return home, move to `Write Note`, and press `A` to send a test message in the active conversation
-- or move to `Mic Note` and press `A` to start recording, then press `UP` to stop and send it through host-side speech-to-text
+- return home, move to `Text Prompt`, and press `A` to send a test message in the active conversation
+- or move to `Audio Prompt` and press `A` to start recording, then press `A` again to stop and send it through host-side speech-to-text
 - press `B` during mic capture to cancel, or `START` to abort that recording session
-- use D-pad / Circle Pad `LEFT/RIGHT` if the reply spans multiple pages
+- use `L/R` to scroll the transcript on the top screen
+- use `LEFT/RIGHT` to switch to the slash-command page if you want native `/reset` or `/compress`
 
 ## Common issues
 
@@ -102,7 +103,7 @@ On the home screen:
 - the token saved on the 3DS must exactly match the Hermes-side 3DS gateway token
 
 ### App says V2 config is incomplete
-- open `Setup` from the home action list
+- open `Settings` from the home action list
 - set `Device ID`
 - save again with `X`
 

@@ -21,9 +21,17 @@
 - [x] UI polish pass for readability and flow
 - [x] microphone input option on 3DS with host-side speech-to-text
 - [x] replace placeholder app art/icon with the provided portrait image asset
+- [x] native slash-command page for `/reset` and `/compress`
+- [x] streamed partial reply rendering for 3DS conversations
 
 ## maybe later
 
+- [ ] camera capture and image upload to Hermes
+- [ ] inline generated-image rendering inside the conversation board
+- [ ] generated-audio playback from Hermes replies
+- [ ] Hermes activity emoticons / expressive status indicators
+- [ ] expanded bottom-screen slash-command surface
+- [ ] sprite-backed DS icons and chrome assets
 - [ ] theme packs
 - [ ] richer media support
 - [ ] notification/polling ideas

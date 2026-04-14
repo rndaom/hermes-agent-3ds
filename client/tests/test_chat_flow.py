@@ -87,6 +87,10 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "KEY_TOUCH" in home_c
     assert "KEY_CPAD_UP" in home_c
     assert "KEY_CPAD_DOWN" in home_c
+    assert "KEY_LEFT" in home_c
+    assert "KEY_RIGHT" in home_c
+    assert "KEY_L" in home_c
+    assert "KEY_R" in home_c
     assert "history_scroll" in main_c
     assert "hermes_app_ui_home_history_max_scroll" in home_c
     assert "KEY_DOWN" in conv_c
@@ -106,27 +110,50 @@ def test_main_c_offers_message_prompt_and_reply_rendering_over_native_v2_only():
     assert "hermes_app_home_handle_input" in main_c
     assert "hermes_app_requests_handle_text" in home_c
     assert "hermes_app_requests_handle_voice" in home_c
+    assert "hermes_app_requests_handle_clear_command" in home_c
     assert "APP_REQUEST_REPLY_WAIT_TIMEOUT_MS" in request_c
     assert "60ULL * 60ULL * 1000ULL" in request_c
     assert "Timed out waiting for Hermes reply." in request_c
     assert "Sending note to Hermes..." in request_c
     assert "Sending mic note to Hermes..." in request_c
+    assert (
+        "status.updated" in request_c
+        or "status.updated" in (CLIENT_DIR / "source" / "bridge_v2.c").read_text()
+    )
     assert '"/api/v1/chat"' not in main_c
 
 
 def test_main_c_wraps_and_scrolls_message_history_for_small_screens():
     main_c = (CLIENT_DIR / "source" / "main.c").read_text()
     home_c = (CLIENT_DIR / "source" / "app_home.c").read_text()
+    request_c = (CLIENT_DIR / "source" / "app_requests.c").read_text()
     ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
 
     assert "KEY_CPAD_UP" in home_c
     assert "KEY_CPAD_DOWN" in home_c
+    assert "KEY_LEFT" in home_c
+    assert "KEY_RIGHT" in home_c
+    assert "KEY_L" in home_c
+    assert "KEY_R" in home_c
     assert "history_scroll" in main_c
     assert "hermes_app_ui_home_history_max_scroll" in home_c
     assert "wrap_text_for_pixels" in ui_c
     assert "HOME_LOG_VIEW_H" in ui_c
     assert "home_history_content_height" in ui_c
     assert "HOME_LOG_LINE_STEP" in ui_c
+    assert "hermes_app_ui_home_history_upsert(APP_UI_MESSAGE_HERMES" in request_c
+    assert "message_buffer[0] == '/'" in request_c
+    assert "hermes_app_ui_home_history_max_scroll(status_line)" in request_c
+    assert "text_is_fresh_session_command" in request_c
+    assert "submit_hidden_reset_command" in request_c
+    assert "THINKING" in ui_c
+    assert "WORKING" in ui_c
+    assert "g_home_history[index].height" in ui_c
+    assert "entry->height" in ui_c
+    assert "message_card_intersects_view" in ui_c
+    assert "y < HOME_LOG_CLIP_BOTTOM && y + height > HOME_LOG_CLIP_TOP" in ui_c
+    assert "HOME_WRAP_MAX_LINES 256" in ui_c
+    assert "HOME_HISTORY_TEXT_MAX" in ui_c
 
 
 def test_ui_wraps_truncated_lines_on_utf8_boundaries_before_graphical_fit():

@@ -10,7 +10,7 @@ Replace the previous dark-mode shell with a PictoChat-clone handheld UI while ke
 
 - preserve the transport stack
 - preserve SD-backed config and room persistence
-- preserve reply paging, approvals, and mic capture
+- preserve approvals and mic capture while modernizing the home transcript UX
 - replace the user-facing shell, wording, and layout system
 
 ## Visual direction
@@ -75,8 +75,9 @@ Expected deployed files:
 
 - docs reference only the new PictoChat clone spec
 - the old dark-mode spec and plan are gone
-- the home UI now uses `Write Note`, `Check Relay`, `Rooms`, `Setup`, `Mic Note`, and `Clear Board`
-- the room picker is presented as the `Room Book`
+- the home UI now uses `Text Prompt`, `Check Relay`, `Sessions`, `Settings`, and `Audio Prompt`
+- the bottom screen includes a second slash-command page for native Hermes commands such as `/reset` and `/compress`
+- the session picker is presented as `Sessions`
 - setup reads as a paper config sheet
 - approval and mic screens match the same shell
 - tests pass

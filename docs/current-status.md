@@ -18,7 +18,8 @@ Last major verified milestone: **the V2-only 3DS client is validated end-to-end 
 - settings fields are editable with the 3DS software keyboard
 - active conversation + recent conversation list are persisted on SD
 - top/bottom-screen UI split is implemented
-- long replies page cleanly with `LEFT/RIGHT`
+- top-screen transcript history scrolls with `L/R`
+- bottom-screen `LEFT/RIGHT` switches between the tool tray and the slash-command page
 - conversation picker exists from the home action list for switching/syncing conversation slots
 - native V2 chat flow is implemented with:
   - `POST /api/v2/messages`
@@ -33,9 +34,11 @@ Last major verified milestone: **the V2-only 3DS client is validated end-to-end 
   - ack cursor handoff
   - matching `reply_to`
   - longer wait window for final replies
+- streamed partial replies now render from `message.updated` events when the gateway emits them
 - a PictoChat-clone Hermes baseline is now the active visual direction for the handheld client
 - the home screen now targets a ruled-paper room board on top and a tool tray on the bottom
 - the home action list now uses D-pad / Circle Pad selection with A-to-confirm instead of labeled home-screen hotkeys
+- the home screen now includes a native Hermes slash-command page for `/reset` and `/compress`
 - reply, thread/link, and token/detail text containment now uses pixel-width wrapping and tighter panel sizing instead of overflowing fixed rows
 
 ### Host-side integration
@@ -88,7 +91,7 @@ Latest built artifact:
 
 ## Recommended next steps
 
-1. verify on the real Old 3DS that the PictoChat-clone room board and tool tray feel natural in practice
-2. tune any remaining text-fit issues found on hardware with especially long room titles or gateway errors
-3. decide whether to import sprite-backed DS icons through `client/gfx/` or keep the procedural shell for Old-3DS simplicity
-4. continue tightening the room-book and setup-sheet screens if hardware testing exposes readability issues
+1. decide whether to import sprite-backed DS icons and chrome through `client/gfx/` or keep the procedural shell for Old-3DS simplicity
+2. add richer media handling such as camera upload, inline generated image rendering, and generated audio playback
+3. add more native slash commands to the bottom-screen command page
+4. continue tightening any remaining text-fit or readability issues found on hardware

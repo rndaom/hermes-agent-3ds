@@ -62,6 +62,7 @@ def test_bridge_v2_module_exists_for_native_gateway_protocol():
     assert "approval.request" in source
     assert "message.created" in source
     assert "message.updated" in source
+    assert "status.updated" in source
     assert "reply_to" in source
     assert '\\"event\\"' in source
 
@@ -72,16 +73,53 @@ def test_bridge_v2_decodes_common_json_unicode_punctuation_for_3ds_console():
     assert "case 'u':" in source
     assert "hex_digit_value" in source
     assert "append_codepoint_fallback" in source
+    assert "parse_unicode_escape_quad" in source
     assert "0x2019" in source
     assert "0x2014" in source
     assert "0x2026" in source
+    assert "0xD800" in source
+    assert "0xDC00" in source
+
+
+def test_bridge_v2_maps_common_hermes_emoji_to_ascii_safe_tags_and_drops_unsupported_emoji():
+    source = (CLIENT_DIR / "source" / "bridge_v2.c").read_text()
+
+    assert '"[tool]"' in source
+    assert '"[search]"' in source
+    assert '"[audio]"' in source
+    assert '"[img]"' in source
+    assert '"[cam]"' in source
+    assert '"[ok]"' in source
+    assert '"[!]"' in source
+    assert '"JPY "' in source
+    assert "is_emoji_codepoint" in source
+    assert "0xFE0F" in source
+    assert "0x200D" in source
+    assert 'append_text(out, out_size, io_used, "?")' not in source
+
+
+def test_bridge_v2_sanitizes_markdown_heavy_display_text_for_3ds_rendering():
+    source = (CLIENT_DIR / "source" / "bridge_v2.c").read_text()
+
+    assert "sanitize_display_text" in source
+    assert "is_markdown_rule_line" in source
+    assert 'strncmp(text + cursor, "```", 3)' in source
+    assert 'strncmp(text + cursor, "- [x] ", 6)' in source
+    assert "extract_json_display_text_v2" in source
+    assert "extract_json_display_text_after" in source
 
 
 def test_bridge_v2_message_body_buffer_matches_the_advertised_text_limit():
     source = (CLIENT_DIR / "source" / "bridge_v2.c").read_text()
+    header = (CLIENT_DIR / "include" / "bridge_v2.h").read_text()
+    chat_header = (CLIENT_DIR / "include" / "bridge_chat.h").read_text()
 
     assert "BRIDGE_V2_MESSAGE_BODY_MAX" in source
+    assert "BRIDGE_V2_TEXT_MAX 8192" in header
+    assert "BRIDGE_CHAT_REPLY_MAX 8192" in chat_header
+    assert "BRIDGE_V2_RESPONSE_MAX 32768" in source
     assert "char body[1024]" not in source
+    assert "Hermes reply exceeded the 3DS response buffer." in source
 
 
 def test_makefile_picks_up_bridge_v2_sources_automatically():

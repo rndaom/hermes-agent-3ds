@@ -47,6 +47,33 @@ void hermes_app_requests_handle_text(
     Result* request_rc
 );
 
+void hermes_app_requests_handle_command(
+    const HermesAppConfig* config,
+    bool network_ready,
+    const AppRequestUiContext* ui,
+    BridgeChatResult* chat_result,
+    char* last_message,
+    size_t last_message_size,
+    size_t* history_scroll,
+    char* status_line,
+    size_t status_line_size,
+    Result* request_rc,
+    const char* command_text
+);
+
+void hermes_app_requests_handle_clear_command(
+    const HermesAppConfig* config,
+    bool network_ready,
+    const AppRequestUiContext* ui,
+    BridgeChatResult* chat_result,
+    char* last_message,
+    size_t last_message_size,
+    size_t* history_scroll,
+    char* status_line,
+    size_t status_line_size,
+    Result* request_rc
+);
+
 void hermes_app_requests_handle_voice(
     const HermesAppConfig* config,
     bool network_ready,

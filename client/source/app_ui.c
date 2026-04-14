@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define HOME_WRAP_MAX_LINES 128
+#define HOME_WRAP_MAX_LINES 256
 #define HOME_WRAP_LINE_MAX 192
 #define HOME_SUMMARY_WRAP_MAX_LINES 4
 #define HOME_HISTORY_MAX 32
@@ -18,16 +18,24 @@
 #define HOME_LOG_TEXT_Y 30.0f
 #define HOME_LOG_RULE_Y 39.0f
 #define HOME_LOG_LINE_STEP 10.0f
+#define HOME_LOG_CLIP_TOP HOME_LOG_VIEW_Y
+#define HOME_LOG_CLIP_BOTTOM (HOME_LOG_VIEW_Y + HOME_LOG_VIEW_H)
+#define HOME_HISTORY_CHUNK_LINES 10
+#define HOME_HISTORY_TEXT_MAX ((HOME_HISTORY_CHUNK_LINES * HOME_WRAP_LINE_MAX) + HOME_HISTORY_CHUNK_LINES + 1)
 
 typedef struct AppUiHomeHistoryEntry {
     AppUiMessageAuthor author;
-    char text[BRIDGE_CHAT_REPLY_MAX];
+    bool continuation;
+    float height;
+    char text[HOME_HISTORY_TEXT_MAX];
 } AppUiHomeHistoryEntry;
 
 static char g_message_wrap_lines[HOME_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
 static char g_home_status_lines[HOME_SUMMARY_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
 static AppUiHomeHistoryEntry g_home_history[HOME_HISTORY_MAX];
 static size_t g_home_history_count = 0;
+
+static void draw_chip(float x, float y, float w, const char* label, u32 fill, u32 text_color, u32 border);
 
 static void copy_bounded_string(char* dest, size_t dest_size, const char* src)
 {
@@ -316,6 +324,11 @@ static float measure_message_card_height(const char* text)
     return message_card_height_for_line_count(line_count);
 }
 
+static bool message_card_intersects_view(float y, float height)
+{
+    return y < HOME_LOG_CLIP_BOTTOM && y + height > HOME_LOG_CLIP_TOP;
+}
+
 static const char* home_notice_text(const char* status_line)
 {
     return status_line != NULL && status_line[0] != '\0' ? status_line : "Waiting for Hermes...";
@@ -334,7 +347,7 @@ static float home_history_content_height(const char* status_line)
     size_t index;
 
     for (index = 0; index < g_home_history_count; index++)
-        total_height += measure_message_card_height(g_home_history[index].text) + HOME_LOG_GAP;
+        total_height += g_home_history[index].height + HOME_LOG_GAP;
 
     if (home_has_status_notice(status_line))
         total_height += measure_message_card_height(home_notice_text(status_line)) + HOME_LOG_GAP;
@@ -362,6 +375,32 @@ static const char* home_status_summary(const char* status_line)
         return "CHECKING";
     if (strstr(status_line, "Sending") != NULL)
         return "SENDING";
+    if (strstr(status_line, "pondering") != NULL ||
+        strstr(status_line, "contemplating") != NULL ||
+        strstr(status_line, "musing") != NULL ||
+        strstr(status_line, "processing") != NULL ||
+        strstr(status_line, "reasoning") != NULL ||
+        strstr(status_line, "analyzing") != NULL ||
+        strstr(status_line, "computing") != NULL ||
+        strstr(status_line, "synthesizing") != NULL ||
+        strstr(status_line, "formulating") != NULL ||
+        strstr(status_line, "brainstorming") != NULL) {
+        return "THINKING";
+    }
+    if (strstr(status_line, "opening") != NULL ||
+        strstr(status_line, "reading") != NULL ||
+        strstr(status_line, "writing") != NULL ||
+        strstr(status_line, "searching") != NULL ||
+        strstr(status_line, "running") != NULL ||
+        strstr(status_line, "drawing") != NULL ||
+        strstr(status_line, "looking") != NULL ||
+        strstr(status_line, "typing") != NULL ||
+        strstr(status_line, "planning") != NULL ||
+        strstr(status_line, "updating") != NULL ||
+        strstr(status_line, "delegating") != NULL ||
+        strstr(status_line, "coordinating") != NULL) {
+        return "WORKING";
+    }
     if (strstr(status_line, "recording") != NULL || strstr(status_line, "Recording") != NULL)
         return "RECORDING";
     if (strstr(status_line, "relay OK") != NULL)
@@ -395,18 +434,12 @@ void hermes_app_ui_home_history_reset(void)
     g_home_history_count = 0;
 }
 
-void hermes_app_ui_home_history_push(AppUiMessageAuthor author, const char* text)
+static void append_history_entry(AppUiMessageAuthor author, const char* text, bool continuation)
 {
     size_t index;
 
     if (text == NULL || text[0] == '\0')
         return;
-
-    if (g_home_history_count > 0) {
-        AppUiHomeHistoryEntry* last = &g_home_history[g_home_history_count - 1];
-        if (last->author == author && strcmp(last->text, text) == 0)
-            return;
-    }
 
     if (g_home_history_count < HOME_HISTORY_MAX) {
         index = g_home_history_count++;
@@ -416,7 +449,76 @@ void hermes_app_ui_home_history_push(AppUiMessageAuthor author, const char* text
     }
 
     g_home_history[index].author = author;
+    g_home_history[index].continuation = continuation;
     copy_bounded_string(g_home_history[index].text, sizeof(g_home_history[index].text), text);
+    g_home_history[index].height = measure_message_card_height(g_home_history[index].text);
+}
+
+static void push_history_message_chunks(AppUiMessageAuthor author, const char* text)
+{
+    size_t total_lines;
+    size_t line_index;
+
+    if (text == NULL || text[0] == '\0')
+        return;
+
+    total_lines = wrap_text_for_pixels(text, HOME_LOG_TEXT_WIDTH, HOME_LOG_TEXT_SCALE, HOME_LOG_TEXT_SCALE, g_message_wrap_lines, HOME_WRAP_MAX_LINES);
+    if (total_lines == 0) {
+        append_history_entry(author, text, false);
+        return;
+    }
+
+    for (line_index = 0; line_index < total_lines; line_index += HOME_HISTORY_CHUNK_LINES) {
+        char chunk_text[(HOME_HISTORY_CHUNK_LINES * HOME_WRAP_LINE_MAX) + HOME_HISTORY_CHUNK_LINES];
+        size_t chunk_end = line_index + HOME_HISTORY_CHUNK_LINES;
+        size_t chunk_used = 0;
+        size_t current_line;
+
+        if (chunk_end > total_lines)
+            chunk_end = total_lines;
+
+        chunk_text[0] = '\0';
+        for (current_line = line_index; current_line < chunk_end; current_line++) {
+            size_t line_length = strlen(g_message_wrap_lines[current_line]);
+
+            if (chunk_used + line_length + 2 >= sizeof(chunk_text))
+                break;
+            memcpy(chunk_text + chunk_used, g_message_wrap_lines[current_line], line_length);
+            chunk_used += line_length;
+            if (current_line + 1 < chunk_end)
+                chunk_text[chunk_used++] = '\n';
+        }
+        chunk_text[chunk_used] = '\0';
+        append_history_entry(author, chunk_text, line_index != 0);
+    }
+}
+
+static void remove_trailing_history_message(AppUiMessageAuthor author)
+{
+    if (g_home_history_count == 0)
+        return;
+    if (g_home_history[g_home_history_count - 1].author != author)
+        return;
+
+    do {
+        g_home_history_count--;
+    } while (g_home_history_count > 0 &&
+             g_home_history[g_home_history_count].continuation &&
+             g_home_history[g_home_history_count - 1].author == author);
+}
+
+void hermes_app_ui_home_history_push(AppUiMessageAuthor author, const char* text)
+{
+    if (text == NULL || text[0] == '\0')
+        return;
+
+    if (g_home_history_count > 0) {
+        AppUiHomeHistoryEntry* last = &g_home_history[g_home_history_count - 1];
+        if (last->author == author && strcmp(last->text, text) == 0)
+            return;
+    }
+
+    push_history_message_chunks(author, text);
 }
 
 void hermes_app_ui_home_history_upsert(AppUiMessageAuthor author, const char* text)
@@ -437,7 +539,8 @@ void hermes_app_ui_home_history_upsert(AppUiMessageAuthor author, const char* te
         return;
     }
 
-    copy_bounded_string(last->text, sizeof(last->text), text);
+    remove_trailing_history_message(author);
+    push_history_message_chunks(author, text);
 }
 
 static const BridgeV2ConversationInfo* find_synced_conversation(
@@ -528,11 +631,13 @@ static void draw_bottom_header(const PictochatTheme* theme, const char* title)
     app_gfx_text(16.0f, 13.0f, 0.40f, 0.40f, theme->text, title);
 }
 
-static void draw_bottom_header_detail(const PictochatTheme* theme, const char* title, const char* detail)
+static void draw_bottom_header_home(const PictochatTheme* theme, const char* title, const char* detail, const char* nav_label)
 {
     draw_bottom_header(theme, title);
     if (detail != NULL && detail[0] != '\0')
-        app_gfx_text_fit(98.0f, 13.0f, 206.0f, 0.30f, 0.30f, theme->text, detail);
+        app_gfx_text_fit(98.0f, 13.0f, 140.0f, 0.30f, 0.30f, theme->text, detail);
+    if (nav_label != NULL && nav_label[0] != '\0')
+        draw_chip(244.0f, 11.0f, 60.0f, nav_label, theme->paper_alt, theme->text, theme->accent.primary_dark);
 }
 
 static void draw_ruled_paper(float x, float y, float w, float h, u32 fill, const PictochatTheme* theme)
@@ -628,16 +733,158 @@ static void draw_menu_row(float x, float y, float w, const char* label, const Pi
     app_gfx_text_fit(x + 24.0f, y + 4.0f, w - 30.0f, 0.30f, 0.30f, theme->text, label);
 }
 
-static void draw_action_button(float x, float y, float w, float h, const char* label, const PictochatTheme* theme, bool selected)
+typedef enum ActionButtonIcon {
+    ACTION_BUTTON_ICON_GENERIC = 0,
+    ACTION_BUTTON_ICON_TEXT,
+    ACTION_BUTTON_ICON_RELAY,
+    ACTION_BUTTON_ICON_SESSIONS,
+    ACTION_BUTTON_ICON_SETTINGS,
+    ACTION_BUTTON_ICON_AUDIO,
+    ACTION_BUTTON_ICON_RESET,
+    ACTION_BUTTON_ICON_CLEAR,
+    ACTION_BUTTON_ICON_COMPRESS,
+    ACTION_BUTTON_ICON_HELP,
+    ACTION_BUTTON_ICON_STATUS,
+    ACTION_BUTTON_ICON_REASONING,
+    ACTION_BUTTON_ICON_MODEL,
+    ACTION_BUTTON_ICON_COMMANDS,
+    ACTION_BUTTON_ICON_CHECK,
+    ACTION_BUTTON_ICON_BOOKMARK,
+    ACTION_BUTTON_ICON_DENY,
+    ACTION_BUTTON_ICON_SEND,
+    ACTION_BUTTON_ICON_ABORT,
+} ActionButtonIcon;
+
+static void draw_action_icon(float x, float y, float h, ActionButtonIcon icon, const PictochatTheme* theme, bool selected)
+{
+    float ix = x + 7.0f;
+    float iy = y + 6.0f;
+    float ih = h - 12.0f;
+    u32 fill = selected ? theme->accent.primary : theme->accent.primary_light;
+    u32 stroke = theme->accent.primary_dark;
+    u32 cutout = theme->paper;
+
+    app_gfx_panel(ix, iy, 18.0f, ih, fill, stroke);
+
+    switch (icon) {
+        case ACTION_BUTTON_ICON_TEXT:
+            app_gfx_panel(ix + 4.0f, iy + 2.0f, 9.0f, 10.0f, cutout, stroke);
+            app_gfx_highlight_bar(ix + 6.0f, iy + 5.0f, 5.0f, 1.0f, stroke);
+            app_gfx_highlight_bar(ix + 6.0f, iy + 8.0f, 4.0f, 1.0f, stroke);
+            app_gfx_highlight_bar(ix + 11.0f, iy + 3.0f, 2.0f, 2.0f, fill);
+            break;
+        case ACTION_BUTTON_ICON_RELAY:
+            app_gfx_highlight_bar(ix + 4.0f, iy + 9.0f, 2.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 7.0f, iy + 7.0f, 2.0f, 4.0f, stroke);
+            app_gfx_highlight_bar(ix + 10.0f, iy + 5.0f, 2.0f, 6.0f, stroke);
+            app_gfx_highlight_bar(ix + 13.0f, iy + 3.0f, 2.0f, 8.0f, stroke);
+            break;
+        case ACTION_BUTTON_ICON_SESSIONS:
+            app_gfx_panel(ix + 6.0f, iy + 2.0f, 7.0f, 6.0f, cutout, stroke);
+            app_gfx_panel(ix + 3.0f, iy + 5.0f, 9.0f, 7.0f, cutout, stroke);
+            app_gfx_highlight_bar(ix + 5.0f, iy + 8.0f, 5.0f, 1.0f, stroke);
+            break;
+        case ACTION_BUTTON_ICON_SETTINGS:
+            app_gfx_highlight_bar(ix + 3.0f, iy + 3.0f, 12.0f, 1.0f, stroke);
+            app_gfx_highlight_bar(ix + 3.0f, iy + 6.0f, 12.0f, 1.0f, stroke);
+            app_gfx_highlight_bar(ix + 3.0f, iy + 9.0f, 12.0f, 1.0f, stroke);
+            app_gfx_highlight_bar(ix + 6.0f, iy + 2.0f, 2.0f, 3.0f, cutout);
+            app_gfx_highlight_bar(ix + 11.0f, iy + 5.0f, 2.0f, 3.0f, cutout);
+            app_gfx_highlight_bar(ix + 8.0f, iy + 8.0f, 2.0f, 3.0f, cutout);
+            break;
+        case ACTION_BUTTON_ICON_AUDIO:
+            app_gfx_panel(ix + 6.0f, iy + 2.0f, 6.0f, 6.0f, cutout, stroke);
+            app_gfx_highlight_bar(ix + 8.0f, iy + 8.0f, 2.0f, 4.0f, stroke);
+            app_gfx_highlight_bar(ix + 5.0f, iy + 11.0f, 8.0f, 1.0f, stroke);
+            break;
+        case ACTION_BUTTON_ICON_RESET:
+            app_gfx_highlight_bar(ix + 5.0f, iy + 3.0f, 8.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 5.0f, iy + 3.0f, 2.0f, 8.0f, stroke);
+            app_gfx_highlight_bar(ix + 5.0f, iy + 9.0f, 8.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 3.0f, iy + 4.0f, 2.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 2.0f, iy + 6.0f, 2.0f, 2.0f, stroke);
+            break;
+        case ACTION_BUTTON_ICON_CLEAR:
+            app_gfx_panel(ix + 5.0f, iy + 3.0f, 8.0f, 6.0f, cutout, stroke);
+            app_gfx_highlight_bar(ix + 4.0f, iy + 10.0f, 10.0f, 1.0f, stroke);
+            break;
+        case ACTION_BUTTON_ICON_COMPRESS:
+            app_gfx_highlight_bar(ix + 3.0f, iy + 3.0f, 12.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 5.0f, iy + 6.0f, 8.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 7.0f, iy + 9.0f, 4.0f, 2.0f, stroke);
+            break;
+        case ACTION_BUTTON_ICON_HELP:
+            app_gfx_highlight_bar(ix + 7.0f, iy + 3.0f, 4.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 9.0f, iy + 5.0f, 2.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 7.0f, iy + 7.0f, 2.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 7.0f, iy + 10.0f, 2.0f, 2.0f, stroke);
+            break;
+        case ACTION_BUTTON_ICON_STATUS:
+            app_gfx_highlight_bar(ix + 5.0f, iy + 3.0f, 8.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 5.0f, iy + 6.0f, 8.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 5.0f, iy + 9.0f, 8.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 3.0f, iy + 3.0f, 1.0f, 8.0f, stroke);
+            break;
+        case ACTION_BUTTON_ICON_REASONING:
+            app_gfx_highlight_bar(ix + 5.0f, iy + 4.0f, 8.0f, 6.0f, stroke);
+            app_gfx_highlight_bar(ix + 6.0f, iy + 6.0f, 2.0f, 2.0f, fill);
+            app_gfx_highlight_bar(ix + 10.0f, iy + 6.0f, 2.0f, 2.0f, fill);
+            break;
+        case ACTION_BUTTON_ICON_MODEL:
+            app_gfx_panel(ix + 4.0f, iy + 3.0f, 10.0f, 8.0f, cutout, stroke);
+            app_gfx_highlight_bar(ix + 6.0f, iy + 5.0f, 6.0f, 1.0f, stroke);
+            app_gfx_highlight_bar(ix + 6.0f, iy + 8.0f, 4.0f, 1.0f, stroke);
+            break;
+        case ACTION_BUTTON_ICON_COMMANDS:
+            app_gfx_highlight_bar(ix + 4.0f, iy + 3.0f, 10.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 4.0f, iy + 6.0f, 10.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 4.0f, iy + 9.0f, 10.0f, 2.0f, stroke);
+            break;
+        case ACTION_BUTTON_ICON_CHECK:
+            app_gfx_highlight_bar(ix + 4.0f, iy + 8.0f, 2.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 6.0f, iy + 10.0f, 2.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 8.0f, iy + 8.0f, 2.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 10.0f, iy + 6.0f, 2.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 12.0f, iy + 4.0f, 2.0f, 2.0f, stroke);
+            break;
+        case ACTION_BUTTON_ICON_BOOKMARK:
+            app_gfx_panel(ix + 5.0f, iy + 2.0f, 8.0f, 10.0f, cutout, stroke);
+            app_gfx_highlight_bar(ix + 8.0f, iy + 10.0f, 2.0f, 2.0f, fill);
+            break;
+        case ACTION_BUTTON_ICON_DENY:
+            app_gfx_highlight_bar(ix + 4.0f, iy + 4.0f, 2.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 6.0f, iy + 6.0f, 2.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 8.0f, iy + 8.0f, 2.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 10.0f, iy + 6.0f, 2.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 12.0f, iy + 4.0f, 2.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 6.0f, iy + 10.0f, 2.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 10.0f, iy + 10.0f, 2.0f, 2.0f, stroke);
+            break;
+        case ACTION_BUTTON_ICON_SEND:
+            app_gfx_highlight_bar(ix + 4.0f, iy + 7.0f, 7.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 10.0f, iy + 5.0f, 2.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 12.0f, iy + 7.0f, 2.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 10.0f, iy + 9.0f, 2.0f, 2.0f, stroke);
+            break;
+        case ACTION_BUTTON_ICON_ABORT:
+            app_gfx_panel(ix + 5.0f, iy + 3.0f, 8.0f, 8.0f, cutout, stroke);
+            break;
+        case ACTION_BUTTON_ICON_GENERIC:
+        default:
+            app_gfx_highlight_bar(ix + 4.0f, iy + 4.0f, 10.0f, 2.0f, stroke);
+            app_gfx_highlight_bar(ix + 4.0f, iy + 8.0f, 10.0f, 2.0f, stroke);
+            break;
+    }
+}
+
+static void draw_action_button(float x, float y, float w, float h, const char* label, ActionButtonIcon icon, const PictochatTheme* theme, bool selected)
 {
     if (theme == NULL)
         theme = pictochat_theme_get(PICTOCHAT_THEME_DEFAULT, true);
 
     app_gfx_panel(x, y, w, h, selected ? theme->paper_alt : theme->paper, selected ? theme->accent.primary_dark : theme->border_dark);
     app_gfx_highlight_bar(x + 2.0f, y + 2.0f, w - 4.0f, 3.0f, selected ? theme->accent.primary_light : theme->paper_shadow);
-    app_gfx_highlight_bar(x + 7.0f, y + 6.0f, 18.0f, h - 12.0f, selected ? theme->accent.primary : theme->accent.primary_light);
-    app_gfx_highlight_bar(x + 10.0f, y + 9.0f, 12.0f, 2.0f, theme->accent.primary_dark);
-    app_gfx_highlight_bar(x + 10.0f, y + 14.0f, 12.0f, 2.0f, theme->accent.primary_dark);
+    draw_action_icon(x, y, h, icon, theme, selected);
     app_gfx_text_fit(x + 32.0f, y + 10.0f, w - 42.0f, 0.32f, 0.32f, theme->text, label);
 }
 
@@ -715,8 +962,8 @@ static void render_home_graphical(
 {
     const PictochatTheme* theme = get_global_theme(config);
     char conversation_label[HERMES_APP_CONVERSATION_ID_MAX];
-    bool has_selection = command_selection <= (size_t)HOME_COMMAND_AUDIO;
-    size_t selected_command = has_selection ? command_selection : (size_t)HOME_COMMAND_TEXT;
+    bool tools_page = command_selection <= (size_t)HOME_COMMAND_AUDIO || command_selection > (size_t)HOME_COMMAND_COMMANDS;
+    size_t selected_command = command_selection <= (size_t)HOME_COMMAND_COMMANDS ? command_selection : (size_t)HOME_COMMAND_TEXT;
     size_t max_scroll;
     size_t index;
     float transcript_height;
@@ -734,7 +981,7 @@ static void render_home_graphical(
     app_gfx_begin_top(theme->background);
     app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, theme->paper_shadow, theme->border_dark);
     draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, theme->paper, theme);
-    draw_top_header(theme, home_status_summary(status_line));
+    app_gfx_clip_rect(16.0f, HOME_LOG_CLIP_TOP, 368.0f, HOME_LOG_VIEW_H);
 
     if (g_home_history_count == 0) {
         draw_message_card(
@@ -752,9 +999,9 @@ static void render_home_graphical(
 
         for (index = 0; index < g_home_history_count; index++) {
             const AppUiHomeHistoryEntry* entry = &g_home_history[index];
-            float card_height = measure_message_card_height(entry->text);
+            float card_height = entry->height;
 
-            if (card_y + card_height >= HOME_LOG_VIEW_Y && card_y <= HOME_LOG_VIEW_Y + HOME_LOG_VIEW_H)
+            if (message_card_intersects_view(card_y, card_height))
                 draw_message_card(16.0f, card_y, 368.0f, entry->author == APP_UI_MESSAGE_USER ? "YOU" : "HERMES", entry->text, HOME_LOG_TEXT_SCALE, theme);
             card_y += card_height + HOME_LOG_GAP;
         }
@@ -762,24 +1009,40 @@ static void render_home_graphical(
         if (home_has_status_notice(status_line)) {
             float card_height = measure_message_card_height(home_notice_text(status_line));
 
-            if (card_y + card_height >= HOME_LOG_VIEW_Y && card_y <= HOME_LOG_VIEW_Y + HOME_LOG_VIEW_H)
+            if (message_card_intersects_view(card_y, card_height))
                 draw_message_card(16.0f, card_y, 368.0f, "STATUS", home_notice_text(status_line), 0.28f, theme);
         }
     }
 
+    app_gfx_clip_reset();
+
+    draw_top_header(theme, home_status_summary(status_line));
+
     app_gfx_begin_bottom(theme->background);
     app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, theme->paper_shadow, theme->border_dark);
     draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, theme->paper, theme);
-    draw_bottom_header_detail(theme, "TOOL TRAY", conversation_label);
-    draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Text Prompt", theme, selected_command == (size_t)HOME_COMMAND_TEXT);
-    draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Check Relay", theme, selected_command == (size_t)HOME_COMMAND_CHECK);
-    draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Sessions", theme, selected_command == (size_t)HOME_COMMAND_SESSIONS);
-    draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Settings", theme, selected_command == (size_t)HOME_COMMAND_SETTINGS);
-    draw_action_button(92.0f, 116.0f, 136.0f, 28.0f, "Audio Prompt", theme, selected_command == (size_t)HOME_COMMAND_AUDIO);
+    if (tools_page) {
+        draw_bottom_header_home(theme, "TOOL TRAY", conversation_label, "CMDS >");
+        draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Text Prompt", ACTION_BUTTON_ICON_TEXT, theme, selected_command == (size_t)HOME_COMMAND_TEXT);
+        draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Check Relay", ACTION_BUTTON_ICON_RELAY, theme, selected_command == (size_t)HOME_COMMAND_CHECK);
+        draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Sessions", ACTION_BUTTON_ICON_SESSIONS, theme, selected_command == (size_t)HOME_COMMAND_SESSIONS);
+        draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Settings", ACTION_BUTTON_ICON_SETTINGS, theme, selected_command == (size_t)HOME_COMMAND_SETTINGS);
+        draw_action_button(92.0f, 116.0f, 136.0f, 28.0f, "Audio Prompt", ACTION_BUTTON_ICON_AUDIO, theme, selected_command == (size_t)HOME_COMMAND_AUDIO);
+    } else {
+        draw_bottom_header_home(theme, "SLASH CMDS", conversation_label, "< TOOLS");
+        draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Reset Session", ACTION_BUTTON_ICON_RESET, theme, selected_command == (size_t)HOME_COMMAND_RESET);
+        draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Clear Screen", ACTION_BUTTON_ICON_CLEAR, theme, selected_command == (size_t)HOME_COMMAND_CLEAR);
+        draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Compress", ACTION_BUTTON_ICON_COMPRESS, theme, selected_command == (size_t)HOME_COMMAND_COMPRESS);
+        draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Help", ACTION_BUTTON_ICON_HELP, theme, selected_command == (size_t)HOME_COMMAND_HELP);
+        draw_action_button(16.0f, 116.0f, 136.0f, 28.0f, "Status", ACTION_BUTTON_ICON_STATUS, theme, selected_command == (size_t)HOME_COMMAND_STATUS);
+        draw_action_button(168.0f, 116.0f, 136.0f, 28.0f, "Reasoning", ACTION_BUTTON_ICON_REASONING, theme, selected_command == (size_t)HOME_COMMAND_REASONING);
+        draw_action_button(16.0f, 152.0f, 136.0f, 28.0f, "Model", ACTION_BUTTON_ICON_MODEL, theme, selected_command == (size_t)HOME_COMMAND_MODEL);
+        draw_action_button(168.0f, 152.0f, 136.0f, 28.0f, "Commands", ACTION_BUTTON_ICON_COMMANDS, theme, selected_command == (size_t)HOME_COMMAND_COMMANDS);
+    }
 
-    draw_hint_button(16.0f, 214.0f, 88.0f, "PAD Scroll", theme);
-    draw_hint_button(110.0f, 214.0f, 90.0f, "A Select", theme);
-    draw_hint_button(206.0f, 214.0f, 98.0f, "START Exit", theme);
+    draw_hint_button(16.0f, 214.0f, 92.0f, "L/R Scroll", theme);
+    draw_hint_button(114.0f, 214.0f, 80.0f, "A Select", theme);
+    draw_hint_button(200.0f, 214.0f, 104.0f, "<- -> Page", theme);
 }
 
 static void render_settings_graphical(
@@ -957,10 +1220,10 @@ void hermes_app_ui_render_approval_prompt(const HermesAppConfig* config, const c
     app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, theme->paper_shadow, theme->border_dark);
     draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, theme->paper, theme);
     draw_bottom_header(theme, "APPROVAL KEYS");
-    draw_action_button(16.0f, 48.0f, 136.0f, 28.0f, "A Once", theme, false);
-    draw_action_button(168.0f, 48.0f, 136.0f, 28.0f, "X Session", theme, false);
-    draw_action_button(16.0f, 84.0f, 136.0f, 28.0f, "Y Always", theme, false);
-    draw_action_button(168.0f, 84.0f, 136.0f, 28.0f, "B Deny", theme, false);
+    draw_action_button(16.0f, 48.0f, 136.0f, 28.0f, "A Once", ACTION_BUTTON_ICON_CHECK, theme, false);
+    draw_action_button(168.0f, 48.0f, 136.0f, 28.0f, "X Session", ACTION_BUTTON_ICON_SESSIONS, theme, false);
+    draw_action_button(16.0f, 84.0f, 136.0f, 28.0f, "Y Always", ACTION_BUTTON_ICON_BOOKMARK, theme, false);
+    draw_action_button(168.0f, 84.0f, 136.0f, 28.0f, "B Deny", ACTION_BUTTON_ICON_DENY, theme, false);
     draw_ruled_paper(8.0f, 128.0f, 304.0f, 54.0f, theme->paper_alt, theme);
     app_gfx_text_fit(16.0f, 138.0f, 288.0f, 0.26f, 0.26f, theme->text, "This is a Hermes gateway approval, styled like a DS system alert.");
     app_gfx_text_fit(16.0f, 156.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "Press START to cancel without answering.");
@@ -1007,9 +1270,9 @@ void hermes_app_ui_render_voice_recording(
     app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, theme->paper_shadow, theme->border_dark);
     draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, theme->paper, theme);
     draw_bottom_header(theme, "MIC KEYS");
-    draw_action_button(16.0f, 48.0f, 88.0f, 28.0f, "A Send", theme, !waiting_for_a_release);
-    draw_action_button(116.0f, 48.0f, 88.0f, 28.0f, "B Cancel", theme, false);
-    draw_action_button(216.0f, 48.0f, 88.0f, 28.0f, "START Abort", theme, false);
+    draw_action_button(16.0f, 48.0f, 88.0f, 28.0f, "A Send", ACTION_BUTTON_ICON_SEND, theme, !waiting_for_a_release);
+    draw_action_button(116.0f, 48.0f, 88.0f, 28.0f, "B Cancel", ACTION_BUTTON_ICON_DENY, theme, false);
+    draw_action_button(216.0f, 48.0f, 88.0f, 28.0f, "START Abort", ACTION_BUTTON_ICON_ABORT, theme, false);
     draw_ruled_paper(8.0f, 92.0f, 304.0f, 116.0f, theme->paper_alt, theme);
     app_gfx_text_fit(16.0f, 104.0f, 288.0f, 0.28f, 0.28f, theme->text, capture_state);
     app_gfx_text_fit(16.0f, 126.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "The session stops after five minutes or when the audio buffer fills.");

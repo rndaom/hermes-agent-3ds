@@ -19,9 +19,12 @@ def test_app_gfx_module_exists_with_citro2d_screen_targets_and_panel_primitives(
     assert "app_gfx_init" in header
     assert "app_gfx_begin_frame" in header
     assert "app_gfx_end_frame" in header
+    assert "app_gfx_clip_rect" in header
+    assert "app_gfx_clip_reset" in header
     assert "app_gfx_panel" in header
     assert "app_gfx_text_fit" in header
     assert "C2D_CreateScreenTarget" in source
+    assert "C3D_SetScissor" in source
     assert "C2D_DrawRectSolid" in source
     assert "C2D_DrawText" in source
     assert "C2D_TextGetDimensions" in source
@@ -80,9 +83,14 @@ def test_graphical_ui_bounds_variable_length_fields_and_uses_touch_sized_action_
     assert "HOME_LOG_TEXT_WIDTH" in ui_c
     assert 'draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Text Prompt"' in ui_c
     assert 'draw_action_button(168.0f, 80.0f, 136.0f, 28.0f, "Settings"' in ui_c
+    assert 'draw_action_button(16.0f, 44.0f, 136.0f, 28.0f, "Reset Session"' in ui_c
+    assert 'draw_action_button(168.0f, 44.0f, 136.0f, 28.0f, "Clear Screen"' in ui_c
+    assert 'draw_action_button(16.0f, 80.0f, 136.0f, 28.0f, "Compress"' in ui_c
+    assert 'draw_action_button(168.0f, 152.0f, 136.0f, 28.0f, "Commands"' in ui_c
     assert "draw_ruled_paper(8.0f, 156.0f, 304.0f, 52.0f" not in ui_c
-    assert 'draw_hint_button(16.0f, 214.0f, 88.0f, "PAD Scroll"' in ui_c
-    assert 'draw_hint_button(110.0f, 214.0f, 90.0f, "A Select"' in ui_c
+    assert 'draw_hint_button(16.0f, 214.0f, 92.0f, "L/R Scroll"' in ui_c
+    assert 'draw_hint_button(114.0f, 214.0f, 80.0f, "A Select"' in ui_c
+    assert 'draw_hint_button(200.0f, 214.0f, 104.0f, "<- -> Page"' in ui_c
     assert '"Touch OK"' not in ui_c
     assert '"B Ask Hermes"' not in ui_c
     assert '"A Check Link"' not in ui_c
@@ -93,5 +101,9 @@ def test_home_message_cards_use_note_card_styling_helpers():
 
     assert "draw_note_lines" in ui_c
     assert "draw_message_card" in ui_c
+    assert (
+        "app_gfx_clip_rect(16.0f, HOME_LOG_CLIP_TOP, 368.0f, HOME_LOG_VIEW_H)" in ui_c
+    )
+    assert "app_gfx_clip_reset()" in ui_c
     assert '"Press Text Prompt below to start a Hermes session."' in ui_c
     assert 'entry->author == APP_UI_MESSAGE_USER ? "YOU" : "HERMES"' in ui_c

@@ -74,6 +74,10 @@ def test_main_c_has_settings_and_conversation_picker_navigation():
     assert "KEY_UP" in home_c
     assert "KEY_CPAD_UP" in home_c
     assert "KEY_CPAD_DOWN" in home_c
+    assert "KEY_LEFT" in home_c
+    assert "KEY_RIGHT" in home_c
+    assert "KEY_L" in home_c
+    assert "KEY_R" in home_c
     assert "KEY_CPAD_UP" in conv_c
     assert "KEY_CPAD_DOWN" in conv_c
     assert "KEY_CPAD_UP" in settings_c

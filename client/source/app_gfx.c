@@ -11,6 +11,27 @@ static C2D_TextBuf g_text_buf = NULL;
 static C2D_TextBuf g_measure_buf = NULL;
 static C2D_Font g_ui_font = NULL;
 static float g_text_scale_adjust = 1.0f;
+static u32 g_active_screen_width = 400;
+static u32 g_active_screen_height = 240;
+
+static u32 clip_coord_floor(float value)
+{
+    if (value <= 0.0f)
+        return 0;
+    return (u32)value;
+}
+
+static u32 clip_coord_ceil(float value)
+{
+    u32 whole;
+
+    if (value <= 0.0f)
+        return 0;
+    whole = (u32)value;
+    if ((float)whole < value)
+        whole++;
+    return whole;
+}
 
 static bool app_gfx_parse_text(C2D_Text* draw_text, C2D_TextBuf buf, const char* text)
 {
@@ -166,17 +187,86 @@ void app_gfx_begin_top(u32 clear_color)
 {
     C2D_TargetClear(g_top_target, clear_color);
     C2D_SceneBegin(g_top_target);
+    g_active_screen_width = 400;
+    g_active_screen_height = 240;
 }
 
 void app_gfx_begin_bottom(u32 clear_color)
 {
     C2D_TargetClear(g_bottom_target, clear_color);
     C2D_SceneBegin(g_bottom_target);
+    g_active_screen_width = 320;
+    g_active_screen_height = 240;
 }
 
 void app_gfx_end_frame(void)
 {
     C3D_FrameEnd(0);
+}
+
+void app_gfx_clip_rect(float x, float y, float w, float h)
+{
+    u32 left;
+    u32 top;
+    u32 right;
+    u32 bottom;
+    u32 screen_width = g_active_screen_width;
+    u32 screen_height = g_active_screen_height;
+    u32 clip_x;
+    u32 clip_y;
+    u32 clip_w;
+    u32 clip_h;
+
+    if (w <= 0.0f || h <= 0.0f) {
+        app_gfx_clip_reset();
+        return;
+    }
+
+    if (x < 0.0f) {
+        w += x;
+        x = 0.0f;
+    }
+    if (y < 0.0f) {
+        h += y;
+        y = 0.0f;
+    }
+    if (x >= (float)screen_width || y >= (float)screen_height) {
+        C2D_Flush();
+        C3D_SetScissor(GPU_SCISSOR_INVERT, 0, 0, screen_height, screen_width);
+        return;
+    }
+    if (x + w > (float)screen_width)
+        w = (float)screen_width - x;
+    if (y + h > (float)screen_height)
+        h = (float)screen_height - y;
+    if (w <= 0.0f || h <= 0.0f) {
+        C2D_Flush();
+        C3D_SetScissor(GPU_SCISSOR_INVERT, 0, 0, screen_height, screen_width);
+        return;
+    }
+
+    clip_x = clip_coord_floor(x);
+    clip_y = clip_coord_floor(y);
+    clip_w = clip_coord_ceil(w);
+    clip_h = clip_coord_ceil(h);
+    if (clip_w == 0)
+        clip_w = 1;
+    if (clip_h == 0)
+        clip_h = 1;
+
+    left = screen_height - (clip_y + clip_h);
+    top = screen_width - (clip_x + clip_w);
+    right = left + clip_h;
+    bottom = top + clip_w;
+
+    C2D_Flush();
+    C3D_SetScissor(GPU_SCISSOR_NORMAL, left, top, right, bottom);
+}
+
+void app_gfx_clip_reset(void)
+{
+    C2D_Flush();
+    C3D_SetScissor(GPU_SCISSOR_DISABLE, 0, 0, 0, 0);
 }
 
 void app_gfx_panel(float x, float y, float w, float h, u32 fill, u32 border)

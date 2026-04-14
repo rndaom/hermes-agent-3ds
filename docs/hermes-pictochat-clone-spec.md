@@ -54,10 +54,11 @@ This spec is grounded in four inputs.
 - the Hermes transport stack is native V2 and should stay intact
 - the current code already supports:
   - message history
-  - reply paging
+  - scrollable message history
   - room selection via conversation IDs
   - settings persistence
   - graphical transient flows
+  - native Hermes slash-command dispatch for selected commands
 
 ## Product fantasy
 
@@ -79,12 +80,12 @@ The emotional target is:
 
 ### Hermes conversations are rooms
 - `conversation_id` is still the real transport identity
-- the handheld UI should call them rooms wherever possible
-- the room picker is the `Room Book`
+- the handheld UI can surface them as sessions when that reads more naturally on-screen
+- the active conversation should stay visible in the lower-screen header
 
 ### Messages are notes
-- text send action becomes `Write Note`
-- voice send action becomes `Mic Note`
+- text send action becomes `Text Prompt`
+- voice send action becomes `Audio Prompt`
 - rendered messages should look like ruled PictoChat note cards
 
 ### Gateway state is relay state
@@ -154,7 +155,7 @@ Use the system font for this pass, but style it to echo the DS reference:
 Required text behavior:
 - use pixel-width measurement
 - use truncation or wrapping budgets for every variable-length field
-- keep long Hermes replies paged
+- keep long Hermes replies readable via transcript scrolling
 - do not assume character count equals visible width
 
 ## Core screen layouts
@@ -166,14 +167,13 @@ The top screen is the room board.
 
 Required structure:
 - DS-style colored header rail
-- room info card
-- relay/status info card
+- compact Hermes / relay-status header
 - stacked ruled message notes
-- current reply page indicator on the active Hermes reply
+- hard cutoff below the header rail so cards never bleed into chrome
 
 Behavior rules:
-- show the latest Hermes reply as the largest note
-- keep recent user / Hermes notes above it when space allows
+- show a scrollable note transcript with the newest messages at the bottom by default
+- allow streamed Hermes partial replies to update the current note in place
 - show a friendly empty-state note when nothing has been sent yet
 
 ### Bottom screen
@@ -181,19 +181,22 @@ The bottom screen is the tool tray.
 
 Required structure:
 - header rail
-- six touch-sized tool buttons
-- selected-tool detail strip
+- multiple touch-sized tool pages
+- tool page plus a Hermes slash-command page
 - footer hint buttons
 
 Required home tools:
-- `Write Note`
+- `Text Prompt`
 - `Check Relay`
-- `Rooms`
-- `Setup`
-- `Mic Note`
-- `Clear Board`
+- `Sessions`
+- `Settings`
+- `Audio Prompt`
 
-## Setup screen
+Required slash-command entries:
+- `Reset Session` -> native `/reset`
+- `Compress` -> native `/compress`
+
+## Settings screen
 
 The setup screen should feel like a configuration sheet, not a dark control panel.
 
@@ -210,18 +213,18 @@ Required structure:
 - status strip for save / validation feedback
 - lower-screen legend for `A`, `X`, `Y`, `B`, and `START`
 
-## Room Book screen
+## Sessions screen
 
-The old conversation picker becomes the `Room Book`.
+The conversation picker becomes the `Sessions` page.
 
 Required structure:
 - recent rooms rendered as consistent ruled rows on paper
 - active selection highlight tied to the current global theme
 - preview text if Hermes supplied it
 - lower-screen legend for:
-  - `A Use room`
-  - `X New room`
-  - `Y Sync rooms`
+  - `A Use session`
+  - `X New session`
+  - `Y Sync sessions`
   - `B Back`
 
 ## Approval screen
@@ -238,7 +241,7 @@ Required structure:
   - deny
 - explicit `START` cancel copy
 
-## Mic Note screen
+## Mic Session screen
 
 This should feel like a note-capture variant of PictoChat.
 
@@ -246,7 +249,7 @@ Required structure:
 - recording status banner
 - simple time and audio counters
 - progress or capture-state framing on paper
-- lower-screen legend for `UP`, `B`, and `START`
+- lower-screen legend for `A`, `B`, and `START`
 
 ## Color system
 
@@ -291,7 +294,8 @@ Usage rule:
 - D-pad and Circle Pad remain first-class
 - touch remains supported for the home tool tray
 - `START` exits the app from main screens
-- `LEFT/RIGHT` continue paging long Hermes replies
+- `L/R` scroll the top-screen transcript
+- `LEFT/RIGHT` switch between lower-screen pages
 
 ### Keep Hermes clear, but quiet
 - Hermes still needs to be visible in the copy

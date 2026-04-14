@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define BRIDGE_V2_TEXT_MAX 1200
+#define BRIDGE_V2_TEXT_MAX 8192
 #define BRIDGE_V2_ERROR_MAX 160
 #define BRIDGE_V2_EVENT_TYPE_MAX 32
 #define BRIDGE_V2_REQUEST_ID_MAX 64

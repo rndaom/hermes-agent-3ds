@@ -12,6 +12,8 @@ void app_gfx_begin_frame(void);
 void app_gfx_begin_top(u32 clear_color);
 void app_gfx_begin_bottom(u32 clear_color);
 void app_gfx_end_frame(void);
+void app_gfx_clip_rect(float x, float y, float w, float h);
+void app_gfx_clip_reset(void);
 
 void app_gfx_panel(float x, float y, float w, float h, u32 fill, u32 border);
 void app_gfx_panel_inset(float x, float y, float w, float h, u32 fill, u32 border, u32 accent);

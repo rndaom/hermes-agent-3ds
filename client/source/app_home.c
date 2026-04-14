@@ -4,6 +4,53 @@
 
 #include "app_requests.h"
 
+#define HOME_SHOULDER_SCROLL_STEP 48U
+
+static bool home_command_is_commands_page(HomeCommand command)
+{
+    return command >= HOME_COMMAND_RESET && command <= HOME_COMMAND_COMMANDS;
+}
+
+static HomeCommand home_page_default_selection(bool commands_page)
+{
+    return commands_page ? HOME_COMMAND_RESET : HOME_COMMAND_TEXT;
+}
+
+static HomeCommand home_page_last_selection(bool commands_page)
+{
+    return commands_page ? HOME_COMMAND_COMMANDS : HOME_COMMAND_AUDIO;
+}
+
+static void switch_home_page(AppHomeContext* context, bool commands_page)
+{
+    if (context == NULL || context->command_selection == NULL)
+        return;
+    *context->command_selection = home_page_default_selection(commands_page);
+}
+
+static bool scroll_home_history(AppHomeContext* context, size_t max_scroll, int direction, size_t step)
+{
+    if (context == NULL || context->history_scroll == NULL || direction == 0 || step == 0)
+        return false;
+
+    if (direction > 0) {
+        if (*context->history_scroll >= max_scroll)
+            return false;
+        *context->history_scroll += step;
+        if (*context->history_scroll > max_scroll)
+            *context->history_scroll = max_scroll;
+        return true;
+    }
+
+    if (*context->history_scroll == 0)
+        return false;
+    if (*context->history_scroll > step)
+        *context->history_scroll -= step;
+    else
+        *context->history_scroll = 0;
+    return true;
+}
+
 static void render_screen(AppScreen screen, const HermesAppConfig* config, const AppHomeContext* context)
 {
     if (context == NULL || context->render == NULL || context->history_scroll == NULL ||
@@ -127,30 +174,175 @@ static void execute_selected_home_command(
                 context->request_rc
             );
             break;
+        case HOME_COMMAND_RESET:
+            hermes_app_requests_handle_command(
+                config,
+                network_ready,
+                request_ui,
+                context->chat_result,
+                context->last_message,
+                context->last_message_size,
+                context->history_scroll,
+                context->status_line,
+                context->status_line_size,
+                context->request_rc,
+                "/reset"
+            );
+            break;
+        case HOME_COMMAND_CLEAR:
+            hermes_app_requests_handle_clear_command(
+                config,
+                network_ready,
+                request_ui,
+                context->chat_result,
+                context->last_message,
+                context->last_message_size,
+                context->history_scroll,
+                context->status_line,
+                context->status_line_size,
+                context->request_rc
+            );
+            break;
+        case HOME_COMMAND_COMPRESS:
+            hermes_app_requests_handle_command(
+                config,
+                network_ready,
+                request_ui,
+                context->chat_result,
+                context->last_message,
+                context->last_message_size,
+                context->history_scroll,
+                context->status_line,
+                context->status_line_size,
+                context->request_rc,
+                "/compress"
+            );
+            break;
+        case HOME_COMMAND_HELP:
+            hermes_app_requests_handle_command(
+                config,
+                network_ready,
+                request_ui,
+                context->chat_result,
+                context->last_message,
+                context->last_message_size,
+                context->history_scroll,
+                context->status_line,
+                context->status_line_size,
+                context->request_rc,
+                "/help"
+            );
+            break;
+        case HOME_COMMAND_STATUS:
+            hermes_app_requests_handle_command(
+                config,
+                network_ready,
+                request_ui,
+                context->chat_result,
+                context->last_message,
+                context->last_message_size,
+                context->history_scroll,
+                context->status_line,
+                context->status_line_size,
+                context->request_rc,
+                "/status"
+            );
+            break;
+        case HOME_COMMAND_REASONING:
+            hermes_app_requests_handle_command(
+                config,
+                network_ready,
+                request_ui,
+                context->chat_result,
+                context->last_message,
+                context->last_message_size,
+                context->history_scroll,
+                context->status_line,
+                context->status_line_size,
+                context->request_rc,
+                "/reasoning"
+            );
+            break;
+        case HOME_COMMAND_MODEL:
+            hermes_app_requests_handle_command(
+                config,
+                network_ready,
+                request_ui,
+                context->chat_result,
+                context->last_message,
+                context->last_message_size,
+                context->history_scroll,
+                context->status_line,
+                context->status_line_size,
+                context->request_rc,
+                "/model"
+            );
+            break;
+        case HOME_COMMAND_COMMANDS:
+            hermes_app_requests_handle_command(
+                config,
+                network_ready,
+                request_ui,
+                context->chat_result,
+                context->last_message,
+                context->last_message_size,
+                context->history_scroll,
+                context->status_line,
+                context->status_line_size,
+                context->request_rc,
+                "/commands"
+            );
+            break;
     }
 }
 
 static void move_home_command_selection(AppHomeContext* context, int direction)
 {
     int selection;
-    const int last_command = (int)HOME_COMMAND_AUDIO;
+    bool commands_page;
+    int first_command;
+    int last_command;
 
     if (context == NULL || context->command_selection == NULL || direction == 0)
         return;
 
+    commands_page = home_command_is_commands_page(*context->command_selection);
+    first_command = (int)home_page_default_selection(commands_page);
+    last_command = (int)home_page_last_selection(commands_page);
+
     selection = context->command_selection != NULL && *context->command_selection == HOME_COMMAND_NONE
-        ? (direction > 0 ? (int)HOME_COMMAND_TEXT : last_command)
+        ? (direction > 0 ? first_command : last_command)
         : (int)*context->command_selection + direction;
-    if (selection < (int)HOME_COMMAND_TEXT)
+    if (selection < first_command)
         selection = last_command;
     else if (selection > last_command)
-        selection = (int)HOME_COMMAND_TEXT;
+        selection = first_command;
 
     *context->command_selection = (HomeCommand)selection;
 }
 
-static HomeCommand home_command_from_touch(int px, int py)
+static HomeCommand home_command_from_touch(bool commands_page, int px, int py)
 {
+    if (commands_page) {
+        if (px >= 16 && px < 152 && py >= 44 && py < 72)
+            return HOME_COMMAND_RESET;
+        if (px >= 168 && px < 304 && py >= 44 && py < 72)
+            return HOME_COMMAND_CLEAR;
+        if (px >= 16 && px < 152 && py >= 80 && py < 108)
+            return HOME_COMMAND_COMPRESS;
+        if (px >= 168 && px < 304 && py >= 80 && py < 108)
+            return HOME_COMMAND_HELP;
+        if (px >= 16 && px < 152 && py >= 116 && py < 144)
+            return HOME_COMMAND_STATUS;
+        if (px >= 168 && px < 304 && py >= 116 && py < 144)
+            return HOME_COMMAND_REASONING;
+        if (px >= 16 && px < 152 && py >= 152 && py < 180)
+            return HOME_COMMAND_MODEL;
+        if (px >= 168 && px < 304 && py >= 152 && py < 180)
+            return HOME_COMMAND_COMMANDS;
+        return HOME_COMMAND_NONE;
+    }
+
     if (px >= 16 && px < 152 && py >= 44 && py < 72)
         return HOME_COMMAND_TEXT;
     if (px >= 168 && px < 304 && py >= 44 && py < 72)
@@ -164,6 +356,11 @@ static HomeCommand home_command_from_touch(int px, int py)
     return HOME_COMMAND_NONE;
 }
 
+static bool home_page_toggle_touched(int px, int py)
+{
+    return px >= 244 && px < 304 && py >= 12 && py < 28;
+}
+
 bool hermes_app_home_handle_input(
     u32 kDown,
     HermesAppConfig* config,
@@ -174,11 +371,14 @@ bool hermes_app_home_handle_input(
 {
     AppRequestUiContext request_ui;
     touchPosition touch;
-    bool dpad_down;
-    bool dpad_up;
-    bool cpad_down;
-    bool cpad_up;
+    bool nav_down;
+    bool nav_up;
+    bool page_left;
+    bool page_right;
+    bool shoulder_up;
+    bool shoulder_down;
     size_t max_scroll;
+    bool commands_page;
 
     if (config == NULL || screen == NULL || context == NULL || context->conversation_state == NULL ||
         context->chat_result == NULL || context->last_message == NULL || context->history_scroll == NULL ||
@@ -191,45 +391,58 @@ bool hermes_app_home_handle_input(
     request_ui.health_result = context->health_result;
     request_ui.command_selection = (size_t)*context->command_selection;
     request_ui.render = context->render;
+    commands_page = home_command_is_commands_page(*context->command_selection);
 
-    dpad_down = (kDown & KEY_DOWN) != 0;
-    dpad_up = (kDown & KEY_UP) != 0;
-    cpad_down = (kDown & KEY_CPAD_DOWN) != 0;
-    cpad_up = (kDown & KEY_CPAD_UP) != 0;
+    nav_down = (kDown & (KEY_DOWN | KEY_CPAD_DOWN)) != 0;
+    nav_up = (kDown & (KEY_UP | KEY_CPAD_UP)) != 0;
+    page_left = (kDown & KEY_LEFT) != 0;
+    page_right = (kDown & KEY_RIGHT) != 0;
+    shoulder_up = (kDown & KEY_L) != 0;
+    shoulder_down = (kDown & KEY_R) != 0;
 
-    if (dpad_down) {
+    if (nav_down) {
         move_home_command_selection(context, 1);
         render_home_screen(config, context);
         return true;
     }
 
-    if (dpad_up) {
+    if (nav_up) {
         move_home_command_selection(context, -1);
         render_home_screen(config, context);
         return true;
     }
 
-    max_scroll = hermes_app_ui_home_history_max_scroll(context->status_line);
-    if (cpad_up && *context->history_scroll < max_scroll) {
-        *context->history_scroll += 20;
-        if (*context->history_scroll > max_scroll)
-            *context->history_scroll = max_scroll;
+    if (page_left && commands_page) {
+        switch_home_page(context, false);
         render_home_screen(config, context);
         return true;
     }
 
-    if (cpad_down && *context->history_scroll > 0) {
-        if (*context->history_scroll > 20)
-            *context->history_scroll -= 20;
-        else
-            *context->history_scroll = 0;
+    if (page_right && !commands_page) {
+        switch_home_page(context, true);
+        render_home_screen(config, context);
+        return true;
+    }
+
+    max_scroll = hermes_app_ui_home_history_max_scroll(context->status_line);
+    if (scroll_home_history(context, max_scroll, shoulder_up ? 1 : 0, HOME_SHOULDER_SCROLL_STEP)) {
+        render_home_screen(config, context);
+        return true;
+    }
+
+    if (scroll_home_history(context, max_scroll, shoulder_down ? -1 : 0, HOME_SHOULDER_SCROLL_STEP)) {
         render_home_screen(config, context);
         return true;
     }
 
     if ((kDown & KEY_TOUCH) != 0) {
         hidTouchRead(&touch);
-        *context->command_selection = home_command_from_touch((int)touch.px, (int)touch.py);
+        if (home_page_toggle_touched((int)touch.px, (int)touch.py)) {
+            switch_home_page(context, !commands_page);
+            render_home_screen(config, context);
+            return true;
+        }
+        *context->command_selection = home_command_from_touch(commands_page, (int)touch.px, (int)touch.py);
         if (*context->command_selection != HOME_COMMAND_NONE) {
             request_ui.command_selection = (size_t)*context->command_selection;
             execute_selected_home_command(config, network_ready, screen, context, &request_ui);

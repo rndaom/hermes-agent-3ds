@@ -12,9 +12,9 @@ def test_pictochat_clone_spec_exists_and_replaces_the_dark_mode_version():
 
     doc = doc_path.read_text()
     assert "PictoChat" in doc
-    assert "Write Note" in doc
+    assert "Text Prompt" in doc
     assert "Check Relay" in doc
-    assert "room" in doc.lower()
+    assert "session" in doc.lower() or "room" in doc.lower()
     assert "Old 3DS" in doc
     assert "Citro2D" in doc
     assert "PrintConsole" in doc
@@ -39,5 +39,5 @@ def test_pictochat_clone_ui_plan_exists_with_renderer_and_room_book_work():
     assert "app_ui.c" in doc
     assert "app_requests.c" in doc
     assert "app_gfx" in doc
-    assert "Room Book" in doc or "room book" in doc.lower()
-    assert "Write Note" in doc
+    assert "slash-command" in doc.lower() or "slash command" in doc.lower()
+    assert "Text Prompt" in doc

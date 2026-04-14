@@ -76,8 +76,8 @@ The health check request is not just a bare route hit. The client currently call
 
 Open **Hermes Agent 3DS** in Homebrew Launcher.
 
-- move to `Setup` with the D-pad / Circle Pad
-- press `A` to open setup
+- move to `Settings` with the D-pad / Circle Pad
+- press `A` to open settings
 - set `Host`
 - set `Port`
 - set `Token`
@@ -90,20 +90,22 @@ Open **Hermes Agent 3DS** in Homebrew Launcher.
 ### 5) Test it
 
 - run `.venv/bin/python -m pytest client/tests -q`
-- D-pad / Circle Pad `UP/DOWN` — choose a home action
+- D-pad / Circle Pad `UP/DOWN` — choose an action on the current bottom-screen page
 - `A` — run the selected action
-- D-pad / Circle Pad `LEFT/RIGHT` — page long replies
+- `LEFT/RIGHT` — switch between the tool tray and the slash-command page
+- `L/R` — scroll the top-screen transcript
 
 ## Controls
 
 ### Home
-- UP/DOWN or Circle Pad UP/DOWN — move through the home action list
-- LEFT/RIGHT or Circle Pad LEFT/RIGHT — page long replies
+- UP/DOWN or Circle Pad UP/DOWN — move through the current bottom-screen page
+- LEFT/RIGHT — switch between the tool tray and slash-command page
+- L/R — scroll the top-screen transcript
 - A — run the selected action
 - Touch the bottom-screen action buttons — select and run that action
 - START — exit
 
-### Rooms
+### Sessions
 - UP/DOWN or Circle Pad UP/DOWN — select a conversation slot
 - A — activate the highlighted conversation
 - X — create a new conversation ID
@@ -111,7 +113,7 @@ Open **Hermes Agent 3DS** in Homebrew Launcher.
 - B — return home
 - START — exit
 
-### Setup
+### Settings
 - UP/DOWN or Circle Pad UP/DOWN — select field
 - A — edit field, cycle theme, or toggle light/dark mode
 - X — save settings
@@ -119,9 +121,14 @@ Open **Hermes Agent 3DS** in Homebrew Launcher.
 - B — return home
 
 ### Mic Session
-- UP — stop recording and send the captured audio
+- A — stop recording and send the captured audio
 - B — cancel the recording
 - START — abort the recording
+
+### Slash Commands Page
+- LEFT/RIGHT from home — switch pages
+- `Reset Session` sends native `/reset` to Hermes
+- `Compress` sends native `/compress` to Hermes
 
 ## FAQ
 

@@ -6,7 +6,7 @@
 #include <string.h>
 
 #define BRIDGE_CHAT_MESSAGE_MAX 256
-#define BRIDGE_CHAT_REPLY_MAX 1200
+#define BRIDGE_CHAT_REPLY_MAX 8192
 #define BRIDGE_CHAT_ERROR_MAX 160
 
 typedef struct BridgeChatResult {

@@ -2,6 +2,7 @@
 
 #include <3ds.h>
 #include <arpa/inet.h>
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
@@ -17,7 +18,7 @@
 
 #define BRIDGE_V2_CONNECT_TIMEOUT_SECONDS 5
 #define BRIDGE_V2_IO_TIMEOUT_SECONDS 20
-#define BRIDGE_V2_RESPONSE_MAX 4096
+#define BRIDGE_V2_RESPONSE_MAX 32768
 #define BRIDGE_V2_MESSAGE_BODY_MAX ((BRIDGE_V2_TEXT_MAX * 2) + (BRIDGE_V2_CONVERSATION_ID_MAX * 4) + 256)
 
 static void set_error(char* out, size_t out_size, const char* message)
@@ -61,9 +62,211 @@ static bool append_text(char* out, size_t out_size, size_t* io_used, const char*
     return true;
 }
 
+static bool is_markdown_left_boundary(char ch)
+{
+    return ch == '\0' || ch == ' ' || ch == '\t' || ch == '\n' ||
+        ch == '(' || ch == '[' || ch == '{' || ch == '"' || ch == '\'';
+}
+
+static bool is_markdown_right_boundary(char ch)
+{
+    return ch == '\0' || ch == ' ' || ch == '\t' || ch == '\n' ||
+        ch == ')' || ch == ']' || ch == '}' || ch == '"' || ch == '\'' ||
+        ch == '.' || ch == ',' || ch == ':' || ch == ';' || ch == '!' || ch == '?';
+}
+
+static bool is_markdown_rule_line(const char* text, size_t start)
+{
+    char marker = '\0';
+    size_t count = 0;
+    size_t cursor = start;
+
+    if (text == NULL)
+        return false;
+
+    while (text[cursor] == ' ' || text[cursor] == '\t')
+        cursor++;
+
+    while (text[cursor] != '\0' && text[cursor] != '\n') {
+        char ch = text[cursor++];
+
+        if (ch == ' ' || ch == '\t')
+            continue;
+        if (ch != '*' && ch != '-' && ch != '_')
+            return false;
+        if (marker == '\0')
+            marker = ch;
+        else if (marker != ch)
+            return false;
+        count++;
+    }
+
+    return count >= 3;
+}
+
+static void skip_to_next_line(const char* text, size_t* io_index)
+{
+    if (text == NULL || io_index == NULL)
+        return;
+
+    while (text[*io_index] != '\0' && text[*io_index] != '\n')
+        (*io_index)++;
+    if (text[*io_index] == '\n')
+        (*io_index)++;
+}
+
+static void sanitize_display_text(char* text)
+{
+    size_t read = 0;
+    size_t write = 0;
+    bool line_start = true;
+
+    if (text == NULL || text[0] == '\0')
+        return;
+
+    while (text[read] != '\0') {
+        if (line_start) {
+            size_t cursor = read;
+
+            while (text[cursor] == ' ' || text[cursor] == '\t')
+                cursor++;
+
+            if (strncmp(text + cursor, "```", 3) == 0) {
+                skip_to_next_line(text, &read);
+                line_start = true;
+                continue;
+            }
+
+            if (is_markdown_rule_line(text, read)) {
+                skip_to_next_line(text, &read);
+                if (write > 0 && text[write - 1] != '\n')
+                    text[write++] = '\n';
+                line_start = true;
+                continue;
+            }
+
+            if (text[cursor] == '#') {
+                size_t heading = cursor;
+
+                while (text[heading] == '#')
+                    heading++;
+                if (text[heading] == ' ')
+                    read = heading + 1;
+            } else if (text[cursor] == '>') {
+                read = cursor + 1;
+                while (text[read] == ' ')
+                    read++;
+            } else if ((text[cursor] == '*' || text[cursor] == '+') && text[cursor + 1] == ' ') {
+                text[write++] = '-';
+                text[write++] = ' ';
+                read = cursor + 2;
+                line_start = false;
+                continue;
+            } else if (strncmp(text + cursor, "- [ ] ", 6) == 0 || strncmp(text + cursor, "- [x] ", 6) == 0 ||
+                       strncmp(text + cursor, "- [X] ", 6) == 0) {
+                text[write++] = '-';
+                text[write++] = ' ';
+                read = cursor + 6;
+                line_start = false;
+                continue;
+            }
+        }
+
+        if (text[read] == '\r') {
+            read++;
+            continue;
+        }
+        if (text[read] == '`') {
+            read++;
+            continue;
+        }
+        if (text[read] == '*' || text[read] == '_' || text[read] == '~') {
+            size_t run = 1;
+            char prev = read == 0 ? '\0' : text[read - 1];
+            char next;
+
+            while (text[read + run] == text[read] && run < 3)
+                run++;
+
+            next = text[read + run];
+            if ((is_markdown_left_boundary(prev) && isalnum((unsigned char)next)) ||
+                (isalnum((unsigned char)prev) && is_markdown_right_boundary(next)) ||
+                (is_markdown_left_boundary(prev) && is_markdown_right_boundary(next))) {
+                read += run;
+                continue;
+            }
+        }
+
+        if (!(text[read] == '\n' && write > 0 && text[write - 1] == '\n'))
+            text[write++] = text[read];
+
+        line_start = text[read] == '\n';
+        read++;
+    }
+
+    while (write > 0 && (text[write - 1] == '\n' || text[write - 1] == ' ' || text[write - 1] == '\t'))
+        write--;
+
+    text[write] = '\0';
+}
+
+static bool extract_json_string_v2(const char* json, const char* key, char* out, size_t out_size);
+static bool extract_json_string_after(const char* json, const char* marker, const char* key, char* out, size_t out_size);
+
+static bool extract_json_display_text_v2(const char* json, const char* key, char* out, size_t out_size)
+{
+    bool extracted = extract_json_string_v2(json, key, out, out_size);
+
+    if (extracted)
+        sanitize_display_text(out);
+    return extracted;
+}
+
+static bool extract_json_display_text_after(const char* json, const char* marker, const char* key, char* out, size_t out_size)
+{
+    bool extracted = extract_json_string_after(json, marker, key, out, out_size);
+
+    if (extracted)
+        sanitize_display_text(out);
+    return extracted;
+}
+
+static bool parse_unicode_escape_quad(const char* cursor, unsigned int* out_codepoint)
+{
+    int digit0;
+    int digit1;
+    int digit2;
+    int digit3;
+
+    if (cursor == NULL || out_codepoint == NULL)
+        return false;
+
+    digit0 = hex_digit_value(cursor[0]);
+    digit1 = hex_digit_value(cursor[1]);
+    digit2 = hex_digit_value(cursor[2]);
+    digit3 = hex_digit_value(cursor[3]);
+    if (digit0 < 0 || digit1 < 0 || digit2 < 0 || digit3 < 0)
+        return false;
+
+    *out_codepoint = (unsigned int)((digit0 << 12) | (digit1 << 8) | (digit2 << 4) | digit3);
+    return true;
+}
+
+static bool is_emoji_codepoint(unsigned int codepoint)
+{
+    return (codepoint >= 0x1F000 && codepoint <= 0x1FAFF) ||
+        (codepoint >= 0x2600 && codepoint <= 0x27BF) ||
+        codepoint == 0x200D ||
+        codepoint == 0x20E3 ||
+        codepoint == 0xFE0E ||
+        codepoint == 0xFE0F;
+}
+
 static bool append_codepoint_fallback(char* out, size_t out_size, size_t* io_used, unsigned int codepoint)
 {
     switch (codepoint) {
+        case 0x00A5:
+            return append_text(out, out_size, io_used, "JPY ");
         case 0x2018:
         case 0x2019:
         case 0x201A:
@@ -86,14 +289,98 @@ static bool append_codepoint_fallback(char* out, size_t out_size, size_t* io_use
             return append_text(out, out_size, io_used, "-");
         case 0x2026:
             return append_text(out, out_size, io_used, "...");
+        case 0x2022:
+            return append_text(out, out_size, io_used, "-");
         case 0x00A0:
             return append_text(out, out_size, io_used, " ");
+        case 0x2190:
+        case 0x2B05:
+            return append_text(out, out_size, io_used, "<-");
+        case 0x2192:
+        case 0x27A1:
+            return append_text(out, out_size, io_used, "->");
+        case 0x2139:
+            return append_text(out, out_size, io_used, "[i]");
+        case 0x23F0:
+            return append_text(out, out_size, io_used, "[time]");
+        case 0x23F3:
+            return append_text(out, out_size, io_used, "[...]");
+        case 0x25C0:
+            return append_text(out, out_size, io_used, "<");
+        case 0x2699:
+            return append_text(out, out_size, io_used, "[tool]");
+        case 0x26A0:
+            return append_text(out, out_size, io_used, "[!]");
+        case 0x26A1:
+            return append_text(out, out_size, io_used, "[run]");
+        case 0x2705:
+        case 0x2714:
+            return append_text(out, out_size, io_used, "[ok]");
+        case 0x270D:
+            return append_text(out, out_size, io_used, "[write]");
+        case 0x274C:
+            return append_text(out, out_size, io_used, "[x]");
+        case 0x2753:
+            return append_text(out, out_size, io_used, "[?]");
+        case 0x1F310:
+            return append_text(out, out_size, io_used, "[web]");
+        case 0x1F3A8:
+            return append_text(out, out_size, io_used, "[art]");
+        case 0x1F3E0:
+            return append_text(out, out_size, io_used, "[home]");
+        case 0x1F40D:
+            return append_text(out, out_size, io_used, "[py]");
+        case 0x1F441:
+            return append_text(out, out_size, io_used, "[see]");
+        case 0x1F446:
+            return append_text(out, out_size, io_used, "[tap]");
+        case 0x1F4BB:
+            return append_text(out, out_size, io_used, "[term]");
+        case 0x1F4BE:
+            return append_text(out, out_size, io_used, "[save]");
+        case 0x1F4C4:
+            return append_text(out, out_size, io_used, "[doc]");
+        case 0x1F4CB:
+            return append_text(out, out_size, io_used, "[todo]");
+        case 0x1F4D6:
+            return append_text(out, out_size, io_used, "[read]");
+        case 0x1F4DA:
+            return append_text(out, out_size, io_used, "[skills]");
+        case 0x1F4DC:
+            return append_text(out, out_size, io_used, "[scroll]");
+        case 0x1F4DD:
+            return append_text(out, out_size, io_used, "[note]");
+        case 0x1F4E8:
+            return append_text(out, out_size, io_used, "[msg]");
+        case 0x1F4F8:
+            return append_text(out, out_size, io_used, "[cam]");
+        case 0x1F500:
+            return append_text(out, out_size, io_used, "[task]");
+        case 0x1F504:
+            return append_text(out, out_size, io_used, "[redo]");
+        case 0x1F50A:
+            return append_text(out, out_size, io_used, "[audio]");
+        case 0x1F50D:
+        case 0x1F50E:
+            return append_text(out, out_size, io_used, "[search]");
+        case 0x1F527:
+            return append_text(out, out_size, io_used, "[patch]");
+        case 0x1F5A5:
+            return append_text(out, out_size, io_used, "[console]");
+        case 0x1F5BC:
+            return append_text(out, out_size, io_used, "[img]");
+        case 0x1F9E0:
+            return append_text(out, out_size, io_used, "[brain]");
+        case 0x1F9EA:
+            return append_text(out, out_size, io_used, "[lab]");
         default:
             if (codepoint >= 0x20 && codepoint <= 0x7E) {
                 char ch[2] = {(char)codepoint, '\0'};
                 return append_text(out, out_size, io_used, ch);
             }
-            return append_text(out, out_size, io_used, "?");
+            if (is_emoji_codepoint(codepoint))
+                return true;
+            return true;
     }
 }
 
@@ -157,17 +444,19 @@ static bool extract_json_string_v2(const char* json, const char* key, char* out,
                     ch = '\f';
                     break;
                 case 'u': {
-                    int digit0 = hex_digit_value(cursor[0]);
-                    int digit1 = hex_digit_value(cursor[1]);
-                    int digit2 = hex_digit_value(cursor[2]);
-                    int digit3 = hex_digit_value(cursor[3]);
                     unsigned int codepoint;
+                    unsigned int low_surrogate;
 
-                    if (digit0 < 0 || digit1 < 0 || digit2 < 0 || digit3 < 0)
+                    if (!parse_unicode_escape_quad(cursor, &codepoint))
                         return false;
 
-                    codepoint = (unsigned int)((digit0 << 12) | (digit1 << 8) | (digit2 << 4) | digit3);
                     cursor += 4;
+                    if (codepoint >= 0xD800 && codepoint <= 0xDBFF && cursor[0] == '\\' && cursor[1] == 'u' &&
+                        parse_unicode_escape_quad(cursor + 2, &low_surrogate) &&
+                        low_surrogate >= 0xDC00 && low_surrogate <= 0xDFFF) {
+                        codepoint = 0x10000 + (((codepoint - 0xD800) << 10) | (low_surrogate - 0xDC00));
+                        cursor += 6;
+                    }
                     if (!append_codepoint_fallback(out, out_size, &used, codepoint)) {
                         out[used] = '\0';
                         return true;
@@ -702,6 +991,11 @@ static Result perform_request(
     close(socket_fd);
     response[response_used] = '\0';
 
+    if (response_used == response_size - 1 && !response_complete(response, response_used)) {
+        set_error(error_out, error_out_size, "Hermes reply exceeded the 3DS response buffer.");
+        return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
+    }
+
     if (http_status != NULL) {
         unsigned int status_code = 0;
         if (sscanf(response, "HTTP/%*s %u", &status_code) != 1) {
@@ -790,7 +1084,7 @@ Result bridge_v2_list_conversations(const char* url, const char* token, const ch
     char path[192];
     char path_with_query[320];
     char full_url[512];
-    char response[BRIDGE_V2_RESPONSE_MAX];
+    char* response;
     const char* body;
     const char* cursor;
     u16 port = 0;
@@ -810,31 +1104,43 @@ Result bridge_v2_list_conversations(const char* url, const char* token, const ch
         return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
     }
 
+    response = (char*)malloc(BRIDGE_V2_RESPONSE_MAX);
+    if (response == NULL) {
+        set_error(result->error, sizeof(result->error), "Could not allocate a response buffer.");
+        return MAKERESULT(RL_FATAL, RS_OUTOFRESOURCE, RM_APPLICATION, RD_OUT_OF_MEMORY);
+    }
+
     if (!parse_http_url(url, host, sizeof(host), &port, path, sizeof(path))) {
         set_error(result->error, sizeof(result->error), "Bridge URL is invalid.");
+        free(response);
         return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
     }
 
     snprintf(path_with_query, sizeof(path_with_query), "%s?device_id=%s&limit=%u", path, device_id, (unsigned int)BRIDGE_V2_CONVERSATION_COUNT_MAX);
     snprintf(full_url, sizeof(full_url), "http://%s:%u%s", host, (unsigned int)port, path_with_query);
 
-    rc = perform_request("GET", full_url, token, NULL, 0, NULL, response, sizeof(response), &status_code, result->error, sizeof(result->error));
-    if (R_FAILED(rc))
+    rc = perform_request("GET", full_url, token, NULL, 0, NULL, response, BRIDGE_V2_RESPONSE_MAX, &status_code, result->error, sizeof(result->error));
+    if (R_FAILED(rc)) {
+        free(response);
         return rc;
+    }
 
     body = response_body_start(response);
     if (body == NULL) {
         set_error(result->error, sizeof(result->error), "Hermes gateway response body was missing.");
+        free(response);
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
     if (status_code != 200) {
         if (!extract_json_string_v2(body, "error", result->error, sizeof(result->error)))
             snprintf(result->error, sizeof(result->error), "Hermes gateway returned HTTP %lu.", (unsigned long)status_code);
+        free(response);
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
     if (!response_ok(body)) {
         if (!extract_json_string_v2(body, "error", result->error, sizeof(result->error)))
             set_error(result->error, sizeof(result->error), "Conversations response was not OK.");
+        free(response);
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
 
@@ -846,8 +1152,8 @@ Result bridge_v2_list_conversations(const char* url, const char* token, const ch
         if (!extract_json_string_v2(cursor, "conversation_id", info->conversation_id, sizeof(info->conversation_id)))
             break;
         extract_json_string_v2(cursor, "session_id", info->session_id, sizeof(info->session_id));
-        extract_json_string_v2(cursor, "title", info->title, sizeof(info->title));
-        extract_json_string_v2(cursor, "preview", info->preview, sizeof(info->preview));
+        extract_json_display_text_v2(cursor, "title", info->title, sizeof(info->title));
+        extract_json_display_text_v2(cursor, "preview", info->preview, sizeof(info->preview));
         extract_json_string_v2(cursor, "updated_at", info->updated_at, sizeof(info->updated_at));
         result->count++;
         cursor = strstr(cursor + 1, "\"conversation_id\"");
@@ -855,19 +1161,22 @@ Result bridge_v2_list_conversations(const char* url, const char* token, const ch
 
     result->success = true;
     result->error[0] = '\0';
+    free(response);
     return 0;
 }
 
 Result bridge_v2_send_message(const char* url, const char* token, const char* device_id, const char* conversation_id, const char* message, BridgeV2MessageResult* result)
 {
-    char escaped_message[(BRIDGE_V2_TEXT_MAX * 2) + 32];
     char escaped_device_id[(BRIDGE_V2_CONVERSATION_ID_MAX * 2) + 32];
     char escaped_conversation_id[(BRIDGE_V2_CONVERSATION_ID_MAX * 2) + 32];
-    char body[BRIDGE_V2_MESSAGE_BODY_MAX];
-    char response[BRIDGE_V2_RESPONSE_MAX];
+    char* escaped_message;
+    char* body;
+    char* response;
     u32 status_code = 0;
     Result rc;
     int body_length;
+    size_t escaped_message_size;
+    size_t body_size;
 
     bridge_v2_message_result_reset(result);
     if (result == NULL)
@@ -882,31 +1191,56 @@ Result bridge_v2_send_message(const char* url, const char* token, const char* de
         return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
     }
 
+    escaped_message_size = (strlen(message) * 2) + 32;
+    body_size = escaped_message_size + (BRIDGE_V2_CONVERSATION_ID_MAX * 4) + 256;
+    escaped_message = (char*)malloc(escaped_message_size);
+    body = (char*)malloc(body_size);
+    response = (char*)malloc(BRIDGE_V2_RESPONSE_MAX);
+    if (escaped_message == NULL || body == NULL || response == NULL) {
+        free(escaped_message);
+        free(body);
+        free(response);
+        set_error(result->error, sizeof(result->error), "Could not allocate request buffers.");
+        return MAKERESULT(RL_FATAL, RS_OUTOFRESOURCE, RM_APPLICATION, RD_OUT_OF_MEMORY);
+    }
+
     if (!escape_json_string(device_id, escaped_device_id, sizeof(escaped_device_id)) ||
         !escape_json_string(conversation_id != NULL ? conversation_id : "main", escaped_conversation_id, sizeof(escaped_conversation_id)) ||
-        !escape_json_string(message, escaped_message, sizeof(escaped_message))) {
+        !escape_json_string(message, escaped_message, escaped_message_size)) {
+        free(escaped_message);
+        free(body);
+        free(response);
         set_error(result->error, sizeof(result->error), "Message was too long to send.");
         return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
     }
 
     body_length = snprintf(
         body,
-        sizeof(body),
+        body_size,
         "{\"device_id\":\"%s\",\"conversation_id\":\"%s\",\"text\":\"%s\",\"client\":{\"platform\":\"3ds\",\"app_version\":\"0.2.0\"}}",
         escaped_device_id,
         escaped_conversation_id,
         escaped_message
     );
-    if (body_length <= 0 || (size_t)body_length >= sizeof(body)) {
+    if (body_length <= 0 || (size_t)body_length >= body_size) {
+        free(escaped_message);
+        free(body);
+        free(response);
         set_error(result->error, sizeof(result->error), "Message was too long to send.");
         return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
     }
 
-    rc = perform_request("POST", url, token, body, strlen(body), "application/json", response, sizeof(response), &status_code, result->error, sizeof(result->error));
-    if (R_FAILED(rc))
+    rc = perform_request("POST", url, token, body, strlen(body), "application/json", response, BRIDGE_V2_RESPONSE_MAX, &status_code, result->error, sizeof(result->error));
+    free(escaped_message);
+    free(body);
+    if (R_FAILED(rc)) {
+        free(response);
         return rc;
+    }
 
-    return parse_message_ack_response(response, status_code, result, "Message");
+    rc = parse_message_ack_response(response, status_code, result, "Message");
+    free(response);
+    return rc;
 }
 
 Result bridge_v2_send_voice_message(const char* url, const char* token, const char* device_id, const char* conversation_id, const void* wav_data, size_t wav_size, BridgeV2MessageResult* result)
@@ -915,7 +1249,7 @@ Result bridge_v2_send_voice_message(const char* url, const char* token, const ch
     char path[192];
     char path_with_query[320];
     char full_url[512];
-    char response[BRIDGE_V2_RESPONSE_MAX];
+    char* response;
     u16 port = 0;
     u32 status_code = 0;
     Result rc;
@@ -933,8 +1267,15 @@ Result bridge_v2_send_voice_message(const char* url, const char* token, const ch
         return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
     }
 
+    response = (char*)malloc(BRIDGE_V2_RESPONSE_MAX);
+    if (response == NULL) {
+        set_error(result->error, sizeof(result->error), "Could not allocate a response buffer.");
+        return MAKERESULT(RL_FATAL, RS_OUTOFRESOURCE, RM_APPLICATION, RD_OUT_OF_MEMORY);
+    }
+
     if (!parse_http_url(url, host, sizeof(host), &port, path, sizeof(path))) {
         set_error(result->error, sizeof(result->error), "Bridge URL is invalid.");
+        free(response);
         return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
     }
 
@@ -948,11 +1289,15 @@ Result bridge_v2_send_voice_message(const char* url, const char* token, const ch
     );
     snprintf(full_url, sizeof(full_url), "http://%s:%u%s", host, (unsigned int)port, path_with_query);
 
-    rc = perform_request("POST", full_url, token, wav_data, wav_size, "audio/wav", response, sizeof(response), &status_code, result->error, sizeof(result->error));
-    if (R_FAILED(rc))
+    rc = perform_request("POST", full_url, token, wav_data, wav_size, "audio/wav", response, BRIDGE_V2_RESPONSE_MAX, &status_code, result->error, sizeof(result->error));
+    if (R_FAILED(rc)) {
+        free(response);
         return rc;
+    }
 
-    return parse_message_ack_response(response, status_code, result, "Voice upload");
+    rc = parse_message_ack_response(response, status_code, result, "Voice upload");
+    free(response);
+    return rc;
 }
 
 Result bridge_v2_poll_events(const char* url, const char* token, const char* device_id, const char* conversation_id, u32 cursor, u32 wait_ms, BridgeV2EventPollResult* result)
@@ -961,7 +1306,7 @@ Result bridge_v2_poll_events(const char* url, const char* token, const char* dev
     char path[192];
     char path_with_query[320];
     char full_url[512];
-    char response[BRIDGE_V2_RESPONSE_MAX];
+    char* response;
     const char* body;
     u16 port = 0;
     u32 status_code = 0;
@@ -982,8 +1327,15 @@ Result bridge_v2_poll_events(const char* url, const char* token, const char* dev
         return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
     }
 
+    response = (char*)malloc(BRIDGE_V2_RESPONSE_MAX);
+    if (response == NULL) {
+        set_error(result->error, sizeof(result->error), "Could not allocate a response buffer.");
+        return MAKERESULT(RL_FATAL, RS_OUTOFRESOURCE, RM_APPLICATION, RD_OUT_OF_MEMORY);
+    }
+
     if (!parse_http_url(url, host, sizeof(host), &port, path, sizeof(path))) {
         set_error(result->error, sizeof(result->error), "Bridge URL is invalid.");
+        free(response);
         return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
     }
 
@@ -999,23 +1351,28 @@ Result bridge_v2_poll_events(const char* url, const char* token, const char* dev
     );
     snprintf(full_url, sizeof(full_url), "http://%s:%u%s", host, (unsigned int)port, path_with_query);
 
-    rc = perform_request("GET", full_url, token, NULL, 0, NULL, response, sizeof(response), &status_code, result->error, sizeof(result->error));
-    if (R_FAILED(rc))
+    rc = perform_request("GET", full_url, token, NULL, 0, NULL, response, BRIDGE_V2_RESPONSE_MAX, &status_code, result->error, sizeof(result->error));
+    if (R_FAILED(rc)) {
+        free(response);
         return rc;
+    }
 
     body = response_body_start(response);
     if (body == NULL) {
         set_error(result->error, sizeof(result->error), "Hermes gateway response body was missing.");
+        free(response);
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
     if (status_code != 200) {
         if (!extract_json_string_v2(body, "error", result->error, sizeof(result->error)))
             snprintf(result->error, sizeof(result->error), "Hermes gateway returned HTTP %lu.", (unsigned long)status_code);
+        free(response);
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
     if (!response_ok(body)) {
         if (!extract_json_string_v2(body, "error", result->error, sizeof(result->error)))
             set_error(result->error, sizeof(result->error), "Event response was not OK.");
+        free(response);
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
 
@@ -1029,6 +1386,8 @@ Result bridge_v2_poll_events(const char* url, const char* token, const char* dev
     if (result->event_type[0] == '\0') {
         if (strstr(body, "\"approval.request\"") != NULL)
             snprintf(result->event_type, sizeof(result->event_type), "%s", "approval.request");
+        else if (strstr(body, "\"status.updated\"") != NULL)
+            snprintf(result->event_type, sizeof(result->event_type), "%s", "status.updated");
         else if (strstr(body, "\"message.updated\"") != NULL)
             snprintf(result->event_type, sizeof(result->event_type), "%s", "message.updated");
         else if (strstr(body, "\"message.created\"") != NULL)
@@ -1040,28 +1399,40 @@ Result bridge_v2_poll_events(const char* url, const char* token, const char* dev
         if (!extract_json_string_after(body, "\"event\"", "request_id", result->request_id, sizeof(result->request_id)))
             extract_json_string_after(body, "\"approval.request\"", "request_id", result->request_id, sizeof(result->request_id));
         result->success = true;
+        free(response);
         return 0;
     }
 
     if (strcmp(result->event_type, "message.updated") == 0) {
-        if (!extract_json_string_after(body, "\"event\"", "text", result->reply_text, sizeof(result->reply_text)))
-            extract_json_string_after(body, "\"message.updated\"", "text", result->reply_text, sizeof(result->reply_text));
+        if (!extract_json_display_text_after(body, "\"event\"", "text", result->reply_text, sizeof(result->reply_text)))
+            extract_json_display_text_after(body, "\"message.updated\"", "text", result->reply_text, sizeof(result->reply_text));
         if (!extract_json_string_after(body, "\"event\"", "reply_to", result->reply_to_message_id, sizeof(result->reply_to_message_id)))
             extract_json_string_after(body, "\"message.updated\"", "reply_to", result->reply_to_message_id, sizeof(result->reply_to_message_id));
         result->success = true;
+        free(response);
+        return 0;
+    }
+
+    if (strcmp(result->event_type, "status.updated") == 0) {
+        if (!extract_json_display_text_after(body, "\"event\"", "text", result->reply_text, sizeof(result->reply_text)))
+            extract_json_display_text_after(body, "\"status.updated\"", "text", result->reply_text, sizeof(result->reply_text));
+        result->success = true;
+        free(response);
         return 0;
     }
 
     if (strcmp(result->event_type, "message.created") == 0) {
-        if (!extract_json_string_after(body, "\"event\"", "text", result->reply_text, sizeof(result->reply_text)))
-            extract_json_string_after(body, "\"message.created\"", "text", result->reply_text, sizeof(result->reply_text));
+        if (!extract_json_display_text_after(body, "\"event\"", "text", result->reply_text, sizeof(result->reply_text)))
+            extract_json_display_text_after(body, "\"message.created\"", "text", result->reply_text, sizeof(result->reply_text));
         if (!extract_json_string_after(body, "\"event\"", "reply_to", result->reply_to_message_id, sizeof(result->reply_to_message_id)))
             extract_json_string_after(body, "\"message.created\"", "reply_to", result->reply_to_message_id, sizeof(result->reply_to_message_id));
         result->success = true;
+        free(response);
         return 0;
     }
 
     result->success = true;
+    free(response);
     return 0;
 }
 
@@ -1069,7 +1440,7 @@ Result bridge_v2_submit_interaction(const char* url, const char* token, const ch
 {
     char escaped_choice[48];
     char body[128];
-    char response[BRIDGE_V2_RESPONSE_MAX];
+    char* response;
     const char* response_body;
     Result rc;
     u32 status_code = 0;
@@ -1088,25 +1459,36 @@ Result bridge_v2_submit_interaction(const char* url, const char* token, const ch
         return MAKERESULT(RL_USAGE, RS_INVALIDARG, RM_APPLICATION, RD_INVALID_SIZE);
     }
 
+    response = (char*)malloc(BRIDGE_V2_RESPONSE_MAX);
+    if (response == NULL) {
+        set_error(result->error, sizeof(result->error), "Could not allocate a response buffer.");
+        return MAKERESULT(RL_FATAL, RS_OUTOFRESOURCE, RM_APPLICATION, RD_OUT_OF_MEMORY);
+    }
+
     snprintf(body, sizeof(body), "{\"choice\":\"%s\"}", escaped_choice);
 
-    rc = perform_request("POST", url, token, body, strlen(body), "application/json", response, sizeof(response), &status_code, result->error, sizeof(result->error));
-    if (R_FAILED(rc))
+    rc = perform_request("POST", url, token, body, strlen(body), "application/json", response, BRIDGE_V2_RESPONSE_MAX, &status_code, result->error, sizeof(result->error));
+    if (R_FAILED(rc)) {
+        free(response);
         return rc;
+    }
 
     response_body = response_body_start(response);
     if (response_body == NULL) {
         set_error(result->error, sizeof(result->error), "Hermes gateway response body was missing.");
+        free(response);
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
     if (status_code != 200) {
         if (!extract_json_string_v2(response_body, "error", result->error, sizeof(result->error)))
             snprintf(result->error, sizeof(result->error), "Hermes gateway returned HTTP %lu.", (unsigned long)status_code);
+        free(response);
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
     if (!response_ok(response_body)) {
         if (!extract_json_string_v2(response_body, "error", result->error, sizeof(result->error)))
             set_error(result->error, sizeof(result->error), "Interaction response was not OK.");
+        free(response);
         return MAKERESULT(RL_STATUS, RS_INVALIDSTATE, RM_APPLICATION, RD_INVALID_RESULT_VALUE);
     }
 
@@ -1114,5 +1496,6 @@ Result bridge_v2_submit_interaction(const char* url, const char* token, const ch
     extract_json_string_v2(response_body, "request_id", result->request_id, sizeof(result->request_id));
     result->success = true;
     result->error[0] = '\0';
+    free(response);
     return 0;
 }
