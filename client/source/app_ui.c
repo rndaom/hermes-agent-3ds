@@ -34,53 +34,109 @@ typedef struct AppUiHomeHistoryEntry {
     char text[HOME_HISTORY_TEXT_MAX];
 } AppUiHomeHistoryEntry;
 
+typedef struct AppUiPreviewTexture {
+    C3D_Tex texture;
+    Tex3DS_SubTexture subtexture;
+    C2D_Image image;
+    bool ready;
+} AppUiPreviewTexture;
+
 static char g_message_wrap_lines[HOME_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
 static char g_home_status_lines[HOME_SUMMARY_WRAP_MAX_LINES][HOME_WRAP_LINE_MAX];
 static AppUiHomeHistoryEntry g_home_history[HOME_HISTORY_MAX];
 static size_t g_home_history_count = 0;
-static C3D_Tex g_home_media_texture;
-static Tex3DS_SubTexture g_home_media_subtexture;
-static C2D_Image g_home_media_image;
-static bool g_home_media_ready = false;
+static AppUiPreviewTexture g_home_media_preview;
+static AppUiPreviewTexture g_picture_capture_preview;
 static unsigned int g_home_media_generation = 0;
 
 static void draw_chip(float x, float y, float w, const char* label, u32 fill, u32 text_color, u32 border);
 
+static void clear_preview_texture(AppUiPreviewTexture* preview)
+{
+    if (preview == NULL)
+        return;
+
+    if (preview->ready)
+        C3D_TexDelete(&preview->texture);
+
+    memset(preview, 0, sizeof(*preview));
+}
+
+static bool set_preview_texture(AppUiPreviewTexture* preview, const u8* rgba8_data, u16 width, u16 height)
+{
+    size_t byte_count;
+    void* linear_image;
+
+    if (preview == NULL || rgba8_data == NULL || width == 0 || height == 0)
+        return false;
+
+    byte_count = (size_t)width * (size_t)height * 4U;
+    linear_image = linearAlloc(byte_count);
+    if (linear_image == NULL)
+        return false;
+
+    memcpy(linear_image, rgba8_data, byte_count);
+    GSPGPU_FlushDataCache(linear_image, byte_count);
+
+    clear_preview_texture(preview);
+    if (!C3D_TexInit(&preview->texture, width, height, GPU_RGBA8)) {
+        linearFree(linear_image);
+        return false;
+    }
+
+    C3D_SyncDisplayTransfer(
+        (u32*)linear_image,
+        GX_BUFFER_DIM(width, height),
+        (u32*)preview->texture.data,
+        GX_BUFFER_DIM(width, height),
+        GX_TRANSFER_FLIP_VERT(0) |
+            GX_TRANSFER_OUT_TILED(1) |
+            GX_TRANSFER_RAW_COPY(0) |
+            GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) |
+            GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGBA8) |
+            GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO)
+    );
+    linearFree(linear_image);
+
+    C3D_TexFlush(&preview->texture);
+    C3D_TexSetFilter(&preview->texture, GPU_LINEAR, GPU_LINEAR);
+    C3D_TexSetWrap(&preview->texture, GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE);
+    preview->subtexture.width = width;
+    preview->subtexture.height = height;
+    preview->subtexture.left = 0.0f;
+    preview->subtexture.top = 1.0f;
+    preview->subtexture.right = 1.0f;
+    preview->subtexture.bottom = 0.0f;
+    preview->image.tex = &preview->texture;
+    preview->image.subtex = &preview->subtexture;
+    preview->ready = true;
+    return true;
+}
+
 static void clear_home_media_preview(void)
 {
-    if (g_home_media_ready)
-        C3D_TexDelete(&g_home_media_texture);
-
-    memset(&g_home_media_texture, 0, sizeof(g_home_media_texture));
-    memset(&g_home_media_subtexture, 0, sizeof(g_home_media_subtexture));
-    memset(&g_home_media_image, 0, sizeof(g_home_media_image));
-    g_home_media_ready = false;
+    clear_preview_texture(&g_home_media_preview);
 }
 
 static bool set_home_media_preview(const u8* rgba8_data, u16 width, u16 height)
 {
-    if (rgba8_data == NULL || width == 0 || height == 0)
+    if (!set_preview_texture(&g_home_media_preview, rgba8_data, width, height))
         return false;
 
-    clear_home_media_preview();
-    if (!C3D_TexInit(&g_home_media_texture, width, height, GPU_RGBA8))
-        return false;
-
-    C3D_TexUpload(&g_home_media_texture, rgba8_data);
-    C3D_TexSetFilter(&g_home_media_texture, GPU_LINEAR, GPU_LINEAR);
-    g_home_media_subtexture.width = width;
-    g_home_media_subtexture.height = height;
-    g_home_media_subtexture.left = 0.0f;
-    g_home_media_subtexture.top = 1.0f;
-    g_home_media_subtexture.right = 1.0f;
-    g_home_media_subtexture.bottom = 0.0f;
-    g_home_media_image.tex = &g_home_media_texture;
-    g_home_media_image.subtex = &g_home_media_subtexture;
-    g_home_media_ready = true;
     g_home_media_generation++;
     if (g_home_media_generation == 0)
         g_home_media_generation = 1;
     return true;
+}
+
+bool hermes_app_ui_picture_capture_set_preview(const u8* rgba8_data, u16 width, u16 height)
+{
+    return set_preview_texture(&g_picture_capture_preview, rgba8_data, width, height);
+}
+
+void hermes_app_ui_picture_capture_clear_preview(void)
+{
+    clear_preview_texture(&g_picture_capture_preview);
 }
 
 static void copy_bounded_string(char* dest, size_t dest_size, const char* src)
@@ -686,12 +742,14 @@ static const PictochatTheme* get_global_theme(const HermesAppConfig* config)
 bool hermes_app_ui_init(void)
 {
     clear_home_media_preview();
+    hermes_app_ui_picture_capture_clear_preview();
     return app_gfx_init();
 }
 
 void hermes_app_ui_exit(void)
 {
     clear_home_media_preview();
+    hermes_app_ui_picture_capture_clear_preview();
     app_gfx_fini();
 }
 
@@ -1074,11 +1132,11 @@ static float draw_image_card(
     draw_chip(x + 10.0f, y + 8.0f, chip_width_for_label(label), label, theme->accent.primary, theme->text, theme->accent.primary_dark);
     app_gfx_panel(x + 18.0f, y + 34.0f, w - 36.0f, 108.0f, theme->paper_alt, theme->border);
 
-    if (preview_visible && g_home_media_ready) {
+    if (preview_visible && g_home_media_preview.ready) {
         preview_scale = 0.75f;
         draw_w = preview_w * preview_scale;
         draw_x = x + ((w - draw_w) / 2.0f);
-        C2D_DrawImageAt(g_home_media_image, draw_x, y + 38.0f, 0.0f, NULL, preview_scale, preview_scale);
+        C2D_DrawImageAt(g_home_media_preview.image, draw_x, y + 38.0f, 0.0f, NULL, preview_scale, preview_scale);
     } else {
         draw_ruled_paper(x + 22.0f, y + 38.0f, w - 44.0f, 100.0f, theme->paper_alt, theme);
         app_gfx_text_fit(x + 34.0f, y + 78.0f, w - 68.0f, 0.26f, 0.26f, theme->text_muted, "Picture preview unavailable on this note.");
@@ -1151,7 +1209,7 @@ static void render_home_graphical(
                         368.0f,
                         entry->author == APP_UI_MESSAGE_USER ? "YOU" : "HERMES",
                         entry->text,
-                        g_home_media_ready && entry->media_generation == g_home_media_generation,
+                        g_home_media_preview.ready && entry->media_generation == g_home_media_generation,
                         theme
                     );
                 else
@@ -1509,6 +1567,49 @@ void hermes_app_ui_render_voice_recording(
     app_gfx_end_frame();
 }
 
+void hermes_app_ui_render_picture_review(
+    const HermesAppConfig* config,
+    const char* status_line,
+    bool waiting_for_a_release
+)
+{
+    const PictochatTheme* theme = get_global_theme(config);
+    const char* review_state = waiting_for_a_release
+        ? "Release A, then choose send or retake."
+        : "Press A to send, X to retake, or B to cancel.";
+
+    app_gfx_begin_frame();
+
+    app_gfx_begin_top(theme->background);
+    app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, theme->paper_shadow, theme->border_dark);
+    draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, theme->paper, theme);
+    draw_top_header(theme, "PICTURE NOTE");
+    draw_alert_banner(30.0f, 44.0f, 340.0f, 24.0f, waiting_for_a_release ? "Release A to review" : "Review picture before send", theme);
+    app_gfx_panel(42.0f, 76.0f, 316.0f, 136.0f, theme->paper_alt, theme->border);
+
+    if (g_picture_capture_preview.ready)
+        C2D_DrawImageAt(g_picture_capture_preview.image, 72.0f, 80.0f, 0.0f, NULL, 1.0f, 1.0f);
+    else
+        app_gfx_text_fit(64.0f, 136.0f, 272.0f, 0.28f, 0.28f, theme->text_muted, "Preview unavailable on this capture. You can still retake or send it.");
+
+    app_gfx_text_fit(24.0f, 198.0f, 352.0f, 0.24f, 0.24f, theme->text, status_line != NULL && status_line[0] != '\0' ? status_line : "Picture captured.");
+
+    app_gfx_begin_bottom(theme->background);
+    app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, theme->paper_shadow, theme->border_dark);
+    draw_ruled_paper(8.0f, 10.0f, 304.0f, 220.0f, theme->paper, theme);
+    draw_bottom_header(theme, "REVIEW KEYS");
+    draw_action_button(16.0f, 48.0f, 88.0f, 28.0f, "A Send", ACTION_BUTTON_ICON_SEND, theme, !waiting_for_a_release);
+    draw_action_button(116.0f, 48.0f, 88.0f, 28.0f, "X Retake", ACTION_BUTTON_ICON_CAMERA, theme, false);
+    draw_action_button(216.0f, 48.0f, 88.0f, 28.0f, "B Cancel", ACTION_BUTTON_ICON_DENY, theme, false);
+    draw_ruled_paper(8.0f, 92.0f, 304.0f, 116.0f, theme->paper_alt, theme);
+    app_gfx_text_fit(16.0f, 106.0f, 288.0f, 0.28f, 0.28f, theme->text, review_state);
+    app_gfx_text_fit(16.0f, 132.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "This preview uses the captured frame, so color and brightness are what Hermes will receive.");
+    app_gfx_text_fit(16.0f, 154.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "If the shot is soft, back up a little and retake it. The 3DS outer camera is fixed-focus.");
+    draw_hint_button(82.0f, 214.0f, 156.0f, "START Abort", theme);
+
+    app_gfx_end_frame();
+}
+
 void hermes_app_ui_render_picture_capture(
     const HermesAppConfig* config,
     const char* status_line,
@@ -1524,12 +1625,16 @@ void hermes_app_ui_render_picture_capture(
     app_gfx_panel(4.0f, 4.0f, 392.0f, 232.0f, theme->paper_shadow, theme->border_dark);
     draw_ruled_paper(8.0f, 8.0f, 384.0f, 224.0f, theme->paper, theme);
     draw_top_header(theme, "PICTURE NOTE");
-    draw_alert_banner(32.0f, 44.0f, 336.0f, 24.0f, waiting_for_a_release ? "Release A to arm camera" : "Outer camera picture prompt", theme);
-    draw_ruled_paper(20.0f, 76.0f, 360.0f, 136.0f, theme->paper, theme);
-    app_gfx_text_fit(32.0f, 98.0f, 316.0f, 0.30f, 0.30f, theme->text, status_line != NULL && status_line[0] != '\0' ? status_line : "Picture prompt ready.");
-    app_gfx_text_fit(32.0f, 130.0f, 316.0f, 0.26f, 0.26f, theme->text_muted, capture_state);
-    app_gfx_text_fit(32.0f, 154.0f, 316.0f, 0.24f, 0.24f, theme->text_muted, "This first pass uses the 3DS outer camera and uploads a BMP note to Hermes for vision analysis.");
-    app_gfx_text_fit(32.0f, 178.0f, 316.0f, 0.24f, 0.24f, theme->text_muted, "Preview rendering happens after capture on the room board.");
+    draw_alert_banner(32.0f, 44.0f, 336.0f, 24.0f, waiting_for_a_release ? "Release A to arm camera" : "Live outer camera view", theme);
+    app_gfx_panel(42.0f, 76.0f, 316.0f, 136.0f, theme->paper_alt, theme->border);
+
+    if (g_picture_capture_preview.ready)
+        C2D_DrawImageAt(g_picture_capture_preview.image, 72.0f, 80.0f, 0.0f, NULL, 1.0f, 1.0f);
+    else
+        app_gfx_text_fit(64.0f, 136.0f, 272.0f, 0.28f, 0.28f, theme->text_muted, "Starting live camera preview...");
+
+    app_gfx_text_fit(24.0f, 198.0f, 352.0f, 0.24f, 0.24f, theme->text,
+        status_line != NULL && status_line[0] != '\0' ? status_line : "Picture prompt ready.");
 
     app_gfx_begin_bottom(theme->background);
     app_gfx_panel(4.0f, 6.0f, 312.0f, 228.0f, theme->paper_shadow, theme->border_dark);
@@ -1540,8 +1645,8 @@ void hermes_app_ui_render_picture_capture(
     draw_action_button(216.0f, 48.0f, 88.0f, 28.0f, "START Abort", ACTION_BUTTON_ICON_ABORT, theme, false);
     draw_ruled_paper(8.0f, 92.0f, 304.0f, 116.0f, theme->paper_alt, theme);
     app_gfx_text_fit(16.0f, 106.0f, 288.0f, 0.28f, 0.28f, theme->text, capture_state);
-    app_gfx_text_fit(16.0f, 132.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "The camera path stays intentionally simple so it remains reliable on original / Old 3DS hardware.");
-    app_gfx_text_fit(16.0f, 154.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "Lighting matters. The outer camera capture is meant for quick snapshots, not a full photo workflow.");
+    app_gfx_text_fit(16.0f, 132.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "The top screen is the raw live camera feed so you can frame the shot before you commit.");
+    app_gfx_text_fit(16.0f, 154.0f, 288.0f, 0.24f, 0.24f, theme->text_muted, "After A, the review screen shows the processed preview Hermes will actually receive.");
     draw_hint_button(82.0f, 214.0f, 156.0f, "Return after send", theme);
 
     app_gfx_end_frame();

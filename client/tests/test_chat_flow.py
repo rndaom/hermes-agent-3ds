@@ -209,10 +209,47 @@ def test_picture_input_uses_graphical_capture_render_helpers_without_console_pri
     assert "camInit()" in picture_input_c
     assert "CAMU_StartCapture" in picture_input_c
     assert "CAMU_SetReceiving" in picture_input_c
+    assert "compute_picture_tone_map" in picture_input_c
+    assert "build_processed_frame_from_camera" in picture_input_c
+    assert "svcSleepThread(PICTURE_INPUT_CAPTURE_WARMUP_NS)" in picture_input_c
     assert "hermes_app_ui_render_picture_capture" in picture_input_c
+    assert "hermes_app_ui_render_picture_review" in picture_input_c
     assert "hermes_app_ui_render_picture_capture" in ui_h
+    assert "hermes_app_ui_render_picture_review" in ui_h
+    assert "KEY_X" in picture_input_c
     assert "consoleSelect" not in picture_input_c
     assert "consoleClear" not in picture_input_c
+
+
+def test_picture_preview_uses_display_transfer_for_gpu_texture_upload():
+    ui_c = (CLIENT_DIR / "source" / "app_ui.c").read_text()
+    picture_input_c = (CLIENT_DIR / "source" / "picture_input.c").read_text()
+
+    assert "C3D_SyncDisplayTransfer" in ui_c
+    assert "GX_TRANSFER_OUT_TILED(1)" in ui_c
+    assert "preview->subtexture.top = 1.0f;" in ui_c
+    assert "preview->subtexture.bottom = 0.0f;" in ui_c
+    assert (
+        "source_y0 = ((size_t)y * (size_t)frame->height) / PICTURE_INPUT_PREVIEW_HEIGHT;"
+        in picture_input_c
+    )
+    assert "sample00 = frame->rgba8_data" in picture_input_c
+    assert "C3D_TexUpload(&g_home_media_texture, rgba8_data)" not in ui_c
+
+
+def test_picture_input_decodes_rgb565_red_from_high_bits_and_blue_from_low_bits():
+    picture_input_c = (CLIENT_DIR / "source" / "picture_input.c").read_text()
+
+    assert "u8 red = expand_5_to_8((u16)((pixel >> 11) & 0x1F));" in picture_input_c
+    assert "u8 blue = expand_5_to_8((u16)(pixel & 0x1F));" in picture_input_c
+    assert (
+        "out_rgba[0] = tone_map_channel(expand_5_to_8((u16)((pixel >> 11) & 0x1F)), tone);"
+        in picture_input_c
+    )
+    assert (
+        "out_rgba[2] = tone_map_channel(expand_5_to_8((u16)(pixel & 0x1F)), tone);"
+        in picture_input_c
+    )
 
 
 def test_main_c_uses_both_top_and_bottom_screens_for_ui():

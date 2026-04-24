@@ -75,6 +75,7 @@ def test_transient_ui_paths_do_not_expose_printconsole_or_manual_buffer_swaps():
     assert "hermes_app_ui_render_approval_prompt" in ui_h
     assert "hermes_app_ui_render_voice_recording" in ui_h
     assert "hermes_app_ui_render_picture_capture" in ui_h
+    assert "hermes_app_ui_render_picture_review" in ui_h
 
 
 def test_graphical_ui_bounds_variable_length_fields_and_uses_touch_sized_action_buttons():

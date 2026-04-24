@@ -27,6 +27,8 @@ void hermes_app_ui_home_history_push(AppUiMessageAuthor author, const char* text
 void hermes_app_ui_home_history_upsert(AppUiMessageAuthor author, const char* text);
 void hermes_app_ui_home_history_push_image(AppUiMessageAuthor author, const char* text, const u8* rgba8_data, u16 width, u16 height);
 void hermes_app_ui_home_history_upsert_image(AppUiMessageAuthor author, const char* text, const u8* rgba8_data, u16 width, u16 height);
+bool hermes_app_ui_picture_capture_set_preview(const u8* rgba8_data, u16 width, u16 height);
+void hermes_app_ui_picture_capture_clear_preview(void);
 
 bool hermes_app_ui_init(void);
 void hermes_app_ui_exit(void);
@@ -67,6 +69,11 @@ void hermes_app_ui_render_voice_recording(
     bool waiting_for_a_release
 );
 void hermes_app_ui_render_picture_capture(
+    const HermesAppConfig* config,
+    const char* status_line,
+    bool waiting_for_a_release
+);
+void hermes_app_ui_render_picture_review(
     const HermesAppConfig* config,
     const char* status_line,
     bool waiting_for_a_release
