@@ -19,6 +19,7 @@ release/
 __pycache__/
 *.pyc
 *.egg-info/
+references/
 
 # Local config
 .env
